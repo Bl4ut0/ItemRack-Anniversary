@@ -1,8 +1,8 @@
 -- ItemRackQueue.lua
 local _
 
--- Compatibility shim for GetItemCooldown (use C_Item for IDs if available, else global)
-local GetItemCooldown = (C_Item and C_Item.GetItemCooldown) or _G.GetItemCooldown
+-- Compatibility shim for GetItemCooldown (global in old TBC, C_Container in 2.5.5)
+local GetItemCooldown = _G.GetItemCooldown or (C_Container and C_Container.GetItemCooldown)
 
 -- Debug mode - set to true to enable debug prints
 ItemRack.QueueDebug = false
