@@ -38,6 +38,12 @@
 			</Layer>
 		</Layers>
 			<Scripts>
+			<OnLoad>
+				ItemRack.ButtonOnLoad(self)
+			</OnLoad>
+			<OnEvent>
+				-- Do nothing to prevent ActionButton_OnEvent from running
+			</OnEvent>
 			<PostClick>
 				ItemRack.ButtonPostClick(self,button)
 			</PostClick>

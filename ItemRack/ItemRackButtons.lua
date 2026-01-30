@@ -20,6 +20,25 @@ ItemRack.LockedButtons = {} -- buttons locked (desaturated)
 
 ItemRack.NewAnchor = nil
 
+function ItemRack.ButtonOnLoad(self)
+	-- Call standard template load to creating child frames (Cooldown, HotKey, etc.)
+	if ActionButton_OnLoad then
+		ActionButton_OnLoad(self)
+	end
+	
+	-- Immediately detach from Action Bar system
+	self:SetAttribute("action", nil)
+	self.action = nil
+	self:UnregisterAllEvents() -- Stop listening to action bar events
+	
+	-- Clear any keybind text that might have been set by ActionButton_OnLoad
+	local hotkey = _G[self:GetName().."HotKey"]
+	if hotkey then
+		hotkey:SetText("")
+		hotkey:Hide()
+	end
+end
+
 function ItemRack.InitButtons()
 	ItemRackUser.Buttons = ItemRackUser.Buttons or {}
 
@@ -69,10 +88,6 @@ function ItemRack.InitButtons()
 		button:SetScript("OnShow", nil)
 		button:SetScript("OnHide", nil)
 		button:SetAttribute("action", nil)
-		button.action = nil
-		if _G[button:GetName().."HotKey"] then
-			_G[button:GetName().."HotKey"]:SetText("")
-		end
 
 	end
 
