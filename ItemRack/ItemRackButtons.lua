@@ -37,6 +37,22 @@ function ItemRack.ButtonOnLoad(self)
 		hotkey:SetText("")
 		hotkey:Hide()
 	end
+
+	-- Hide unwanted ActionButton overlays (Yellow/Orange Triangles, Flash, etc.)
+	-- "Kill" the texture objects by hiding them and disabling their Show method.
+	-- This prevents external code (like ActionButton_Update) from re-showing them.
+	local function Kill(frame)
+		if frame then
+			frame:Hide()
+			frame:SetAlpha(0)
+			frame.Show = function() end
+		end
+	end
+
+	Kill(self.NewActionTexture)
+	Kill(self.SpellHighlightTexture)
+	Kill(self.Flash)
+	Kill(self.QuickKeybindHighlightTexture)
 end
 
 function ItemRack.InitButtons()
