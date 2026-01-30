@@ -14,8 +14,18 @@ ItemRackOpt = {
 
 function ItemRackOpt.GetSpecName(group)
 	local maxPoints, maxName = 0, "None"
+	local activeGroup = GetActiveTalentGroup and GetActiveTalentGroup()
+	
 	for i=1,3 do
-		local name, icon, points = GetTalentTabInfo(i, nil, nil, group)
+		-- Try standard call first (works in recent Wrath/Cata)
+		local name, icon, points = GetTalentTabInfo(i, false, false, group)
+		
+		-- Fallback: If points are 0 or nil, and we are querying the active group (or no group API support), try generic call
+		if (not points or points == 0) and (activeGroup and group == activeGroup) then
+			-- If the 'group' arg is breaking it, this no-arg call usually gets the active spec info
+			name, icon, points = GetTalentTabInfo(i)
+		end
+
 		local p = tonumber(points) or 0
 		if p > maxPoints then
 			maxPoints = p
@@ -504,8 +514,13 @@ function ItemRackOpt.ValidateSetButtons()
 	ItemRackOptSpec1:Hide()
 	ItemRackOptSpec2:Hide()
 	
+	-- Clear all points to prevent conflicting anchors
 	ItemRackOptSetsHideCheckButton:ClearAllPoints()
-	ItemRackOptSetsHideCheckButton:SetPoint("TOPLEFT",ItemRackOptShowCloak,"BOTTOMLEFT",0,-2)
+	ItemRackOptSpec1:ClearAllPoints()
+	ItemRackOptSpec2:ClearAllPoints()
+
+	-- Explicitly anchor Spec1 below ShowCloak with tighter spacing
+	ItemRackOptSpec1:SetPoint("TOPLEFT",ItemRackOptShowCloak,"BOTTOMLEFT",0,0)
 
 	-- Always show and update Spec 1
 	ItemRackOptSpec1:Show()
@@ -513,12 +528,13 @@ function ItemRackOpt.ValidateSetButtons()
 	
 	if GetNumTalentGroups and GetNumTalentGroups()>1 then
 		ItemRackOptSpec2:Show()
+		ItemRackOptSpec2:SetPoint("TOPLEFT",ItemRackOptSpec1,"BOTTOMLEFT",0,0)
 		ItemRackOptSpec2Text:SetText(ItemRackOpt.GetSpecName(2))
-		ItemRackOptSetsHideCheckButton:ClearAllPoints()
-		ItemRackOptSetsHideCheckButton:SetPoint("TOPLEFT",ItemRackOptSpec2,"BOTTOMLEFT",0,-2)
+
+		-- Tighter spacing when dual spec is active to prevent overflow
+		ItemRackOptSetsHideCheckButton:SetPoint("TOPLEFT",ItemRackOptSpec2,"BOTTOMLEFT",0,0)
 	else
 		ItemRackOptSpec2:Hide()
-		ItemRackOptSetsHideCheckButton:ClearAllPoints()
 		ItemRackOptSetsHideCheckButton:SetPoint("TOPLEFT",ItemRackOptSpec1,"BOTTOMLEFT",0,-2)
 	end
 

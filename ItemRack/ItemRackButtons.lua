@@ -428,6 +428,19 @@ function ItemRack.UpdateButtons()
 	for i in pairs(ItemRackUser.Buttons) do
 		if i<20 then
 			_G["ItemRackButton"..i.."ItemRackIcon"]:SetTexture(ItemRack.GetTextureBySlot(i))
+			
+			-- Update Stack/Charge Count (Hide if <= 1, Show if > 1)
+			local count = GetInventoryItemCount("player", i)
+			local countFrame = _G["ItemRackButton"..i.."Count"]
+			if countFrame then
+				if count and count > 1 then
+					countFrame:SetText(count)
+					countFrame:Show()
+				else
+					countFrame:SetText("")
+					countFrame:Hide()
+				end
+			end
 		end
 		--ranged ammo is now infinite, so the below ammo count updater has been commented out
 		if i==0 then --ranged "ammo" slot

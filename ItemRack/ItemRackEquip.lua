@@ -360,7 +360,11 @@ function ItemRack.EndSetSwap(setname)
 				local neededSpec = ItemRackUser.Sets[setname].AssociatedSpec
 				if currentSpec ~= neededSpec then
 					ItemRack.Print("Set "..setname.." requires Spec "..neededSpec..". Switching talents...")
-					SetActiveTalentGroup(neededSpec)
+					if SetActiveTalentGroup then
+						SetActiveTalentGroup(neededSpec)
+					else
+						ItemRack.Print("Error: specific API for talent switching invalid.")
+					end
 				end
 			end
 
