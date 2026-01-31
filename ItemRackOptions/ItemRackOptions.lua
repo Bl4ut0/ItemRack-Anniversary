@@ -551,7 +551,15 @@ function ItemRackOpt.ValidateSetButtons()
 	ItemRackOptSpec1:Show()
 	ItemRackOptSpec1Text:SetText(ItemRackOpt.GetSpecName(1))
 	
-	if GetNumTalentGroups and GetNumTalentGroups()>1 then
+	local numGroups = 0
+	if GetNumTalentGroups then
+		numGroups = GetNumTalentGroups() or 0
+		ItemRack.Print("[DEBUG] ValidateSetButtons: GetNumTalentGroups="..numGroups)
+	else
+		ItemRack.Print("[DEBUG] ValidateSetButtons: GetNumTalentGroups is nil!")
+	end
+	
+	if numGroups > 1 then
 		ItemRackOptSpec2:Show()
 		ItemRackOptSpec2:SetPoint("TOPLEFT",ItemRackOptSpec1,"BOTTOMLEFT",0,-2)
 		ItemRackOptSpec2Text:SetText(ItemRackOpt.GetSpecName(2))
@@ -569,7 +577,7 @@ function ItemRackOpt.ValidateSetButtons()
 		ItemRackOptSpec1:EnableMouse(true)
 		ItemRackOptSpec1Text:SetTextColor(1,1,1,1)
 		
-		if GetNumTalentGroups and GetNumTalentGroups()>1 then
+		if numGroups > 1 then
 			ItemRackOptSpec2:Enable()
 			ItemRackOptSpec2:EnableMouse(true)
 			ItemRackOptSpec2Text:SetTextColor(1,1,1,1)
