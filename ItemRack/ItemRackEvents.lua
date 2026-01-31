@@ -239,18 +239,23 @@ function ItemRack.InitEvents()
 end
 
 function ItemRack.RegisterEvents()
+	ItemRack.Print("[DEBUG] RegisterEvents called")
 	local frame = ItemRackEventProcessingFrame
 	frame:UnregisterAllEvents()
 	ItemRack.StopTimer("CheckForMountedEvents")
 	ItemRack.ReflectEventsRunning()
 	if ItemRackUser.EnableEvents=="OFF" then
+		ItemRack.Print("[DEBUG] Events are OFF, not registering")
 		return
 	end
 	local enabled = ItemRackUser.Events.Enabled
 	local events = ItemRackEvents
+	
+	ItemRack.Print("[DEBUG] Enabled events count: "..tostring(ItemRack.TableCount(enabled)))
 	local eventType
 	for eventName in pairs(enabled) do
 		eventType = events[eventName].Type
+		ItemRack.Print("[DEBUG] Processing event: "..eventName.." Type: "..tostring(eventType))
 		if eventType=="Buff" then
 			if not frame:IsEventRegistered("UNIT_AURA") then
 				frame:RegisterEvent("UNIT_AURA")
@@ -267,11 +272,14 @@ function ItemRack.RegisterEvents()
 				frame:RegisterEvent("ZONE_CHANGED_INDOORS")
 			end
 		elseif eventType=="Specialization" then
+			ItemRack.Print("[DEBUG] RegisterEvents: Registering Specialization events")
 			if not frame:IsEventRegistered("ACTIVE_TALENT_GROUP_CHANGED") then
 				frame:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
+				ItemRack.Print("[DEBUG] Registered ACTIVE_TALENT_GROUP_CHANGED")
 			end
 			if not frame:IsEventRegistered("PLAYER_TALENT_UPDATE") then
 				frame:RegisterEvent("PLAYER_TALENT_UPDATE")
+				ItemRack.Print("[DEBUG] Registered PLAYER_TALENT_UPDATE")
 			end
 		elseif eventType=="Script" then
 			if not frame:IsEventRegistered(events[eventName].Trigger) then
