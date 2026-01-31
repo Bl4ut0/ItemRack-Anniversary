@@ -35,7 +35,7 @@ This addon is based on the original **ItemRack Classic** maintained by Rottenbee
 
 ## TBC Anniversary Compatibility
 
-The TBC Anniversary Edition runs on a modern WoW client engine, which required several API compatibility fixes. See [TECHNICAL_CHANGES.md](TECHNICAL_CHANGES.md) for detailed documentation of all modifications.
+The TBC Anniversary Edition runs on a modern WoW client engine, which required several API compatibility fixes. See [TECHNICAL_CHANGES.md](TECHNICAL_CHANGES.md) for technical details and [CHANGELOG.md](CHANGELOG.md) for a summary of feature updates.
 
 ### Key Changes
 - API namespace migrations (`C_Container`, `C_Item`, `C_AddOns`)
