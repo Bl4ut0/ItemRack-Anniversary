@@ -1,4 +1,4 @@
-## Interface: 20504
+## Interface: 20505
 ## Title: ItemRack - Anniversary
 ## IconTexture: Interface\AddOns\ItemRack\ItemRackIcon
 ## Version: 4.27
@@ -18,3 +18,4 @@ ItemRackButtons.xml
 ItemRackEquip.lua
 ItemRackQueue.lua
 ItemRackEvents.lua
+ItemRackSpecTest.lua
