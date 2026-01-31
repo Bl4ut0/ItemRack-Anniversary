@@ -542,10 +542,10 @@ function ItemRackOpt.ValidateSetButtons()
 
 	-- Re-anchor ShowCloak to ShowHelm with tighter spacing (-4) to match the new compact layout
 	ItemRackOptShowCloak:ClearAllPoints()
-	ItemRackOptShowCloak:SetPoint("TOPLEFT",ItemRackOptShowHelm,"BOTTOMLEFT",0,-2)
+	ItemRackOptShowCloak:SetPoint("TOPLEFT",ItemRackOptShowHelm,"BOTTOMLEFT",0,0)
 
 	-- Explicitly anchor Spec1 below ShowCloak with tighter spacing (-4)
-	ItemRackOptSpec1:SetPoint("TOPLEFT",ItemRackOptShowCloak,"BOTTOMLEFT",0,-2)
+	ItemRackOptSpec1:SetPoint("TOPLEFT",ItemRackOptShowCloak,"BOTTOMLEFT",0,0)
 
 	-- Always show and update Spec 1
 	ItemRackOptSpec1:Show()
@@ -561,14 +561,14 @@ function ItemRackOpt.ValidateSetButtons()
 	
 	if numGroups > 1 then
 		ItemRackOptSpec2:Show()
-		ItemRackOptSpec2:SetPoint("TOPLEFT",ItemRackOptSpec1,"BOTTOMLEFT",0,-2)
+		ItemRackOptSpec2:SetPoint("TOPLEFT",ItemRackOptSpec1,"BOTTOMLEFT",0,0)
 		ItemRackOptSpec2Text:SetText(ItemRackOpt.GetSpecName(2))
 
 		-- Tighter spacing when dual spec is active to prevent overflow
-		ItemRackOptSetsHideCheckButton:SetPoint("TOPLEFT",ItemRackOptSpec2,"BOTTOMLEFT",0,-2)
+		ItemRackOptSetsHideCheckButton:SetPoint("TOPLEFT",ItemRackOptSpec2,"BOTTOMLEFT",0,0)
 	else
 		ItemRackOptSpec2:Hide()
-		ItemRackOptSetsHideCheckButton:SetPoint("TOPLEFT",ItemRackOptSpec1,"BOTTOMLEFT",0,-2)
+		ItemRackOptSetsHideCheckButton:SetPoint("TOPLEFT",ItemRackOptSpec1,"BOTTOMLEFT",0,0)
 	end
 
 	-- Enable if name entered

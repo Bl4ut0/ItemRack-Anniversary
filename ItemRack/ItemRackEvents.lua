@@ -251,7 +251,9 @@ function ItemRack.RegisterEvents()
 	local enabled = ItemRackUser.Events.Enabled
 	local events = ItemRackEvents
 	
-	ItemRack.Print("[DEBUG] Enabled events count: "..tostring(ItemRack.TableCount(enabled)))
+	local enabledCount = 0
+	for _ in pairs(enabled) do enabledCount = enabledCount + 1 end
+	ItemRack.Print("[DEBUG] Enabled events count: "..enabledCount)
 	local eventType
 	for eventName in pairs(enabled) do
 		eventType = events[eventName].Type
