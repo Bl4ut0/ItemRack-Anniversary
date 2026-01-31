@@ -24,9 +24,22 @@ if not GetMouseFocus and GetMouseFoci then
       end
 end
 
+
 -- Compatibility shim for CastingInfo/ChannelInfo (moved to UnitCastingInfo/UnitChannelInfo in some versions)
 local CastingInfo = CastingInfo or function() return UnitCastingInfo("player") end
 local ChannelInfo = ChannelInfo or function() return UnitChannelInfo("player") end
+
+-- Compatibility shims for Talent APIs (Modern/Cata+ uses C_SpecializationInfo namespace)
+-- These MUST be global (not local) so other ItemRack files can access them
+if not GetActiveTalentGroup and C_SpecializationInfo and C_SpecializationInfo.GetActiveSpecGroup then
+	GetActiveTalentGroup = C_SpecializationInfo.GetActiveSpecGroup
+end
+if not SetActiveTalentGroup and C_SpecializationInfo and C_SpecializationInfo.SetActiveSpecGroup then
+	SetActiveTalentGroup = C_SpecializationInfo.SetActiveSpecGroup
+end
+if not GetNumTalentGroups and C_SpecializationInfo and C_SpecializationInfo.GetNumSpecGroups then
+	GetNumTalentGroups = C_SpecializationInfo.GetNumSpecGroups
+end
 
 -- Compatibility shim for AuraUtil.FindAuraByName (may not exist in TBC 2.5.5)
 if not AuraUtil or not AuraUtil.FindAuraByName then

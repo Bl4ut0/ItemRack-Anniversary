@@ -270,6 +270,9 @@ function ItemRack.RegisterEvents()
 			if not frame:IsEventRegistered("ACTIVE_TALENT_GROUP_CHANGED") then
 				frame:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
 			end
+			if not frame:IsEventRegistered("PLAYER_TALENT_UPDATE") then
+				frame:RegisterEvent("PLAYER_TALENT_UPDATE")
+			end
 		elseif eventType=="Script" then
 			if not frame:IsEventRegistered(events[eventName].Trigger) then
 				frame:RegisterEvent(events[eventName].Trigger)
@@ -306,6 +309,11 @@ function ItemRack.ProcessingFrameOnEvent(self,event,...)
 	local events = ItemRackEvents
 	local startBuff, startZone, startStance, eventType
 	local arg1, arg2 = ...;
+	
+	-- Debug: Log talent-related events
+	if event == "ACTIVE_TALENT_GROUP_CHANGED" or event == "PLAYER_TALENT_UPDATE" then
+		ItemRack.Print("[DEBUG] Received event: "..event)
+	end
 
 	for eventName in pairs(enabled) do
 		eventType = events[eventName].Type
@@ -317,7 +325,8 @@ function ItemRack.ProcessingFrameOnEvent(self,event,...)
 			startZone = 1
 		elseif event == "ZONE_CHANGED_INDOORS" and eventType == "Zone" and select(2, IsInInstance()) == "raid" then -- if player change subzone in raid instance, toggle set change, else not.
 			startZone = 1
-		elseif event == "ACTIVE_TALENT_GROUP_CHANGED" and eventType == "Specialization" then
+		elseif (event == "ACTIVE_TALENT_GROUP_CHANGED" or event == "PLAYER_TALENT_UPDATE") and eventType == "Specialization" then
+			ItemRack.Print("[DEBUG] Event fired: "..event.." for eventName: "..eventName)
 			ItemRack.ProcessSpecializationEvent()
 		elseif eventType=="Script" and events[eventName].Trigger==event then
 			local method = loadstring(events[eventName].Script)
@@ -414,25 +423,35 @@ function ItemRack.ProcessSpecializationEvent()
 	local enabled = ItemRackUser.Events.Enabled
 	local events = ItemRackEvents
 	
-	if not GetActiveTalentGroup then return end -- legacy client check
+	if not GetActiveTalentGroup then 
+		ItemRack.Print("[DEBUG] GetActiveTalentGroup is nil")
+		return 
+	end
 	local currentSpec = GetActiveTalentGroup()
+	ItemRack.Print("[DEBUG] ProcessSpecializationEvent: currentSpec="..tostring(currentSpec))
 	
 	local setToEquip, setToUnequip, setname
 	
 	for eventName in pairs(enabled) do
+		ItemRack.Print("[DEBUG] Checking event: "..eventName.." Type="..(events[eventName] and events[eventName].Type or "nil"))
 		if events[eventName].Type=="Specialization" and events[eventName].Spec then
 			setname = ItemRackUser.Events.Set[eventName]
+			ItemRack.Print("[DEBUG] Event "..eventName.." Spec="..events[eventName].Spec.." Set="..tostring(setname))
 			if events[eventName].Spec == currentSpec and not ItemRack.IsSetEquipped(setname) then
 				setToEquip = setname
+				ItemRack.Print("[DEBUG] Will equip: "..setname)
 			elseif events[eventName].Spec ~= currentSpec and events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
 				setToUnequip = setname
+				ItemRack.Print("[DEBUG] Will unequip: "..setname)
 			end
 		end
 	end
 	if setToUnequip then
+		ItemRack.Print("[DEBUG] Unequipping: "..setToUnequip)
 		ItemRack.UnequipSet(setToUnequip)
 	end
 	if setToEquip then
+		ItemRack.Print("[DEBUG] Equipping: "..setToEquip)
 		ItemRack.EquipSet(setToEquip)
 	end
 end

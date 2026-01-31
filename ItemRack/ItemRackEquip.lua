@@ -355,16 +355,30 @@ function ItemRack.EndSetSwap(setname)
 			ItemRack.UpdateCurrentSet()
 			
 			-- Dual Spec Support: Auto-Swap Spec if Set is bound
-			if ItemRackUser.Sets[setname].AssociatedSpec and GetActiveTalentGroup and GetNumTalentGroups()>1 then
-				local currentSpec = GetActiveTalentGroup()
-				local neededSpec = ItemRackUser.Sets[setname].AssociatedSpec
-				if currentSpec ~= neededSpec then
-					ItemRack.Print("Set "..setname.." requires Spec "..neededSpec..". Switching talents...")
-					if SetActiveTalentGroup then
-						SetActiveTalentGroup(neededSpec)
+			local set = ItemRackUser.Sets[setname]
+			ItemRack.Print("[DEBUG] EndSetSwap: Set="..setname.." AssociatedSpec="..tostring(set.AssociatedSpec))
+			if set.AssociatedSpec then
+				ItemRack.Print("[DEBUG] GetActiveTalentGroup="..tostring(GetActiveTalentGroup).." GetNumTalentGroups="..tostring(GetNumTalentGroups))
+				if GetActiveTalentGroup and GetNumTalentGroups then
+					local currentSpec = GetActiveTalentGroup()
+					local numGroups = GetNumTalentGroups()
+					local neededSpec = set.AssociatedSpec
+					
+					ItemRack.Print("[DEBUG] EndSetSwap: Set="..setname.." Assoc="..neededSpec.." Cur="..currentSpec.." Num="..numGroups)
+
+					if numGroups > 1 and currentSpec ~= neededSpec then
+						ItemRack.Print("Set "..setname.." requires Spec "..neededSpec..". Switching talents...")
+						if SetActiveTalentGroup then
+							ItemRack.Print("[DEBUG] Calling SetActiveTalentGroup("..neededSpec..")")
+							SetActiveTalentGroup(neededSpec)
+						else
+							ItemRack.Print("[DEBUG] SetActiveTalentGroup is nil!")
+						end
 					else
-						ItemRack.Print("Error: specific API for talent switching invalid.")
+						ItemRack.Print("[DEBUG] Not switching: numGroups="..numGroups.." currentSpec="..currentSpec.." neededSpec="..neededSpec)
 					end
+				else
+					ItemRack.Print("[DEBUG] Talent APIs missing!")
 				end
 			end
 

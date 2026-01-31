@@ -455,9 +455,8 @@ function ItemRackOpt.ToggleSpec(self,specID)
 			ItemRackOptSpec1:SetChecked(false)
 		end
 	end
-	-- Update the saved set immediately so the user doesn't have to hit "Save" to see the check persist?
-	-- Actually ItemRack usually requires "Save" to persist changes to a set.
-	-- But let's ensure ValidateSetButtons doesn't wipe it.
+	ItemRackOpt.ValidateSetButtons()
+	ItemRackOptSetsSaveButton:Enable()
 end
 
 function ItemRackOpt.SaveSet()
@@ -475,16 +474,38 @@ function ItemRackOpt.SaveSet()
 		end
 	end
 	
-	-- Save Associated Spec
+	-- Save Associated Spec and Sync with Events
 	set.AssociatedSpec = nil
-	if ItemRackOptSpec1:GetChecked() then
-		set.AssociatedSpec = 1
-	elseif ItemRackOptSpec2:GetChecked() then
-		set.AssociatedSpec = 2
+	local event1 = "Primary Spec"
+	local event2 = "Secondary Spec"
+
+	-- Clear legacy assignments for this set to avoid stale links/conflicts
+	if ItemRackUser.Events.Set[event1] == setname then
+		ItemRackUser.Events.Set[event1] = nil
+		ItemRackUser.Events.Enabled[event1] = nil
+	end
+	if ItemRackUser.Events.Set[event2] == setname then
+		ItemRackUser.Events.Set[event2] = nil
+		ItemRackUser.Events.Enabled[event2] = nil
 	end
 
-	-- set.equip[0] = nil
-	-- set.equip[18] = nil
+	if ItemRackOptSpec1:GetChecked() then
+		set.AssociatedSpec = 1
+		ItemRackUser.Events.Set[event1] = setname
+		ItemRackUser.Events.Enabled[event1] = true
+	elseif ItemRackOptSpec2:GetChecked() then
+		set.AssociatedSpec = 2
+		ItemRackUser.Events.Set[event2] = setname
+		ItemRackUser.Events.Enabled[event2] = true
+	end
+	
+	if ItemRackUser.EnableEvents == "OFF" and set.AssociatedSpec then
+		ItemRack.Print("Note: Events are currently disabled. You may need to enable them for auto-swaps to work.")
+	end
+
+	ItemRack.RegisterEvents()
+	ItemRackOpt.PopulateEventList()
+
 	ItemRackOpt.ReconcileSetBindings()
 	ItemRackOpt.ValidateSetButtons()
 	ItemRack.UpdateCurrentSet()
@@ -519,8 +540,12 @@ function ItemRackOpt.ValidateSetButtons()
 	ItemRackOptSpec1:ClearAllPoints()
 	ItemRackOptSpec2:ClearAllPoints()
 
-	-- Explicitly anchor Spec1 below ShowCloak with tighter spacing
-	ItemRackOptSpec1:SetPoint("TOPLEFT",ItemRackOptShowCloak,"BOTTOMLEFT",0,0)
+	-- Re-anchor ShowCloak to ShowHelm with tighter spacing (-4) to match the new compact layout
+	ItemRackOptShowCloak:ClearAllPoints()
+	ItemRackOptShowCloak:SetPoint("TOPLEFT",ItemRackOptShowHelm,"BOTTOMLEFT",0,-2)
+
+	-- Explicitly anchor Spec1 below ShowCloak with tighter spacing (-4)
+	ItemRackOptSpec1:SetPoint("TOPLEFT",ItemRackOptShowCloak,"BOTTOMLEFT",0,-2)
 
 	-- Always show and update Spec 1
 	ItemRackOptSpec1:Show()
@@ -528,11 +553,11 @@ function ItemRackOpt.ValidateSetButtons()
 	
 	if GetNumTalentGroups and GetNumTalentGroups()>1 then
 		ItemRackOptSpec2:Show()
-		ItemRackOptSpec2:SetPoint("TOPLEFT",ItemRackOptSpec1,"BOTTOMLEFT",0,0)
+		ItemRackOptSpec2:SetPoint("TOPLEFT",ItemRackOptSpec1,"BOTTOMLEFT",0,-2)
 		ItemRackOptSpec2Text:SetText(ItemRackOpt.GetSpecName(2))
 
 		-- Tighter spacing when dual spec is active to prevent overflow
-		ItemRackOptSetsHideCheckButton:SetPoint("TOPLEFT",ItemRackOptSpec2,"BOTTOMLEFT",0,0)
+		ItemRackOptSetsHideCheckButton:SetPoint("TOPLEFT",ItemRackOptSpec2,"BOTTOMLEFT",0,-2)
 	else
 		ItemRackOptSpec2:Hide()
 		ItemRackOptSetsHideCheckButton:SetPoint("TOPLEFT",ItemRackOptSpec1,"BOTTOMLEFT",0,-2)
