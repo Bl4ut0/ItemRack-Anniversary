@@ -574,6 +574,7 @@ function ItemRackOpt.ValidateSetButtons()
 	end
 
 	-- Enable if name entered
+	ItemRack.Print("[DEBUG] ValidateSetButtons: setname='"..setname.."' len="..string.len(setname).." blacklisted="..tostring(ItemRack.SetnameBlacklist[setname]))
 	if string.len(setname)>0 and not ItemRack.SetnameBlacklist[setname] then
 		ItemRackOptSpec1:Enable()
 		ItemRackOptSpec1:EnableMouse(true)
