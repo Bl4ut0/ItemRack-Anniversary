@@ -356,29 +356,21 @@ function ItemRack.EndSetSwap(setname)
 			
 			-- Dual Spec Support: Auto-Swap Spec if Set is bound
 			local set = ItemRackUser.Sets[setname]
-			ItemRack.Print("[DEBUG] EndSetSwap: Set="..setname.." AssociatedSpec="..tostring(set.AssociatedSpec))
 			if set.AssociatedSpec then
-				ItemRack.Print("[DEBUG] GetActiveTalentGroup="..tostring(GetActiveTalentGroup).." GetNumTalentGroups="..tostring(GetNumTalentGroups))
 				if GetActiveTalentGroup and GetNumTalentGroups then
 					local currentSpec = GetActiveTalentGroup()
 					local numGroups = GetNumTalentGroups()
 					local neededSpec = set.AssociatedSpec
 					
-					ItemRack.Print("[DEBUG] EndSetSwap: Set="..setname.." Assoc="..neededSpec.." Cur="..currentSpec.." Num="..numGroups)
-
 					if numGroups > 1 and currentSpec ~= neededSpec then
-						ItemRack.Print("Set "..setname.." requires Spec "..neededSpec..". Switching talents...")
+						ItemRack.Print("Set "..setname.." requires Spec "..neededSpec.." (Current: "..currentSpec.."). Switching...")
 						if SetActiveTalentGroup then
-							ItemRack.Print("[DEBUG] Calling SetActiveTalentGroup("..neededSpec..")")
 							SetActiveTalentGroup(neededSpec)
-						else
-							ItemRack.Print("[DEBUG] SetActiveTalentGroup is nil!")
 						end
 					else
-						ItemRack.Print("[DEBUG] Not switching: numGroups="..numGroups.." currentSpec="..currentSpec.." neededSpec="..neededSpec)
+						-- Diagnostic for when it doesn't switch
+						-- ItemRack.Print("Spec Check: No switch needed. neededSpec="..tostring(neededSpec).." current="..tostring(currentSpec).." numGroups="..tostring(numGroups))
 					end
-				else
-					ItemRack.Print("[DEBUG] Talent APIs missing!")
 				end
 			end
 
@@ -389,7 +381,10 @@ function ItemRack.EndSetSwap(setname)
 			ItemRack.UpdateCurrentSet()
 		end
 		if ItemRackOptFrame and ItemRackOptFrame:IsVisible() then
-			ItemRackOpt.ChangeEditingSet()
+			-- Only jump to the equipped set if the user isn't currently editing one
+			if not ItemRackOptSetsSaveButton:IsEnabled() then
+				ItemRackOpt.ChangeEditingSet()
+			end
 		end
 		
 		ItemRack.UpdateCombatQueue() -- update button gear icon if per set queues is active

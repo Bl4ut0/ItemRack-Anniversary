@@ -446,7 +446,8 @@ function ItemRack.UpdateButtons()
 		if i==0 then --ranged "ammo" slot
 			local baseID = ItemRack.GetIRString(ItemRack.GetID(0),true) --get the ItemRack-style ID for the ammo item in inventory slot 0 (ranged ammo) and convert it to just its baseID
 			if baseID~=0 then -- verify that we properly have the ammo item's baseID
-				ItemRackButton0Count:SetText(GetItemCount(baseID)) -- write the ammo count on top of the slot
+				local ammoCount = GetItemCount(baseID)
+				ItemRackButton0Count:SetText(ammoCount > 0 and ammoCount or "") -- hide the 0 if out of ammo
 			else
 				ItemRackButton0Count:SetText("") -- clear the ammo count since there is no ammo in the slot
 			end

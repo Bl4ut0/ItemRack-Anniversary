@@ -10,6 +10,7 @@ ItemRackOpt = {
 	numSubFrames = 8, -- number of subframes
 	slotOrder = {1,2,3,15,5,4,19,9,16,17,18,0,14,13,12,11,8,7,6,10,6,7,8,11,12,13,14,0,18,17,16,9,19,4,5,15,3,2},
 	currentMarquee = 1,
+	SpecDirty = false,
 }
 
 function ItemRackOpt.GetSpecName(group)
@@ -222,6 +223,7 @@ function ItemRackOpt.OnShow(setname)
 		ItemRackOpt.selectedIcon = ItemRackOpt.Icons[math.random(#(ItemRackOpt.Icons)-20)+20]
 	end
 	ItemRackOpt.UpdateInv()
+	ItemRackOpt.SpecDirty = false
 	ItemRackOptSubFrame5:Hide()
 	ItemRackOpt.ListScrollFrameUpdate()
 end
@@ -242,6 +244,7 @@ function ItemRackOpt.ChangeEditingSet()
 		ItemRackOptSetsName:SetText(setname)
 		ItemRackOpt.selectedIcon = ItemRackUser.Sets[setname].icon
 		ItemRackOpt.UpdateInv()
+		ItemRackOpt.SpecDirty = false
 		ItemRackOptSubFrame5:Hide()
 	end
 end
@@ -457,6 +460,7 @@ function ItemRackOpt.ToggleSpec(self,specID)
 			ItemRackOptSpec1:SetChecked(false)
 		end
 	end
+	ItemRackOpt.SpecDirty = true
 	-- We don't call ValidateSetButtons() here because it would reset the checkboxes from the saved table
 	ItemRackOptSetsSaveButton:Enable()
 end
@@ -509,6 +513,7 @@ function ItemRackOpt.SaveSet()
 	ItemRackOpt.PopulateEventList()
 
 	ItemRackOpt.ReconcileSetBindings()
+	ItemRackOpt.SpecDirty = false
 	ItemRackOpt.ValidateSetButtons()
 	ItemRack.UpdateCurrentSet()
 	ItemRack:FireItemRackEvent("ITEMRACK_SET_SAVED", setname)
@@ -542,13 +547,9 @@ function ItemRackOpt.ValidateSetButtons()
 	ItemRackOptSpec1:ClearAllPoints()
 	ItemRackOptSpec2:ClearAllPoints()
 
-	-- Re-anchor ShowCloak to ShowHelm with tighter spacing (basically touching)
+	-- Re-anchor ShowCloak to ShowHelm
 	ItemRackOptShowCloak:ClearAllPoints()
-	ItemRackOptShowCloak:SetPoint("TOPLEFT",ItemRackOptShowHelm,"BOTTOMLEFT",0,-2)
-
-	-- Explicitly anchor Spec1 below ShowCloak with tighter spacing
-	ItemRackOptSpec1:SetPoint("TOPLEFT",ItemRackOptShowCloak,"BOTTOMLEFT",0,-4)
-
+	
 	-- Always show and update Spec 1
 	ItemRackOptSpec1:Show()
 	ItemRackOptSpec1Text:SetText(ItemRackOpt.GetSpecName(1))
@@ -556,25 +557,25 @@ function ItemRackOpt.ValidateSetButtons()
 	local numGroups = 0
 	if GetNumTalentGroups then
 		numGroups = GetNumTalentGroups() or 0
-		ItemRack.Print("[DEBUG] ValidateSetButtons: GetNumTalentGroups="..numGroups)
-	else
-		ItemRack.Print("[DEBUG] ValidateSetButtons: GetNumTalentGroups is nil!")
 	end
 	
 	if numGroups > 1 then
+		-- DUAL SPEC: Use overlapping "negative" spacing to fit 5 buttons
+		ItemRackOptShowCloak:SetPoint("TOPLEFT",ItemRackOptShowHelm,"BOTTOMLEFT",0,4)
+		ItemRackOptSpec1:SetPoint("TOPLEFT",ItemRackOptShowCloak,"BOTTOMLEFT",0,4)
 		ItemRackOptSpec2:Show()
-		ItemRackOptSpec2:SetPoint("TOPLEFT",ItemRackOptSpec1,"BOTTOMLEFT",0,-4)
+		ItemRackOptSpec2:SetPoint("TOPLEFT",ItemRackOptSpec1,"BOTTOMLEFT",0,4)
 		ItemRackOptSpec2Text:SetText(ItemRackOpt.GetSpecName(2))
-
-		-- Tighter spacing when dual spec is active to prevent overflow
-		ItemRackOptSetsHideCheckButton:SetPoint("TOPLEFT",ItemRackOptSpec2,"BOTTOMLEFT",0,-4)
+		ItemRackOptSetsHideCheckButton:SetPoint("TOPLEFT",ItemRackOptSpec2,"BOTTOMLEFT",0,4)
 	else
+		-- SINGLE SPEC: Keep the spacing that was "perfect" for 4 buttons
+		ItemRackOptShowCloak:SetPoint("TOPLEFT",ItemRackOptShowHelm,"BOTTOMLEFT",0,-2)
+		ItemRackOptSpec1:SetPoint("TOPLEFT",ItemRackOptShowCloak,"BOTTOMLEFT",0,-4)
 		ItemRackOptSpec2:Hide()
 		ItemRackOptSetsHideCheckButton:SetPoint("TOPLEFT",ItemRackOptSpec1,"BOTTOMLEFT",0,-4)
 	end
 
 	-- Enable if name entered
-	ItemRack.Print("[DEBUG] ValidateSetButtons: setname='"..setname.."' len="..string.len(setname).." blacklisted="..tostring(ItemRack.SetnameBlacklist[setname]))
 	if string.len(setname)>0 and not ItemRack.SetnameBlacklist[setname] then
 		ItemRackOptSpec1:Enable()
 		ItemRackOptSpec1:EnableMouse(true)
@@ -608,7 +609,7 @@ function ItemRackOpt.ValidateSetButtons()
 		ItemRackOptSetsCurrentSetIcon:SetTexture(ItemRackUser.Sets[setname].icon)
 		
 		-- Only load saved state if we aren't already editing (to prevent overriding clicks)
-		if not ItemRackOptSetsSaveButton:IsEnabled() then
+		if not ItemRackOpt.SpecDirty then
 			local assocSpec = ItemRackUser.Sets[setname].AssociatedSpec
 			ItemRackOptSpec1:SetChecked(assocSpec == 1)
 			ItemRackOptSpec2:SetChecked(assocSpec == 2)
@@ -831,11 +832,25 @@ function ItemRackOpt.SelectSetList(self)
 		ItemRackOpt.PopulateEventList()
 	else
 		-- fill out set build info if picking a set (ItemRackOptSubFrame2)
-		ItemRackOpt.selectedIcon = ItemRackUser.Sets[setname].icon
+		local set = ItemRackUser.Sets[setname]
+		ItemRackOpt.selectedIcon = set.icon
 		ItemRackOptSetsName:SetText(setname)
+		
+		-- Load the items from the set into the UI slots
+		for i=0,19 do
+			if set.equip[i] then
+				ItemRackOpt.Inv[i].id = set.equip[i]
+				ItemRackOpt.Inv[i].selected = 1
+			else
+				ItemRackOpt.Inv[i].selected = nil
+				ItemRackOpt.Inv[i].id = ItemRack.GetID(i)
+			end
+		end
+
 		if ItemRackSettings.EquipOnSetPick=="ON" then
 			ItemRack.EquipSet(setname)
 		end
+		ItemRackOpt.SpecDirty = false
 	end
 
 	ItemRackOptSubFrame5:Hide()

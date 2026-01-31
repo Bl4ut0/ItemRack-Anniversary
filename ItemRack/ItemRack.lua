@@ -1343,11 +1343,11 @@ function ItemRack.BuildMenu(id,menuInclude,masqueGroup)
 					border:Show()
 				end
 			end
+			count = ItemRack.GetCountByID(ItemRack.Menu[i])
 			if ItemRack.menuOpen==0 then
-				count = ItemRack.GetCountByID(ItemRack.Menu[i])
 				_G["ItemRackMenu"..i.."Count"]:SetText(count>0 and count or "")
 			else
-				_G["ItemRackMenu"..i.."Count"]:SetText("")
+				_G["ItemRackMenu"..i.."Count"]:SetText(count>1 and count or "")
 			end
 		end
 	end
