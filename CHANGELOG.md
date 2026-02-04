@@ -3,14 +3,10 @@
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
 ## [4.27.4] - 2026-02-03
-### 🚀 New in v4.27.4
-
-#### ⚡ Event System Overhaul
+### Event System Overhaul
 - **Buff Event State Tracking**: Fixed an issue where temporary events (Mounting, Drinking) could get "stuck" or spam gear swaps. Added distinct `.Active` state tracking to ensure events properly unequip their gear when ending.
 - **Nested Event Handling**: Implemented "stack splicing" logic to handle complex event transitions (e.g., Drinking ending while Mounted). The system now correctly restores the original gear state instead of reverting to an intermediate temporary set.
 - **Stance Reliability**: Extended the `.Active` state tracking to Stance events (Shapesifting, Ghost Wolf), ensuring they cleanly revert gear even if the equipment API reports mismatches.
-
-#### 🎨 UI & Visual Fixes
 - **UI Label Stability**: The current set label/icon now correctly persists during active events (like "Zoomies") instead of reverting to "Custom" when `IsSetEquipped` fails falsely due to API inconsistencies.
 
 ## [4.27.3] - 2026-02-02
