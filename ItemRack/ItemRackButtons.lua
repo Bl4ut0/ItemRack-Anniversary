@@ -30,6 +30,11 @@ function ItemRack.ButtonOnLoad(self)
 	self:SetAttribute("action", nil)
 	self.action = nil
 	self:UnregisterAllEvents() -- Stop listening to action bar events
+
+	-- Override SetChecked to block external calls from Blizzard action bar system
+	local originalSetChecked = self.SetChecked
+	self.OriginalSetChecked = originalSetChecked
+	self.SetChecked = function() end -- No-op; ItemRack uses OriginalSetChecked directly
 	
 	-- Clear any keybind text that might have been set by ActionButton_OnLoad
 	local hotkey = _G[self:GetName().."HotKey"]
@@ -39,7 +44,6 @@ function ItemRack.ButtonOnLoad(self)
 	end
 
 	-- Hide unwanted ActionButton overlays (Yellow/Orange Triangles, Flash, etc.)
-	-- Hide unwanted ActionButton overlays (Yellow/Orange Triangles, Flash, etc.)
 	-- This includes anonymous textures created by ActionButtonTemplate that don't have friendly names.
 	-- We iterate through all regions and hide anything that isn't a standard state texture or our custom icon.
 	for _, region in ipairs({self:GetRegions()}) do
@@ -47,11 +51,11 @@ function ItemRack.ButtonOnLoad(self)
 			local isStandard = false
 			local name = region:GetName()
 
-			-- Keep standard button states
+			-- Keep standard button states (except CheckedTexture which we'll disable separately)
 			if region == self.NormalTexture or (self.GetNormalTexture and region == self:GetNormalTexture()) then isStandard = true end
 			if region == self.PushedTexture or (self.GetPushedTexture and region == self:GetPushedTexture()) then isStandard = true end
 			if region == self.HighlightTexture or (self.GetHighlightTexture and region == self:GetHighlightTexture()) then isStandard = true end
-			if region == self.CheckedTexture or (self.GetCheckedTexture and region == self:GetCheckedTexture()) then isStandard = true end
+			-- NOTE: We explicitly do NOT keep CheckedTexture as standard - it will be hidden below
 			
 			-- Keep ItemRack's specific textures (Icon, Queue overlay)
 			if name and (name:find("ItemRackIcon") or name:find("Queue")) then 
@@ -65,6 +69,29 @@ function ItemRack.ButtonOnLoad(self)
 				region.Show = function() end -- Disable Show()
 			end
 		end
+	end
+
+	-- Completely disable the CheckedTexture to prevent action bar system from showing it
+	local checkedTexture = self:GetCheckedTexture()
+	if checkedTexture then
+		checkedTexture:Hide()
+		checkedTexture:SetAlpha(0)
+		checkedTexture.Show = function() end
+	end
+	
+	-- Disable SpellActivationAlert if it exists (causes glow effects on spell procs)
+	if self.SpellActivationAlert then
+		self.SpellActivationAlert:Hide()
+		self.SpellActivationAlert.Show = function() end
+	end
+	
+	-- Block ActionButton_ShowOverlayGlow from affecting this button
+	if ActionButton_ShowOverlayGlow then
+		local origShowOverlayGlow = ActionButton_ShowOverlayGlow
+		self.ShowOverlayGlow = function() end
+	end
+	if ActionButton_HideOverlayGlow then
+		self.HideOverlayGlow = function() end
 	end
 end
 
@@ -572,7 +599,7 @@ end
 --[[ Using buttons ]]
 
 function ItemRack.ButtonPostClick(self,button)
-	self:SetChecked(false)
+	if self.OriginalSetChecked then self:OriginalSetChecked(false) end
 	local id = self:GetID()
 	if button=="RightButton" then
 		local handled = nil
@@ -654,7 +681,8 @@ function ItemRack.ReflectClickedUpdate()
 	for i in pairs(reflect) do
 		reflect[i] = reflect[i] - .2
 		if reflect[i]<0 then
-			_G["ItemRackButton"..i]:SetChecked(false)
+			local btn = _G["ItemRackButton"..i]
+			if btn and btn.OriginalSetChecked then btn:OriginalSetChecked(false) end
 			reflect[i] = nil
 		end
 		found = 1

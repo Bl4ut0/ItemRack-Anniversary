@@ -394,7 +394,8 @@ function ItemRack.EndSetSwap(setname)
 			-- if this is a special set that stored a setname, set current to that setname
 			ItemRackUser.CurrentSet = ItemRackUser.Sets[setname].oldset
 			ItemRackUser.Sets[setname].oldset = nil
-			ItemRack.UpdateCurrentSet()
+			-- Delay the UI update to allow item locks to clear (same as normal sets on line 371)
+			C_Timer.After(0.5, ItemRack.UpdateCurrentSet)
 		end
 		if ItemRackOptFrame and ItemRackOptFrame:IsVisible() then
 			-- Only jump to the equipped set if the user isn't currently editing one

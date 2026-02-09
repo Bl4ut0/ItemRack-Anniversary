@@ -2,6 +2,16 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.27.5] - 2026-02-09
+### Bug Fixes
+- **Action Bar Interaction**: Fixed an issue where casting spells from the main action bar (slots 1-12) would inadvertently highlight/check corresponding ItemRack slots. This was caused by the underlying button template responding to action bar events; these event handlers have now been explicitly disabled for ItemRack buttons, including hiding the CheckedTexture and SpellActivationAlert elements.
+- **Mounted-to-Casting Transitions**: Fixed an issue where gear set swaps would get stuck when transitioning from mounted to casting. The `SetsWaiting` queue was not being processed after casting ended, causing pending set changes to never execute. Re-enabled processing of waiting sets after both spell completion and the delayed combat queue.
+- **Keybind Saving in Combat**: Improved combat handling for keybind saving. If a reload happens during combat, the keybind save operation is now queued to run automatically after combat ends, instead of failing silently.
+- **Ammo Slot Nil Check**: Fixed a "bad argument #1" Lua error that occurred when `GetInventoryItemID` returned nil for empty slots (particularly the ammo slot). The error would trigger during buff event processing (e.g., mounting, drinking) when the addon scanned inventory slots. Added proper nil check before calling `GetItemInfo`.
+- **Combat Queue UI Timing**: Fixed an issue where the set icon would briefly show "Custom" after combat ends, even though the correct set was equipped. This was caused by `UpdateCurrentSet()` being called immediately after combat queue items were equipped, before the item swap animation completed. Added a 0.5s delay to match the timing used for normal set swaps.
+
+---
+
 ## [4.27.4] - 2026-02-03
 ### Event System Overhaul
 - **Buff Event State Tracking**: Fixed an issue where temporary events (Mounting, Drinking) could get "stuck" or spam gear swaps. Added distinct `.Active` state tracking to ensure events properly unequip their gear when ending.

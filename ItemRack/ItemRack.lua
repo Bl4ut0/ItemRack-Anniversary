@@ -419,11 +419,10 @@ function ItemRack.OnCastingStop(self,event,unit)
 			else
 				ItemRack.OnSpellSucceed()
 			end
-			--[[
+			-- Process any sets that were waiting for casting to end
 			if #(ItemRack.SetsWaiting)>0 and not ItemRack.AnythingLocked() then
 				ItemRack.ProcessSetsWaiting()
 			end
-			]]
 		end
 	end
 end
@@ -442,6 +441,10 @@ function ItemRack.DelayedCombatQueue()
 		return
 	end
 	ItemRack.ProcessCombatQueue()
+	-- Also process any sets waiting for a swap
+	if #(ItemRack.SetsWaiting)>0 and not ItemRack.AnythingLocked() then
+		ItemRack.ProcessSetsWaiting()
+	end
 end
 
 function ItemRack.OnUnitInventoryChanged(self,event,unit)
@@ -467,6 +470,10 @@ function ItemRack.OnLeavingCombatOrDeath()
 		return
 	end
 	ItemRack.ProcessCombatQueue()
+	-- Process any sets waiting for combat/casting to end
+	if #(ItemRack.SetsWaiting)>0 and not ItemRack.AnythingLocked() then
+		ItemRack.ProcessSetsWaiting()
+	end
 end
 
 function ItemRack.ProcessCombatQueue()
@@ -784,7 +791,10 @@ function ItemRack.GetID(bag,slot)
 		itemLink = GetContainerItemLink(bag,slot)
 	else
 		if bag == INVSLOT_AMMO then -- classic workaround for ammo slot API bugs
-			_, itemLink = GetItemInfo(GetInventoryItemID("player",bag))
+			local invID = GetInventoryItemID("player",bag)
+			if invID then
+				_, itemLink = GetItemInfo(invID)
+			end
 		else
 			itemLink = GetInventoryItemLink("player",bag)
 		end
@@ -1588,7 +1598,8 @@ end
 
 function ItemRack.ReflectItemUse(id)
 	if ItemRackUser.Buttons[id] then
-		_G["ItemRackButton"..id]:SetChecked(true)
+		local btn = _G["ItemRackButton"..id]
+		if btn and btn.OriginalSetChecked then btn:OriginalSetChecked(true) end
 		ItemRack.ReflectClicked[id] = 1
 		ItemRack.StartTimer("ReflectClickedUpdate")
 	end
@@ -2172,7 +2183,9 @@ end
 local retryCount = 0
 function ItemRack.SetSetBindings()
 	if InCombatLockdown() then
-		ItemRack.Print("Cannot save hotkeys in combat, please try again out of combat!")
+		-- Queue to run after combat ends
+		if not ItemRack.RunAfterCombat then ItemRack.RunAfterCombat = {} end
+		table.insert(ItemRack.RunAfterCombat, "SetSetBindings")
 		return
 	end
 	if retryCount > 3 then return end
