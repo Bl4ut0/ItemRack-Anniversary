@@ -4,7 +4,7 @@ All notable changes to the TBC Anniversary port of ItemRack will be documented i
 
 ## [4.28] - 2026-02-14
 ### Bug Fixes
-- **Tooltip Set Info ("Show set info in tooltips")**: Fixed an issue where hovering over items in your bags or character panel would inconsistently show or miss the "ItemRack Set:" label. The root cause was a strict full-string comparison between saved item IDs and live API item IDs. After the TBC Anniversary launch changed the item string format (additional fields), saved items with the old format would fail the exact match. Switched to base item ID matching (`SameID`), consistent with how set equipping, set detection, and hyperlink tooltips already work.
+- **Tooltip Set Info ("Show set info in tooltips")**: Fixed an issue where hovering over items in your bags or character panel would inconsistently show or miss the "ItemRack Set:" label. The root cause was a strict full-string comparison that broke when the TBC Anniversary launch added extra fields to item strings. Replaced with a new `SameExactID` comparison that matches the first 8 item-identifying fields (itemID, enchant, gems, suffix, unique) while ignoring trailing context fields (level, spec). This correctly differentiates items with different enchants or gems, and is immune to item string format changes. Internal sets (`~Unequip`, `~CombatQueue`) are now also filtered from tooltips.
 
 ### Improvements
 - **Blizzard Keybinding Integration**: All 20 equipment slots (0–19) are now registered in the Blizzard Keybindings panel under **AddOns > ItemRack**. Each slot has a descriptive label (e.g., "Head (Slot 1)", "Off Hand / Shield / Held In Off-hand (Slot 17)"). Added `Bindings.xml` for keybinding registration.

@@ -611,11 +611,11 @@ do
 			return
 		end
 		if not id or id == 0 then return end
-		local same_ids = ItemRack.SameID
+		local same_exact = ItemRack.SameExactID
 		for name, set in pairs(ItemRackUser.Sets) do
 			if not name:match("^~") then
 				for _, item in pairs(set.equip) do
-					if same_ids(item, id) then
+					if same_exact(item, id) then
 						data[name] = true
 					end
 				end
@@ -786,6 +786,7 @@ ItemRack.iSPatternRegularToIR = "item:(.-)\124h" --example: "62384:0:4041:4041:0
 ItemRack.iSPatternBaseIDFromIR = "^(%-?%d+)" --this must *only* be used on ItemRack-style IDs, and will return the first field (the itemID), allowing us to do loose item matching
 ItemRack.iSPatternBaseIDFromRegular = "item:(%-?%d+)" --this must *only* be used regular itemLinks/itemStrings, and will return the first field (the itemID), allowing us to do loose item matching
 ItemRack.iSPatternEnhancementsFromIR = "^(%-?%d+):(%-?%d*):(%-?%d*):(%-?%d*):(%-?%d*)" --this must *only* be used on ItemRack-style IDs, and will return itemID, enchantID, gem1, gem2, gem3
+ItemRack.iSPatternItemFieldsFromIR = "^(%-?%d+:%-?%d*:%-?%d*:%-?%d*:%-?%d*:%-?%d*:%-?%d*:%-?%d*)" --extracts the first 8 item-identifying fields (itemID:enchant:gem1:gem2:gem3:gem4:suffix:unique), ignoring level/spec/etc trailing fields
 function ItemRack.GetIRString(inputString,baseid,regular)
 	return string.match(tostring(inputString or ""), (baseid and (regular and ItemRack.iSPatternBaseIDFromRegular or ItemRack.iSPatternBaseIDFromIR) or ItemRack.iSPatternRegularToIR)) or 0
 end
@@ -832,6 +833,14 @@ end
 -- takes two ItemRack-style IDs (one or both of the parameters can be a baseID instead if needed) and returns true if those items share the same base itemID
 function ItemRack.SameID(id1,id2)
 	return ItemRack.GetIRString(id1,true) == ItemRack.GetIRString(id2,true)
+end
+
+-- takes two ItemRack-style IDs and returns true if they share the same item-identifying fields (itemID, enchant, gems, suffix, unique)
+-- this is more precise than SameID (which only compares base itemID) but tolerant of item string format changes (Classic 10 fields vs TBC 14 fields)
+function ItemRack.SameExactID(id1,id2)
+	local f1 = id1 and tostring(id1):match(ItemRack.iSPatternItemFieldsFromIR)
+	local f2 = id2 and tostring(id2):match(ItemRack.iSPatternItemFieldsFromIR)
+	return f1 and f2 and f1 == f2
 end
 
 -- takes an ItemRack-style ID and returns the name, texture, equipslot and quality
