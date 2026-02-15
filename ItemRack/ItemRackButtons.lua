@@ -37,10 +37,18 @@ function ItemRack.ButtonOnLoad(self)
 	self.SetChecked = function() end -- No-op; ItemRack uses OriginalSetChecked directly
 	
 	-- Clear any keybind text that might have been set by ActionButton_OnLoad
+	-- Don't hide the HotKey FontString - KeyBindingsChanged() controls its visibility
 	local hotkey = _G[self:GetName().."HotKey"]
 	if hotkey then
 		hotkey:SetText("")
-		hotkey:Hide()
+	end
+
+	-- Suppress WoW's built-in CooldownFrame countdown text (e.g. "1:20")
+	-- WoW settings only allow disabling this for spells, not items, so we do it here.
+	-- ItemRack's own CooldownCount system (the Time element) is unaffected.
+	local cooldown = _G[self:GetName().."Cooldown"]
+	if cooldown and cooldown.SetHideCountdownNumbers then
+		cooldown:SetHideCountdownNumbers(true)
 	end
 
 	-- Hide unwanted ActionButton overlays (Yellow/Orange Triangles, Flash, etc.)
@@ -812,7 +820,34 @@ function ItemRack.WriteCooldown(where,start,duration)
 	elseif cooldown<3 and not where:GetText() then
 		-- this is a global cooldown. don't display it. not accurate but at least not annoying
 	else
-		where:SetText((cooldown<(ItemRackSettings.Cooldown90=="ON" and 90 or 60) and math.floor(cooldown+.5).." s") or (cooldown<3600 and math.ceil(cooldown/60).." m") or math.ceil(cooldown/3600).." h")
+		if ItemRackSettings.LargeNumbers=="ON" then
+			-- Blizzard-style format: mm:ss or h:mm or just seconds
+			local text
+			if cooldown >= 3600 then
+				local h = math.floor(cooldown / 3600)
+				local m = math.floor((cooldown - h * 3600) / 60)
+				text = string.format("%d:%02d", h, m)
+			elseif cooldown >= 60 then
+				local m = math.floor(cooldown / 60)
+				local s = math.floor(cooldown - m * 60)
+				text = string.format("%d:%02d", m, s)
+			else
+				text = tostring(math.floor(cooldown + 0.5))
+			end
+			where:SetText(text)
+			-- Dynamic coloring like Blizzard: white > 60s, yellow < 60s, red < 5s
+			if cooldown < 5 then
+				where:SetTextColor(1, 0.1, 0.1, 1)
+			elseif cooldown < 60 then
+				where:SetTextColor(1, 0.82, 0, 1)
+			else
+				where:SetTextColor(1, 1, 1, 1)
+			end
+		else
+			-- Original small numbers format: "30 s", "2 m", "1 h"
+			where:SetText((cooldown<(ItemRackSettings.Cooldown90=="ON" and 90 or 60) and math.floor(cooldown+.5).." s") or (cooldown<3600 and math.ceil(cooldown/60).." m") or math.ceil(cooldown/3600).." h")
+			where:SetTextColor(1, 1, 1, 1)
+		end
 	end
 end
 
@@ -821,11 +856,22 @@ end
 function ItemRack.KeyBindingsChanged()
 	local key
 	for i in pairs(ItemRackUser.Buttons) do
-		if ItemRackSettings.ShowHotKeys=="ON" then
-			key = GetBindingKey("CLICK ItemRackButton"..i..":LeftButton")
-			_G["ItemRackButton"..i.."HotKey"]:SetText(GetBindingText(key or "",nil,1))
-		else
-			_G["ItemRackButton"..i.."HotKey"]:SetText("")
+		local hotkey = _G["ItemRackButton"..i.."HotKey"]
+		if hotkey then
+			if ItemRackSettings.ShowHotKeys=="ON" then
+				key = GetBindingKey("CLICK ItemRackButton"..i..":LeftButton")
+				if key then
+					hotkey:SetText(GetBindingText(key,nil,1))
+					hotkey:SetTextColor(0.6, 0.6, 0.6, 1)
+					hotkey:Show()
+				else
+					hotkey:SetText("")
+					hotkey:Hide()
+				end
+			else
+				hotkey:SetText("")
+				hotkey:Hide()
+			end
 		end
 	end
 end

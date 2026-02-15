@@ -3,6 +3,31 @@ _G[addonName] = addon
 
 local _
 
+-- Blizzard Keybinding UI localization strings
+-- These globals provide the human-readable names displayed in ESC > Keybindings > AddOns > ItemRack
+-- CLICK bindings require _G["BINDING_NAME_<full action string>"] format (spaces/colons included)
+BINDING_HEADER_ITEMRACK = "ItemRack"
+_G["BINDING_NAME_CLICK ItemRackButton0:LeftButton"]  = "Ammo (Slot 0)"
+_G["BINDING_NAME_CLICK ItemRackButton1:LeftButton"]  = "Head (Slot 1)"
+_G["BINDING_NAME_CLICK ItemRackButton2:LeftButton"]  = "Neck (Slot 2)"
+_G["BINDING_NAME_CLICK ItemRackButton3:LeftButton"]  = "Shoulder (Slot 3)"
+_G["BINDING_NAME_CLICK ItemRackButton4:LeftButton"]  = "Shirt (Slot 4)"
+_G["BINDING_NAME_CLICK ItemRackButton5:LeftButton"]  = "Chest / Robe (Slot 5)"
+_G["BINDING_NAME_CLICK ItemRackButton6:LeftButton"]  = "Waist (Slot 6)"
+_G["BINDING_NAME_CLICK ItemRackButton7:LeftButton"]  = "Legs (Slot 7)"
+_G["BINDING_NAME_CLICK ItemRackButton8:LeftButton"]  = "Feet (Slot 8)"
+_G["BINDING_NAME_CLICK ItemRackButton9:LeftButton"]  = "Wrist (Slot 9)"
+_G["BINDING_NAME_CLICK ItemRackButton10:LeftButton"] = "Hands (Slot 10)"
+_G["BINDING_NAME_CLICK ItemRackButton11:LeftButton"] = "Finger 1 (Slot 11)"
+_G["BINDING_NAME_CLICK ItemRackButton12:LeftButton"] = "Finger 2 (Slot 12)"
+_G["BINDING_NAME_CLICK ItemRackButton13:LeftButton"] = "Trinket 1 (Slot 13)"
+_G["BINDING_NAME_CLICK ItemRackButton14:LeftButton"] = "Trinket 2 (Slot 14)"
+_G["BINDING_NAME_CLICK ItemRackButton15:LeftButton"] = "Back / Cloak (Slot 15)"
+_G["BINDING_NAME_CLICK ItemRackButton16:LeftButton"] = "Main Hand / Two-Hand (Slot 16)"
+_G["BINDING_NAME_CLICK ItemRackButton17:LeftButton"] = "Off Hand / Shield / Held In Off-hand (Slot 17)"
+_G["BINDING_NAME_CLICK ItemRackButton18:LeftButton"] = "Ranged / Wand / Thrown / Relic (Slot 18)"
+_G["BINDING_NAME_CLICK ItemRackButton19:LeftButton"] = "Tabard (Slot 19)"
+
 -- Compatibility shims for addon management APIs (moved to C_AddOns in TBC 2.5.5+)
 local GetAddOnMetadata = GetAddOnMetadata or (C_AddOns and C_AddOns.GetAddOnMetadata)
 local EnableAddOn = EnableAddOn or (C_AddOns and C_AddOns.EnableAddOn)
@@ -567,11 +592,11 @@ function ItemRack.UpdateClassSpecificStuff()
 end
 
 function ItemRack.OnSetBagItem(tooltip, bag, slot)
-	ItemRack.ListSetsHavingItem(tooltip, ItemRack.GetID(bag, slot), true)
+	ItemRack.ListSetsHavingItem(tooltip, ItemRack.GetID(bag, slot))
 end
 
 function ItemRack.OnSetInventoryItem(tooltip, unit, inv_slot)
-	ItemRack.ListSetsHavingItem(tooltip, ItemRack.GetID(inv_slot), true)
+	ItemRack.ListSetsHavingItem(tooltip, ItemRack.GetID(inv_slot))
 end
 
 function ItemRack.OnSetHyperlink(tooltip, link)
@@ -581,20 +606,15 @@ end
 do
 	local data = {}
 
-	function ItemRack.ListSetsHavingItem(tooltip, id, exact)
+	function ItemRack.ListSetsHavingItem(tooltip, id)
 		if ItemRackSettings.ShowSetInTooltip ~= "ON" then
 			return
 		end
 		if not id or id == 0 then return end
 		local same_ids = ItemRack.SameID
 		for name, set in pairs(ItemRackUser.Sets) do
-			for _, item in pairs(set.equip) do
-				if exact then
-					item = ItemRack.UpdateIRString(item)
-					if item==id then
-						data[name] = true
-					end
-				else
+			if not name:match("^~") then
+				for _, item in pairs(set.equip) do
 					if same_ids(item, id) then
 						data[name] = true
 					end
@@ -695,7 +715,7 @@ function ItemRack.InitCore()
 	ItemRackSettings.CharacterSheetMenus = ItemRackSettings.CharacterSheetMenus or "ON" -- 2.22
 	ItemRackSettings.DisableAltClick = ItemRackSettings.DisableAltClick or "OFF" -- 2.23
 	ItemRackSettings.HidePetBattle = ItemRackSettings.HidePetBattle or "ON" -- 2.87
-	ItemRackSettings.LeftSlotsGoRight = ItemRackSettings.LeftSlotsGoRight or "OFF" -- 4.27.3
+	ItemRackSettings.LeftSlotsGoRight = ItemRackSettings.LeftSlotsGoRight or "ON" -- 4.28
 	ItemRackSettings.RightSlotsGoLeft = ItemRackSettings.RightSlotsGoLeft or "OFF" -- 4.27.3
 	ItemRackSettings.CharacterSheetMenusLeft = nil -- removed in 4.27.3, replaced with per-side toggles
 end
@@ -2116,8 +2136,8 @@ function ItemRack.SetFont(button)
 		return
 	end
 	if ItemRackSettings.LargeNumbers=="ON" then
-		item:SetFont("Fonts\\FRIZQT__.TTF",16,"OUTLINE")
-		item:SetTextColor(1,.82,0,1)
+		item:SetFont("Fonts\\FRIZQT__.TTF",16,"THICKOUTLINE")
+		item:SetTextColor(1,1,1,1)
 		item:ClearAllPoints()
 		item:SetPoint("CENTER",button,"CENTER")
 	else

@@ -1,3 +1,10 @@
+__ New in 4.28 - By Bl4ut0 __
+- Fix: "Show set info in tooltips" now reliably shows the "ItemRack Set:" label on all items in saved sets. Switched from exact string matching to base-ID matching to handle TBC item string format changes.
+- Added: Blizzard Keybindings panel integration — all 20 equipment slots now appear under AddOns > ItemRack with descriptive slot names.
+- Improved: Large Numbers cooldown display now uses mm:ss format with dynamic coloring (white > 60s, yellow < 60s, red < 5s) and THICKOUTLINE font.
+- Improved: Suppressed WoW's native cooldown countdown numbers on ItemRack buttons to prevent duplicate text.
+- Improved: Hotkey text rendering — subtle gray color and proper hide/show when no key is bound.
+
 __ New in 4.27.1 - By Bl4ut0 __
 - Fixed Spec Swap Bug:
   - Ensured "Custom" label correctly updates to the set name after a specialization change.

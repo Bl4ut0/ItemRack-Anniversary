@@ -1,0 +1,42 @@
+<Bindings>
+	<Binding name="CLICK ItemRackButton0:LeftButton" header="ITEMRACK">
+	</Binding>
+	<Binding name="CLICK ItemRackButton1:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton2:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton3:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton4:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton5:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton6:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton7:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton8:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton9:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton10:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton11:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton12:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton13:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton14:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton15:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton16:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton17:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton18:LeftButton">
+	</Binding>
+	<Binding name="CLICK ItemRackButton19:LeftButton">
+	</Binding>
+</Bindings>

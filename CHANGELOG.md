@@ -2,6 +2,18 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.28] - 2026-02-14
+### Bug Fixes
+- **Tooltip Set Info ("Show set info in tooltips")**: Fixed an issue where hovering over items in your bags or character panel would inconsistently show or miss the "ItemRack Set:" label. The root cause was a strict full-string comparison between saved item IDs and live API item IDs. After the TBC Anniversary launch changed the item string format (additional fields), saved items with the old format would fail the exact match. Switched to base item ID matching (`SameID`), consistent with how set equipping, set detection, and hyperlink tooltips already work.
+
+### Improvements
+- **Blizzard Keybinding Integration**: All 20 equipment slots (0–19) are now registered in the Blizzard Keybindings panel under **AddOns > ItemRack**. Each slot has a descriptive label (e.g., "Head (Slot 1)", "Off Hand / Shield / Held In Off-hand (Slot 17)"). Added `Bindings.xml` for keybinding registration.
+- **Cooldown Display Overhaul (Large Numbers)**: When "Large Numbers" is enabled, cooldown text now uses a `mm:ss` / `h:mm` format (similar to Blizzard's style) with dynamic coloring — white above 60s, yellow under 60s, red under 5s. The font uses `THICKOUTLINE` for better readability. Small numbers mode retains the original `30 s` / `2 m` / `1 h` format.
+- **Native Countdown Suppression**: Suppressed WoW's built-in `CooldownFrame` countdown numbers on ItemRack buttons. The game's settings only allow disabling this for spells (not items), so ItemRack now explicitly calls `SetHideCountdownNumbers(true)` to prevent duplicate countdown text when using its own cooldown system.
+- **Hotkey Display**: Improved keybinding text rendering on slot buttons — keys now display in a subtle gray (`0.6, 0.6, 0.6`) and are properly hidden when no key is bound. Added nil-safety checks for the hotkey font string.
+
+---
+
 ## [4.27.5] - 2026-02-09
 ### Bug Fixes
 - **Action Bar Interaction**: Fixed an issue where casting spells from the main action bar (slots 1-12) would inadvertently highlight/check corresponding ItemRack slots. This was caused by the underlying button template responding to action bar events; these event handlers have now been explicitly disabled for ItemRack buttons, including hiding the CheckedTexture and SpellActivationAlert elements.
