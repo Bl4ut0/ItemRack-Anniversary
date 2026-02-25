@@ -2,17 +2,28 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.29] - 2026-02-25
+### Bug Fixes
+- **Action Bar Taint (ADDON_ACTION_BLOCKED)**: Fixed a critical taint propagation issue that caused Blizzard action bar buttons (e.g. `MultiBar5Button1:SetShown()`) to break after opening the character sheet. Two root causes were addressed:
+  1. **GameTooltip taint**: Temporarily replacing `GameTooltip.SetOwner` with an addon closure permanently flagged the table key as tainted, propagating through `OnEnter` → `UpdateShownButtons` → `SetShown`. Tooltip repositioning now occurs *after* the secure handler, using `ClearAllPoints`/`SetPoint` with alpha-hide to prevent visual snap.
+  2. **Action bar dispatcher taint**: ItemRack buttons inheriting `ActionBarButtonTemplate` were registered with Blizzard's shared event dispatcher tables. Addon code touching these buttons propagated taint to all real action buttons. `ButtonOnLoad` now unregisters from `ActionBarButtonEventsFrame`, `ActionBarActionEventsFrame`, and related dispatchers.
+- **Button Nil Errors**: Fixed `attempt to index field '?' (a nil value)` scaling errors that occasionally occurred on clients carrying over older profile data (e.g. Season of Discovery / Classic Era) when mousing over buttons or dragging them.
+
+### Improvements
+- **Tooltip Highlight Unequipped**: Added a new setting "Highlight unequipped in tooltip" to the Options pane. When viewing a set's minimap or on-screen tooltip, items that are taking up inventory space but are not currently equipped are drawn in **Orange**, making it easy to see what items aren't on your character.
+- **Improved Tooltip Placement**: Tooltips for popout menus on character-sheet slots now dynamically anchor to ensure they don't cover the buttons or the screen edges. Tooltips for right-side slots (Hands, Belt, etc) now fall down below the ItemRack menu to keep the buttons usable.
+
+---
+
 ## [4.28] - 2026-02-14
 ### Bug Fixes
 - **Tooltip Set Info ("Show set info in tooltips")**: Fixed an issue where hovering over items in your bags or character panel would inconsistently show or miss the "ItemRack Set:" label. The root cause was a strict full-string comparison that broke when the TBC Anniversary launch added extra fields to item strings. Replaced with a new `SameExactID` comparison that matches the first 8 item-identifying fields (itemID, enchant, gems, suffix, unique) while ignoring trailing context fields (level, spec). This correctly differentiates items with different enchants or gems, and is immune to item string format changes. Internal sets (`~Unequip`, `~CombatQueue`) are now also filtered from tooltips.
 
 ### Improvements
 - **Blizzard Keybinding Integration**: All 20 equipment slots (0–19) are now registered in the Blizzard Keybindings panel under **AddOns > ItemRack**. Each slot has a descriptive label (e.g., "Head (Slot 1)", "Off Hand / Shield / Held In Off-hand (Slot 17)"). Added `Bindings.xml` for keybinding registration.
-- **Cooldown Display Overhaul (Large Numbers)**: When "Large Numbers" is enabled, cooldown text now uses a `mm:ss` / `h:mm` format (similar to Blizzard's style) with dynamic coloring — white above 60s, yellow under 60s, red under 5s. The font uses `THICKOUTLINE` for better readability. Small numbers mode retains the original `30 s` / `2 m` / `1 h` format.
+- **Improved Cooldown Display (Large Numbers)**: When "Large Numbers" is enabled in settings, cooldown text now uses a compact `mm:ss` / `h:mm` format with dynamic coloring: **white** (>60s), **yellow** (<60s), and **red** (<5s). Small numbers mode retains the original `30 s` / `2 m` / `1 h` format.
 - **Native Countdown Suppression**: Suppressed WoW's built-in `CooldownFrame` countdown numbers on ItemRack buttons. The game's settings only allow disabling this for spells (not items), so ItemRack now explicitly calls `SetHideCountdownNumbers(true)` to prevent duplicate countdown text when using its own cooldown system.
 - **Hotkey Display**: Improved keybinding text rendering on slot buttons — keys now display in a subtle gray (`0.6, 0.6, 0.6`) and are properly hidden when no key is bound. Added nil-safety checks for the hotkey font string.
-
----
 
 ## [4.27.5] - 2026-02-09
 ### Bug Fixes

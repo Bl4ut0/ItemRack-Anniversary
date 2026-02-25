@@ -21,15 +21,42 @@ ItemRack.LockedButtons = {} -- buttons locked (desaturated)
 ItemRack.NewAnchor = nil
 
 function ItemRack.ButtonOnLoad(self)
-	-- Call standard template load to creating child frames (Cooldown, HotKey, etc.)
-	if ActionButton_OnLoad then
-		ActionButton_OnLoad(self)
-	end
+	-- ActionBarButtonTemplate fires ActionBarButtonMixin_OnLoad which calls both
+	-- BaseActionButtonMixin_OnLoad AND ActionBarActionButtonDerivedMixin_OnLoad.
+	-- The derived mixin registers the button with ActionBarButtonEventsFrame (for 
+	-- global action bar events) and ActionBarActionEventsFrame (for action-specific events).
+	-- We MUST unregister from these to prevent taint propagation — when ItemRack's addon
+	-- code touches these buttons, the taint would spread through the shared event dispatch
+	-- tables to ALL real Blizzard action buttons.
 	
-	-- Immediately detach from Action Bar system
+	-- Unregister from the central action bar event dispatchers
+	if ActionBarButtonEventsFrame and ActionBarButtonEventsFrame.frames then
+		for k, frame in pairs(ActionBarButtonEventsFrame.frames) do
+			if frame == self then
+				ActionBarButtonEventsFrame.frames[k] = nil
+				break
+			end
+		end
+	end
+	if ActionBarActionEventsFrame and ActionBarActionEventsFrame.frames then
+		ActionBarActionEventsFrame.frames[self] = nil
+	end
+	if ActionBarButtonUpdateFrame and ActionBarButtonUpdateFrame.frames then
+		ActionBarButtonUpdateFrame.frames[self] = nil
+	end
+	if ActionBarButtonRangeCheckFrame and ActionBarButtonRangeCheckFrame.actions then
+		for action, frames in pairs(ActionBarButtonRangeCheckFrame.actions) do
+			if frames[self] then
+				frames[self] = nil
+			end
+		end
+	end
+
+	-- Clear any action-related state that the mixin OnLoad set
 	self:SetAttribute("action", nil)
 	self.action = nil
-	self:UnregisterAllEvents() -- Stop listening to action bar events
+	self.eventsRegistered = nil
+	self:UnregisterAllEvents() -- Stop listening to any inherited events
 
 	-- Override SetChecked to block external calls from Blizzard action bar system
 	local originalSetChecked = self.SetChecked
@@ -144,8 +171,9 @@ function ItemRack.InitButtons()
 			ItemRack.MasqueGroups[1]:AddButton(button)
 		end
 
-		-- Fix for TBC Anniversary: Detach ActionBarButtonTemplate logic
-		-- This prevents ItemRack buttons from inheriting Main Action Bar states (flashing red on auto-attack, action keybinds)
+		-- Defensive cleanup: ensure no action bar scripts/events are active
+		-- ButtonOnLoad already unregisters from the dispatch tables, but this ensures
+		-- no stray event handlers remain after InitButtons runs
 		button:UnregisterAllEvents()
 		button:SetScript("OnEvent", nil)
 		button:SetScript("OnUpdate", nil)
@@ -317,10 +345,7 @@ end
 
 -- return button if it's not docked, or the original button of dock chain if docked
 function ItemRack.FindParent(button)
-	while ItemRackUser.Buttons[button].DockTo do
-		if not ItemRackUser.Buttons[button].DockTo then
-			return button
-		end
+	while ItemRackUser.Buttons[button] and ItemRackUser.Buttons[button].DockTo do
 		button = ItemRackUser.Buttons[button].DockTo
 	end
 	return button
@@ -385,7 +410,7 @@ function ItemRack.StartMovingButton(self)
 end
 
 function ItemRack.StopMovingButton(self)
-	if ItemRackUser.Locked=="ON" then return end
+	if ItemRackUser.Locked=="ON" or not ItemRack.ButtonMoving then return end
 	ItemRack.StopTimer("ButtonsDocking")
 	ItemRack.ButtonMoving:StopMovingOrSizing()
 	ItemRack.NewAnchor = nil
@@ -423,9 +448,10 @@ function ItemRack.ConstructLayout()
 		ItemRackUser.Buttons[i].needsDrawn = 1
 	end
 
-	-- draw undocked buttons first
+	-- draw undocked buttons first (or buttons docked to a non-existent parent)
 	for i in pairs(ItemRackUser.Buttons) do
-		if ItemRackUser.Buttons[i].needsDrawn and not ItemRackUser.Buttons[i].DockTo then
+		local dockTo = ItemRackUser.Buttons[i].DockTo
+		if ItemRackUser.Buttons[i].needsDrawn and (not dockTo or not ItemRackUser.Buttons[dockTo]) then
 --			button = ItemRack.CreateButton(ItemRackUser.Buttons[i].name,i,ItemRackUser.Buttons[i].type)
 			button = _G["ItemRackButton"..i]
 			ItemRackUser.Buttons[i].needsDrawn = nil
@@ -443,13 +469,15 @@ function ItemRack.ConstructLayout()
 	while not done do
 		done = 1
 		for i in pairs(ItemRackUser.Buttons) do
-			if ItemRackUser.Buttons[i].needsDrawn and not ItemRackUser.Buttons[ItemRackUser.Buttons[i].DockTo].needsDrawn then -- if this button's DockTo is already drawn
+			local dockTo = ItemRackUser.Buttons[i].DockTo
+			-- if this button still needs drawing, and its parent is fully drawn (needsDrawn is nil/false)
+			if ItemRackUser.Buttons[i].needsDrawn and dockTo and ItemRackUser.Buttons[dockTo] and not ItemRackUser.Buttons[dockTo].needsDrawn then 
 --				button = ItemRack.CreateButton(ItemRackUser.Buttons[i].name,i,ItemRackUser.Buttons[i].type)
 				button = _G["ItemRackButton"..i]
 				ItemRackUser.Buttons[i].needsDrawn = nil
 				button:ClearAllPoints()
 				dockinfo = ItemRack.DockInfo[ItemRackUser.Buttons[i].Side]
-				button:SetPoint(ItemRackUser.Buttons[i].Side,"ItemRackButton"..ItemRackUser.Buttons[i].DockTo,ItemRack.OppositeSide[ItemRackUser.Buttons[i].Side],dockinfo.xoff*(ItemRackUser.ButtonSpacing or 4),dockinfo.yoff*(ItemRackUser.ButtonSpacing or 4))
+				button:SetPoint(ItemRackUser.Buttons[i].Side,"ItemRackButton"..dockTo,ItemRack.OppositeSide[ItemRackUser.Buttons[i].Side],dockinfo.xoff*(ItemRackUser.ButtonSpacing or 4),dockinfo.yoff*(ItemRackUser.ButtonSpacing or 4))
 				button:Show()
 				done = nil
 			end
@@ -501,9 +529,9 @@ function ItemRack.DockMenuToButton(button)
 
 	local parent = ItemRack.FindParent(button)
 	-- get docking and orientation from parent of this button group, use defaults if none defined
-	local menuDock = ItemRackUser.Buttons[parent].MenuDock or "BOTTOMLEFT"
-	local mainDock = ItemRackUser.Buttons[parent].MainDock or "TOPLEFT"
-	local menuOrient = ItemRackUser.Buttons[parent].MenuOrient or "VERTICAL"
+	local menuDock = (ItemRackUser.Buttons[parent] and ItemRackUser.Buttons[parent].MenuDock) or "BOTTOMLEFT"
+	local mainDock = (ItemRackUser.Buttons[parent] and ItemRackUser.Buttons[parent].MainDock) or "TOPLEFT"
+	local menuOrient = (ItemRackUser.Buttons[parent] and ItemRackUser.Buttons[parent].MenuOrient) or "VERTICAL"
 	ItemRack.DockWindows(menuDock,_G["ItemRackButton"..button],mainDock,menuOrient,button)
 end
 

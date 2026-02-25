@@ -8,6 +8,71 @@ The TBC Anniversary Edition runs on a modern WoW client engine (similar to Retai
 
 ---
 
+## GameTooltip Taint Fix (ADDON_ACTION_BLOCKED)
+**File:** `ItemRack.lua` — `PaperDollItemSlotButton_OnEnter` override
+
+### Problem
+After hovering over a character sheet equipment slot (while an ItemRack popout menu was visible), Blizzard action bar buttons would start throwing `ADDON_ACTION_BLOCKED` errors on `MultiBar5Button1:SetShown()`. The error persisted until `/reload`.
+
+The call chain in the error was:
+```
+OnEnter → UpdateAction → UpdateShownButtons → SetShown (BLOCKED)
+```
+
+### Root Cause
+To prevent tooltip overlap with ItemRack's popout menus, the `PaperDollItemSlotButton_OnEnter` override temporarily **replaced** `GameTooltip.SetOwner` with an addon closure:
+
+```lua
+-- BEFORE (taint-causing)
+oldSetOwner = GameTooltip.SetOwner
+GameTooltip.SetOwner = function(tooltip, owner, _anchor, ...)
+    oldSetOwner(tooltip, ownerHook, anchorHook, ...)
+end
+-- ... call original handler ...
+GameTooltip.SetOwner = oldSetOwner  -- restore
+```
+
+Even though the original function was restored immediately, **WoW's taint system permanently flags the table key** once addon code writes to it. The `GameTooltip` table was now considered tainted. Later, when Blizzard's action bar `OnEnter` handler called `GameTooltip:SetOwner()`, it read from the tainted table, propagating taint through the entire execution chain until `SetShown()` (a protected function) was blocked.
+
+### Solution — Tooltip Repositioning
+Instead of intercepting `GameTooltip.SetOwner`, we now:
+1. **Hide** the tooltip with `SetAlpha(0)` before calling the original handler (prevents a visible "snap")
+2. Call the original Blizzard handler **completely untouched** (secure, no taint)
+3. **After** it finishes, reposition using `ClearAllPoints()`/`SetPoint()` — these are method calls, not table key assignments, so they don't cause taint
+4. **Reveal** the tooltip at the correct position with `SetAlpha(1)`
+5. Store the desired anchor in `ItemRack.pendingTooltipAnchor` so it can be **re-applied** after `tooltip:Show()` calls from hooks (e.g. `ListSetsHavingItem`) which would otherwise re-snap the tooltip
+6. If the repositioned tooltip is **too wide** and overlaps the menu, fall back to below the menu frame
+
+```lua
+-- Hide during setup to prevent visible snap
+GameTooltip:SetAlpha(0)
+ItemRack.oldPaperDollItemSlotButton_OnEnter(self)  -- secure, untouched
+
+-- Reposition and reveal
+ItemRack.ApplyTooltipAnchor()  -- ClearAllPoints + SetPoint to desired position
+GameTooltip:SetAlpha(1)
+```
+
+### Solution — Button Template & Taint Isolation
+**File:** `ItemRackButtons.xml`, `ItemRackButtons.lua` — `ButtonOnLoad`
+
+ItemRack buttons inherit `ActionBarButtonTemplate` (which includes `SecureActionButtonTemplate` + the click-handling mixins needed for item use). However, this template also registers each button with Blizzard's shared event dispatchers (`ActionBarButtonEventsFrame`, `ActionBarActionEventsFrame`, etc.). When addon code later touches these buttons, the taint propagates through the shared dispatch tables to ALL real action buttons.
+
+`ButtonOnLoad` now immediately unregisters ItemRack buttons from these dispatchers:
+```lua
+-- Remove from shared event dispatch tables to prevent taint propagation
+ActionBarButtonEventsFrame.frames[k] = nil   -- global button events
+ActionBarActionEventsFrame.frames[self] = nil -- action-specific events
+ActionBarButtonUpdateFrame.frames[self] = nil -- update ticks
+```
+
+### Key Takeaways
+1. **Never directly assign to secure table keys** (e.g. `GameTooltip.SetOwner = ...`), even temporarily. WoW's taint tracking flags the key permanently.
+2. **Buttons inheriting `ActionBarButtonTemplate` must unregister from shared dispatchers** if they are managed by addon code, otherwise taint propagates to all real action buttons.
+3. Use `hooksecurefunc()` for pre/post hooks, or reposition frames after the secure handler completes.
+
+---
+
 ## Recent Feature Refinements (Spec Switching & UI Persistence)
 
 ### Specialization & Gear Synchronization

@@ -626,6 +626,10 @@ do
 			data[name] = nil
 		end
 		tooltip:Show()
+		-- Re-apply our desired anchor position. tooltip:Show() recalculates layout
+		-- and snaps back to the original Blizzard anchor, undoing any repositioning
+		-- we did in PaperDollItemSlotButton_OnEnter.
+		ItemRack.ApplyTooltipAnchor()
 	end
 end
 
@@ -1780,7 +1784,33 @@ end
 
 function ItemRack.AnchorTooltip(owner)
 	if string.match(ItemRack.menuDockedTo or "","^Character") then
-		GameTooltip:SetOwner(owner,"ANCHOR_RIGHT")
+		local name = ItemRack.menuDockedTo
+		local slot
+		for i=0,19 do
+			if name=="Character"..ItemRack.SlotInfo[i].name then
+				slot = i
+			end
+		end
+		
+		if slot then
+			if slot == 0 or (slot >= 16 and slot <= 18) then
+				GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+			elseif slot==1 or slot==2 or slot==3 or slot==15 or slot==5 or slot==4 or slot==19 or slot==9 then
+				if ItemRackSettings.LeftSlotsGoRight == "ON" then
+					GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+				else
+					GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
+				end
+			else
+				if ItemRackSettings.RightSlotsGoLeft == "ON" then
+					GameTooltip:SetOwner(owner, "ANCHOR_BOTTOMLEFT")
+				else
+					GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+				end
+			end
+		else
+			GameTooltip:SetOwner(owner,"ANCHOR_RIGHT")
+		end
 	elseif ItemRackSettings.TooltipFollow=="ON" then
 		if owner.GetLeft and owner:GetLeft() and owner:GetLeft()<400 then
 			GameTooltip:SetOwner(owner,"ANCHOR_RIGHT")
@@ -1972,9 +2002,129 @@ end
 
 ItemRack.oldPaperDollItemSlotButton_OnEnter = PaperDollItemSlotButton_OnEnter
 function PaperDollItemSlotButton_OnEnter(self)
-	ItemRack.oldPaperDollItemSlotButton_OnEnter(self)
-	if ItemRack.menuDockedTo~=self:GetName() and (ItemRackSettings.MenuOnShift=="OFF" or IsShiftKeyDown()) and ItemRackSettings.CharacterSheetMenus=="ON" then
+	local name = self:GetName()
+	local isMenuOpening = ItemRack.menuDockedTo~=name and (ItemRackSettings.MenuOnShift=="OFF" or IsShiftKeyDown()) and ItemRackSettings.CharacterSheetMenus=="ON"
+	
+	-- We must build the menu BEFORE rendering the tooltip, so ItemRackMenuFrame exists with current dimensions
+	if isMenuOpening then
 		ItemRack.DockMenuToCharacterSheet(self)
+	end
+
+	local isMenuOpen = ItemRackMenuFrame:IsVisible() and ItemRack.menuDockedTo == name
+	
+	local slot
+	for i=0,19 do
+		if name=="Character"..ItemRack.SlotInfo[i].name then
+			slot = i
+			break
+		end
+	end
+	
+	-- Hide the tooltip during the Blizzard handler to prevent a visible "snap"
+	-- from the default position to our desired position.
+	if isMenuOpen and slot then
+		GameTooltip:SetAlpha(0)
+	end
+	
+	-- Call the original Blizzard function FIRST, completely untouched.
+	-- We MUST NOT modify GameTooltip.SetOwner or any other secure table — doing so
+	-- taints the GameTooltip table, which propagates to Blizzard action bar OnEnter
+	-- handlers and causes ADDON_ACTION_BLOCKED errors on protected calls like SetShown().
+	ItemRack.oldPaperDollItemSlotButton_OnEnter(self)
+	
+	-- AFTER the secure handler has finished (including any hooksecurefunc hooks like
+	-- ListSetsHavingItem which call tooltip:Show()), reposition and reveal the tooltip.
+	if isMenuOpen and slot then
+		local desiredOwner, desiredAnchor
+		
+		if slot == 0 or (slot >= 16 and slot <= 18) then
+			-- Bottom slots: menu goes down. Tooltip to the right is fine.
+			desiredOwner = self
+			desiredAnchor = "ANCHOR_RIGHT"
+		elseif slot==1 or slot==2 or slot==3 or slot==15 or slot==5 or slot==4 or slot==19 or slot==9 then
+			if ItemRackSettings.LeftSlotsGoRight == "ON" then
+				desiredOwner = ItemRackMenuFrame
+				desiredAnchor = "ANCHOR_RIGHT"
+			else
+				desiredOwner = self
+				desiredAnchor = "ANCHOR_RIGHT"
+			end
+		else
+			if ItemRackSettings.RightSlotsGoLeft == "ON" then
+				desiredOwner = self
+				desiredAnchor = "ANCHOR_BOTTOMLEFT"
+			else
+				desiredOwner = self
+				desiredAnchor = "ANCHOR_LEFT"
+			end
+		end
+		
+		-- Store for re-application after tooltip:Show() in hooks
+		ItemRack.pendingTooltipAnchor = desiredAnchor
+		ItemRack.pendingTooltipOwner = desiredOwner
+		
+		-- Apply positioning and reveal
+		ItemRack.ApplyTooltipAnchor()
+		GameTooltip:SetAlpha(1)
+	else
+		ItemRack.pendingTooltipAnchor = nil
+		ItemRack.pendingTooltipOwner = nil
+	end
+end
+
+-- Apply the stored tooltip anchor. Called after PaperDollItemSlotButton_OnEnter
+-- and again after ListSetsHavingItem's tooltip:Show() which re-snaps the position.
+-- Also handles wide tooltips that would overlap the menu by falling back to
+-- positioning below or above the menu frame.
+function ItemRack.ApplyTooltipAnchor()
+	local anchor = ItemRack.pendingTooltipAnchor
+	local owner = ItemRack.pendingTooltipOwner
+	if not anchor or not owner then return end
+	
+	-- Only apply to character sheet slot tooltips. This function is also called from
+	-- ListSetsHavingItem which fires for ALL tooltips (including ItemRack toolbar buttons).
+	-- Without this guard, stale state from a character sheet hover would yank ItemRack
+	-- button tooltips to the wrong position, breaking on-use item click interaction.
+	local tooltipOwner = GameTooltip:GetOwner()
+	if not tooltipOwner or not tooltipOwner.GetName then return end
+	local ownerName = tooltipOwner:GetName() or ""
+	if not ownerName:match("^Character") then
+		-- Not a character sheet tooltip — clear stale pending state
+		ItemRack.pendingTooltipAnchor = nil
+		ItemRack.pendingTooltipOwner = nil
+		return
+	end
+	
+	-- Apply the desired anchor
+	GameTooltip:ClearAllPoints()
+	if anchor == "ANCHOR_RIGHT" then
+		GameTooltip:SetPoint("TOPLEFT", owner, "TOPRIGHT", 0, 0)
+	elseif anchor == "ANCHOR_LEFT" then
+		GameTooltip:SetPoint("TOPRIGHT", owner, "TOPLEFT", 0, 0)
+	elseif anchor == "ANCHOR_BOTTOMLEFT" then
+		GameTooltip:SetPoint("TOPLEFT", owner, "BOTTOMLEFT", 0, 0)
+	end
+	
+	-- Check if the positioned tooltip overlaps the menu (e.g. wide tooltip with ANCHOR_LEFT).
+	-- If so, fall back to positioning below or above the menu to keep buttons accessible.
+	if ItemRackMenuFrame:IsVisible() then
+		local ttL = GameTooltip:GetLeft()
+		local ttR = GameTooltip:GetRight()
+		local ttT = GameTooltip:GetTop()
+		local ttB = GameTooltip:GetBottom()
+		local mL = ItemRackMenuFrame:GetLeft()
+		local mR = ItemRackMenuFrame:GetRight()
+		local mT = ItemRackMenuFrame:GetTop()
+		local mB = ItemRackMenuFrame:GetBottom()
+		
+		if ttL and ttR and ttT and ttB and mL and mR and mT and mB then
+			local overlaps = not (ttR < mL or ttL > mR or ttB > mT or ttT < mB)
+			if overlaps then
+				-- Tooltip is too wide and covers the menu — drop below the menu instead
+				GameTooltip:ClearAllPoints()
+				GameTooltip:SetPoint("TOPLEFT", ItemRackMenuFrame, "BOTTOMLEFT", 0, -2)
+			end
+		end
 	end
 end
 

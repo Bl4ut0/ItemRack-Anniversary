@@ -176,6 +176,7 @@ function ItemRackOpt.OnLoad(self)
 		{type="check",optset=ItemRackSettings,variable="NotifyThirty",label="Notify at 30",tooltip="Announce when an item you used is at 30 seconds cooldown."},
 		{type="check",optset=ItemRackSettings,variable="NotifyChatAlso",label="Notify chat also",tooltip="Send cooldown notifications to chat also."},
 		{type="check",optset=ItemRackSettings,variable="ShowSetInTooltip",label="Show set info in tooltips",tooltip="Show which set an item belongs to in the tooltip."},
+		{type="check",optset=ItemRackSettings,variable="TooltipColorUnEquipped",depend="ShowSetInTooltip",label="Highlight unequipped in tooltip",tooltip="Show items that are in your bags but not currently equipped as Orange in the set tooltip."},
 		{type="check",optset=ItemRackSettings,variable="ShowTooltips",label="Show tooltips",tooltip="Show tooltips like the one you're reading now."},
 		{type="check",optset=ItemRackSettings,variable="TinyTooltips",depend="ShowTooltips",label="Tiny Tooltips",tooltip="Shrink item tooltips to display only name, cooldown and durability."},
 		{type="check",optset=ItemRackSettings,variable="TooltipFollow",depend="ShowTooltips",label="Tooltips at pointer",tooltip="Show tooltips near the mouse."},
