@@ -2,6 +2,22 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.29.1] - 2026-02-25
+### Bug Fixes
+- **Specialization Re-equip Flicker**: Fixed an issue where zoning or reloading would cause ItemRack to aggressively re-equip spec-tied gear sets, overwriting manual gear changes (like equipping a shield).
+  1. **Spec Priming**: ItemRack now primes its state on startup, recognizing the current specialization, stance, and zone to prevent redundant "new" swaps.
+  2. **Zoning Guard**: Added protection against invalid spec indices (0) that occasionally flicker during loading screens.
+  3. **State Tracking**: Converted Specialization and Zone events to use `.Active` flag tracking. This ensures that once a set is equipped for a spec/zone, ItemRack won't "fight" manual gear overrides until the player actually changes state.
+
+### Improvements
+- **Optimized Popout Menus**: Redesigned the popout menu (`BuildMenu`) logic to handle high item counts (like multiple necklaces/rings).
+  - **Dynamic Wrapping**: Menus now automatically wrap into multiple columns when item counts are high (4/8/12/24 items), keeping the menu compact.
+  - **Always to the Side**: Handled the "Always go to either side" rule for character sheet popouts. Weapon and Ammo slots now grow horizontally to the Left or Right instead of downwards, preventing them from covering lower equipment slots or going off-screen.
+  - **Screen Space Awareness**: Menus now calculate their height against the screen resolution, automatically adjusting column counts to ensure the entire menu remains visible and accessible.
+- **Enhanced Tooltip Anchoring**: Improved `ApplyTooltipAnchor` to protect all ItemRack toolbar buttons. Tooltips now intelligently anchor away from screen edges and Blizzard's default UI elements to prevent overlap.
+
+---
+
 ## [4.29] - 2026-02-25
 ### Bug Fixes
 - **Action Bar Taint (ADDON_ACTION_BLOCKED)**: Fixed a critical taint propagation issue that caused Blizzard action bar buttons (e.g. `MultiBar5Button1:SetShown()`) to break after opening the character sheet. Two root causes were addressed:

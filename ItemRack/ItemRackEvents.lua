@@ -229,6 +229,37 @@ function ItemRack.InitEvents()
 	ItemRack.CreateTimer("EventsZoneTimer",ItemRack.ProcessZoneEvent,.16)
 	ItemRack.CreateTimer("CheckForMountedEvents",ItemRack.CheckForMountedEvents,.5,1)
 	ItemRack.CreateTimer("SpecChangeTimer",ItemRack.ProcessSpecializationEvent,0.5,1)
+	
+	-- Prime all events to prevent redundant swaps on login/reload
+	local getSpec = GetActiveTalentGroup or (C_Talent and C_Talent.GetActiveTalentGroup)
+	local currentSpec = getSpec and getSpec()
+	local currentStance = GetShapeshiftForm()
+	local curZone = GetRealZoneText()
+	local curSubZone = GetSubZoneText()
+	local isMounted = IsMounted() and not UnitOnTaxi("player")
+
+	ItemRack.LastLastSpec = (currentSpec and currentSpec > 0) and currentSpec or nil
+
+	for eventName, eventData in pairs(ItemRackEvents) do
+		local shouldBeActive = false
+		if eventData.Type == "Specialization" and currentSpec and eventData.Spec == currentSpec then
+			shouldBeActive = true
+		elseif eventData.Type == "Stance" and ItemRack.GetStanceNumber(eventData.Stance) == currentStance then
+			shouldBeActive = true
+		elseif eventData.Type == "Zone" and (eventData.Zones[curZone] or eventData.Zones[curSubZone]) then
+			shouldBeActive = true
+		elseif eventData.Type == "Buff" then
+			if eventData.Anymount then
+				if isMounted then shouldBeActive = true end
+			elseif eventData.Buff and AuraUtil.FindAuraByName(eventData.Buff, "player") then
+				shouldBeActive = true
+			end
+		end
+		
+		if shouldBeActive then
+			eventData.Active = true
+		end
+	end
 
 	if ItemRackButton20Queue then
 		ItemRackButton20Queue:SetTexture("Interface\\AddOns\\ItemRack\\ItemRackGear")
@@ -417,10 +448,25 @@ function ItemRack.ProcessZoneEvent()
 	for eventName in pairs(enabled) do
 		if events[eventName].Type=="Zone" then
 			setname = ItemRackUser.Events.Set[eventName]
-			if (events[eventName].Zones[currentZone] or events[eventName].Zones[currentSubZone]) and not ItemRack.IsSetEquipped(setname) then
-				setToEquip = setname
-			elseif not (events[eventName].Zones[currentZone] or events[eventName].Zones[currentSubZone]) and events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
-				setToUnequip = setname
+			local inZone = events[eventName].Zones[currentZone] or events[eventName].Zones[currentSubZone]
+			
+			if inZone then
+				if not events[eventName].Active then
+					if not ItemRack.IsSetEquipped(setname) then
+						setToEquip = setname
+					end
+					events[eventName].Active = true
+				end
+			else-- if not inZone
+				if events[eventName].Active then
+					if events[eventName].Unequip then
+						setToUnequip = setname
+					end
+					events[eventName].Active = nil
+				elseif events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
+					-- Fallback for consistency (e.g. reload UI while in zone then leave)
+					setToUnequip = setname
+				end
 			end
 		end
 	end
@@ -440,8 +486,10 @@ function ItemRack.ProcessSpecializationEvent()
 	if not getSpec then return end
 	local currentSpec = getSpec()
 	
-	-- Only trigger gear swap if the spec index has actually changed
-	-- This prevents spec-sets from fighting with other events like "Drinking"
+	-- Guard against invalid spec index (can occur during zoning/loading)
+	if not currentSpec or currentSpec == 0 then return end
+	
+	-- Only proceed if the spec index has actually changed
 	if ItemRack.LastLastSpec == currentSpec then return end
 	ItemRack.LastLastSpec = currentSpec
 	
@@ -452,13 +500,25 @@ function ItemRack.ProcessSpecializationEvent()
 			setname = ItemRackUser.Events.Set[eventName]
 			-- Always equip the set for the current spec
 			if events[eventName].Spec == currentSpec then
-				setToEquip = setname
+				if not events[eventName].Active then
+					setToEquip = setname
+					events[eventName].Active = true
+				end
 			-- Unequip sets for other specs if they're equipped
-			elseif events[eventName].Spec ~= currentSpec and events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
-				setToUnequip = setname
+			elseif events[eventName].Spec ~= currentSpec then
+				if events[eventName].Active then
+					if events[eventName].Unequip then
+						setToUnequip = setname
+					end
+					events[eventName].Active = nil
+				elseif events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
+					-- Fallback for consistency
+					setToUnequip = setname
+				end
 			end
 		end
 	end
+	
 	-- Unequip first, then equip (to avoid conflicts)
 	if setToUnequip then
 		ItemRack.UnequipSet(setToUnequip)
@@ -469,13 +529,9 @@ function ItemRack.ProcessSpecializationEvent()
 			ItemRack.EquipSet(setToEquip)
 			
 			-- Dual-Wield Awareness: Schedule a delayed re-check for weapon slots
-			-- Some specs grant dual-wield (e.g., Enhancement Shaman, Fury Warrior)
-			-- The offhand may fail to equip if dual-wield isn't recognized immediately
-			-- Uses EquipItemByID directly (not temporary sets) to avoid queue issues
 			ItemRack.ScheduleDualWieldRetry(setToEquip)
 		else
 			-- If already equipped, still update the UI to ensure the correct set name is shown
-			-- This prevents the label from getting stuck as "Custom" after a spec change.
 			ItemRack.UpdateCurrentSet()
 		end
 	end

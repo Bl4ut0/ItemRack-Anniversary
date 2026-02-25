@@ -1296,19 +1296,38 @@ function ItemRack.BuildMenu(id,menuInclude,masqueGroup)
 	else
 		-- display outward from docking point
 		local col,row,xpos,ypos = 0,0,ItemRack.DockInfo[ItemRack.currentDock].xstart,ItemRack.DockInfo[ItemRack.currentDock].ystart
-		local max_cols = 1
-		local button, icon
-
+		local menuCount = #(ItemRack.Menu)
+		local max_cols, button, icon
 		if ItemRackUser.SetMenuWrap=="ON" then
 			max_cols = ItemRackUser.SetMenuWrapValue
-		elseif #(ItemRack.Menu)>24 then
-			max_cols = 5
-		elseif #(ItemRack.Menu)>18 then
-			max_cols = 4
-		elseif #(ItemRack.Menu)>9 then
-			max_cols = 3
-		elseif #(ItemRack.Menu)>4 then
-			max_cols = 2
+		else
+			-- Dynamic wrap based on count to keep popups compact but manageable
+			if menuCount > 24 then
+				max_cols = 6
+			elseif menuCount > 12 then
+				max_cols = 4
+			elseif menuCount > 8 then
+				max_cols = 3
+			elseif menuCount > 4 then
+				max_cols = 2
+			else
+				max_cols = 1
+			end
+		end
+
+		-- Screen space awareness: ensure height doesn't exceed screen
+		local screenHeight = GetScreenHeight()
+		if ItemRack.menuOrient == "HORIZONTAL" then
+			-- In horizontal mode, max_cols is the HEIGHT in buttons
+			if (max_cols * 40 + 40) > screenHeight then
+				max_cols = math.floor((screenHeight - 80) / 40)
+			end
+		else
+			-- In vertical mode, height grows with rows (menuCount / max_cols)
+			local rows = math.ceil(menuCount / max_cols)
+			if (rows * 40 + 40) > screenHeight then
+				max_cols = math.ceil(menuCount / (math.floor((screenHeight - 80) / 40)))
+			end
 		end
 
 		for i=1,#(ItemRack.Menu) do
@@ -1809,7 +1828,12 @@ function ItemRack.AnchorTooltip(owner)
 				end
 			end
 		else
-			GameTooltip:SetOwner(owner,"ANCHOR_RIGHT")
+			-- Default toolbar buttons: anchor away from nearest screen edge
+			if owner:GetCenter() < GetScreenWidth()/2 then
+				GameTooltip:SetOwner(owner,"ANCHOR_RIGHT")
+			else
+				GameTooltip:SetOwner(owner,"ANCHOR_LEFT")
+			end
 		end
 	elseif ItemRackSettings.TooltipFollow=="ON" then
 		if owner.GetLeft and owner:GetLeft() and owner:GetLeft()<400 then
@@ -2081,15 +2105,12 @@ function ItemRack.ApplyTooltipAnchor()
 	local owner = ItemRack.pendingTooltipOwner
 	if not anchor or not owner then return end
 	
-	-- Only apply to character sheet slot tooltips. This function is also called from
-	-- ListSetsHavingItem which fires for ALL tooltips (including ItemRack toolbar buttons).
-	-- Without this guard, stale state from a character sheet hover would yank ItemRack
-	-- button tooltips to the wrong position, breaking on-use item click interaction.
+	-- Only apply to ItemRack-related tooltips
 	local tooltipOwner = GameTooltip:GetOwner()
 	if not tooltipOwner or not tooltipOwner.GetName then return end
 	local ownerName = tooltipOwner:GetName() or ""
-	if not ownerName:match("^Character") then
-		-- Not a character sheet tooltip — clear stale pending state
+	if not (ownerName:match("^Character") or ownerName:match("^ItemRack")) then
+		-- Not an ItemRack related tooltip — clear stale pending state
 		ItemRack.pendingTooltipAnchor = nil
 		ItemRack.pendingTooltipOwner = nil
 		return
@@ -2138,8 +2159,12 @@ function ItemRack.DockMenuToCharacterSheet(self)
 	end
 	if slot then
 		if slot==0 or (slot>=16 and slot<=18) then
-			-- Bottom/weapon slots: always dock vertically
-			ItemRack.DockWindows("TOPLEFT",self,"BOTTOMLEFT","VERTICAL")
+			-- Bottom slots (Weapons/Ammo): grow sideways to avoid covering center slots or going off-screen
+			if self:GetCenter() < GetScreenWidth()/2 then
+				ItemRack.DockWindows("TOPRIGHT",self,"TOPLEFT","HORIZONTAL") -- To the Left
+			else
+				ItemRack.DockWindows("TOPLEFT",self,"TOPRIGHT","HORIZONTAL") -- To the Right
+			end
 		else
 			if slot==14 and ItemRackSettings.TrinketMenuMode=="ON" then
 				self = CharacterTrinket0Slot
