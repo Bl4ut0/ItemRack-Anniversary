@@ -444,11 +444,12 @@ function ItemRack.ProcessZoneEvent()
 	local currentZone = GetRealZoneText()
 	local currentSubZone = GetSubZoneText()
 	local setToEquip, setToUnequip, setname
+	local _,instanceType = IsInInstance()
 
 	for eventName in pairs(enabled) do
 		if events[eventName].Type=="Zone" then
 			setname = ItemRackUser.Events.Set[eventName]
-			local inZone = events[eventName].Zones[currentZone] or events[eventName].Zones[currentSubZone]
+			local inZone = events[eventName].Zones[currentZone] or events[eventName].Zones[currentSubZone] or events[eventName].Zones[instanceType]
 			
 			if inZone then
 				if not events[eventName].Active then
