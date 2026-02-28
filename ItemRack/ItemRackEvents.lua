@@ -237,6 +237,7 @@ function ItemRack.InitEvents()
 	local curZone = GetRealZoneText()
 	local curSubZone = GetSubZoneText()
 	local isMounted = IsMounted() and not UnitOnTaxi("player")
+	local _, instanceType = IsInInstance()
 
 	ItemRack.LastLastSpec = (currentSpec and currentSpec > 0) and currentSpec or nil
 
@@ -246,7 +247,7 @@ function ItemRack.InitEvents()
 			shouldBeActive = true
 		elseif eventData.Type == "Stance" and ItemRack.GetStanceNumber(eventData.Stance) == currentStance then
 			shouldBeActive = true
-		elseif eventData.Type == "Zone" and (eventData.Zones[curZone] or eventData.Zones[curSubZone]) then
+		elseif eventData.Type == "Zone" and (eventData.Zones[curZone] or eventData.Zones[curSubZone] or eventData.Zones[instanceType] or eventData.Zones[instanceType:gsub("^%l", string.upper)]) then
 			shouldBeActive = true
 		elseif eventData.Type == "Buff" then
 			if eventData.Anymount then
@@ -444,11 +445,15 @@ function ItemRack.ProcessZoneEvent()
 	local currentZone = GetRealZoneText()
 	local currentSubZone = GetSubZoneText()
 	local setToEquip, setToUnequip, setname
+	local _, instanceType = IsInInstance()
 
 	for eventName in pairs(enabled) do
 		if events[eventName].Type=="Zone" then
 			setname = ItemRackUser.Events.Set[eventName]
-			local inZone = events[eventName].Zones[currentZone] or events[eventName].Zones[currentSubZone]
+			local inZone = events[eventName].Zones[currentZone] or 
+						   events[eventName].Zones[currentSubZone] or 
+						   events[eventName].Zones[instanceType] or 
+						   events[eventName].Zones[instanceType:gsub("^%l", string.upper)]
 			
 			if inZone then
 				if not events[eventName].Active then

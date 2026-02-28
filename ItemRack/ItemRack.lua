@@ -756,7 +756,11 @@ function ItemRack.UpdateCurrentSet()
 	end
 	if ItemRackButton20 and ItemRackUser.Buttons[20] then
 		ItemRackButton20ItemRackIcon:SetTexture(texture)
-		ItemRackButton20Name:SetText(setname)
+		local nameText = _G["ItemRackButton20Name"]
+		if nameText then
+			nameText:SetText(setname)
+			nameText:Show()
+		end
 	end
 	ItemRack.Broker.icon = texture
 	ItemRack.Broker.text = setname

@@ -198,11 +198,12 @@ function ItemRack.InitButtons()
 
 		-- Defensive sweep: clear any macro/action name text that may have been
 		-- set by the ActionBarButtonTemplate during initial frame creation
-		local nameText = button.Name or _G["ItemRackButton"..i.."Name"]
-		if nameText then
-			nameText:SetText("")
-			nameText:Hide()
-			if i < 20 then
+		-- Only apply this sweep to slots 0-19 to avoid breaking Slot 20's set name overlay
+		if i < 20 then
+			local nameText = button.Name or _G["ItemRackButton"..i.."Name"]
+			if nameText then
+				nameText:SetText("")
+				nameText:Hide()
 				nameText.SetText = function() end
 			end
 		end

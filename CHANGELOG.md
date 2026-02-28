@@ -39,6 +39,10 @@ All notable changes to the TBC Anniversary port of ItemRack will be documented i
   2. **Action bar dispatcher taint**: ItemRack buttons inheriting `ActionBarButtonTemplate` were registered with Blizzard's shared event dispatcher tables. Addon code touching these buttons propagated taint to all real action buttons. `ButtonOnLoad` now unregisters from `ActionBarButtonEventsFrame`, `ActionBarActionEventsFrame`, and related dispatchers.
 - **Button Nil Errors**: Fixed `attempt to index field '?' (a nil value)` scaling errors that occasionally occurred on clients carrying over older profile data (e.g. Season of Discovery / Classic Era) when mousing over buttons or dragging them.
 
+### Changed
+- Improved macro functionality: `ItemRack.CreateMacro()` now uses a more flexible regex `string.find(text, "#showtooltip")` to detect proper macro prefixes and preserves spacing before tooltips, fixing issues with `#showtooltip` breaking.
+- Added support for tracking instance types in Zone events (`ItemRackEvents.lua`). You can now just enter `arena`, `pvp`, `party`, or `raid` in the Zone event textbook and it properly works across all localized clients. (Thanks to [UDrew](https://github.com/UDrew/ItemRack-Anniversary/commit/a226d36ad1b1903c29e8fb357b41033320af415e) for the fork and foundation!)
+
 ### Improvements
 - **Tooltip Highlight Unequipped**: Added a new setting "Highlight unequipped in tooltip" to the Options pane. When viewing a set's minimap or on-screen tooltip, items that are taking up inventory space but are not currently equipped are drawn in **Orange**, making it easy to see what items aren't on your character.
 - **Improved Tooltip Placement**: Tooltips for popout menus on character-sheet slots now dynamically anchor to ensure they don't cover the buttons or the screen edges. Tooltips for right-side slots (Hands, Belt, etc) now fall down below the ItemRack menu to keep the buttons usable.
