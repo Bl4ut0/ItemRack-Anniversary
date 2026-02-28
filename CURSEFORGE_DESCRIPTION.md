@@ -6,6 +6,21 @@
 
 This version is a dedicated update for the **TBC Anniversary Edition** client (2.5.4+). It builds upon the excellent work of previous maintainers to ensure full compatibility with the modern WoW API used by the Anniversary client.
 
+---
+
+## ⚠️ FAQ: Flyout Menu Opening on the Wrong Side?
+
+Several users have reported that character sheet flyout menus open in the wrong direction (e.g., left-side slots opening to the left and overlapping the screen edge, or right-side slots going the wrong way). **This is configurable!**
+
+Open **ItemRack Options** (`/itemrack opt`) and look under the **"Character sheet menus"** section. You'll find two checkboxes:
+
+* **"Left slots: menu on right"** — Flips left-side slots (Head, Neck, Shoulder, Back, Chest, Shirt, Tabard, Wrist) to show menus on the **RIGHT**.
+* **"Right slots: menu on left"** — Flips right-side slots (Hands, Waist, Legs, Feet, Rings, Trinkets) to show menus on the **LEFT**.
+
+Toggle whichever option fixes the direction for your setup. Bottom weapon slots (Main Hand, Off Hand, Ranged) always dock vertically and are unaffected.
+
+---
+
 ## Validated Base Version
 
 This adaptation is based on the **4.23 release by Rottenbeer** (released November 28th, 2024), updated to support the unique requirements of the Anniversary client.
@@ -67,8 +82,10 @@ The TBC Anniversary client runs on a modern retail-based engine, which introduce
 
 ### UI Polish
 
-* **Smart Menu Docking**: Left-side character sheet slots default to opening menus on the right to prevent overlap.
-* Configurable per-side menu direction under Options.
+* **Smart Menu Docking**: Left-side character sheet slots default to opening menus to the left, and right-side slots open to the right. If this automatic direction is wrong for your setup, you can override it per-side in **Options** (under "Character sheet menus"):
+  * **"Left slots: menu on right"** — Flips left-side slots (Head, Neck, Shoulder, Back, Chest, Shirt, Tabard, Wrist) to show menus on the RIGHT instead of the left.
+  * **"Right slots: menu on left"** — Flips right-side slots (Hands, Waist, Legs, Feet, Rings, Trinkets) to show menus on the LEFT instead of the right.
+  * Bottom weapon slots (Main Hand, Off Hand, Ranged) always dock vertically and are unaffected by these settings.
 * Hotkey text renders in subtle gray with proper hide/show behavior.
 * Set icon and label accurately reflect the equipped set after combat, spec changes, and event transitions.
 

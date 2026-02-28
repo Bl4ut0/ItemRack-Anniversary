@@ -1,3 +1,6 @@
+__ New in 4.29.3 - By Bl4ut0 __
+- Fix: Removed stray macro/action name text from Blizzard's ActionBarButtonTemplate leaking onto ItemRack quick access buttons. The inherited Name FontString is now cleared and permanently blocked for slots 0-19.
+
 __ New in 4.29 - By Bl4ut0 __
 - Fix: Resolved "ADDON_ACTION_BLOCKED" taint errors that caused Blizzard action bar buttons to break after opening the character sheet. Two taint vectors fixed: (1) GameTooltip.SetOwner replacement permanently tainting the table key — now uses post-handler ClearAllPoints/SetPoint with alpha-hide. (2) ActionBarButtonTemplate dispatcher registration propagating taint from ItemRack buttons to real action buttons — ButtonOnLoad now unregisters from all shared dispatchers.
 - Fix: Button nil scaling errors on clients with older profile data (SoD / Classic Era).

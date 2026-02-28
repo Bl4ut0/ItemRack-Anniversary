@@ -70,6 +70,21 @@ function ItemRack.ButtonOnLoad(self)
 		hotkey:SetText("")
 	end
 
+	-- Clear the "Name" FontString (macro/action name text from ActionButtonTemplate).
+	-- During ActionBarButtonMixin:OnLoad(), UpdateAction() writes macro text from matching
+	-- action bar slots to self.Name via GetActionText(). We must clear it and prevent
+	-- future writes to stop macro names from overlaying ItemRack buttons.
+	local nameText = self.Name or _G[self:GetName().."Name"]
+	if nameText then
+		nameText:SetText("")
+		nameText:Hide()
+		-- For slots 0-19, permanently block future SetText calls.
+		-- Slot 20 uses Name legitimately for gear set name display.
+		if self:GetID() < 20 then
+			nameText.SetText = function() end
+		end
+	end
+
 	-- Suppress WoW's built-in CooldownFrame countdown text (e.g. "1:20")
 	-- WoW settings only allow disabling this for spells, not items, so we do it here.
 	-- ItemRack's own CooldownCount system (the Time element) is unaffected.
@@ -180,6 +195,17 @@ function ItemRack.InitButtons()
 		button:SetScript("OnShow", nil)
 		button:SetScript("OnHide", nil)
 		button:SetAttribute("action", nil)
+
+		-- Defensive sweep: clear any macro/action name text that may have been
+		-- set by the ActionBarButtonTemplate during initial frame creation
+		local nameText = button.Name or _G["ItemRackButton"..i.."Name"]
+		if nameText then
+			nameText:SetText("")
+			nameText:Hide()
+			if i < 20 then
+				nameText.SetText = function() end
+			end
+		end
 
 	end
 

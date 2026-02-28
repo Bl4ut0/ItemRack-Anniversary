@@ -4,6 +4,7 @@
 
 # WoW Interface Code
 BlizzardInterfaceCode/
+.agent/
 
 # Local files
 CURSEFORGE_DESCRIPTION.md

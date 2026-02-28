@@ -2,6 +2,20 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.29.3] - 2026-02-28
+### Bug Fixes
+- **Macro Text Overlay on Buttons**: Fixed an issue where macro/action name text from Blizzard's action bar could appear overlaid on ItemRack quick access buttons. Since ItemRack buttons inherit `ActionBarButtonTemplate`, the template's `Name` FontString would display macro names from matching action bar slot IDs (e.g., a macro in slot 1 showing its name on the Head slot button). The `Name` FontString is now cleared, hidden, and permanently blocked from future writes on slots 0-19. Slot 20 (Set Button) is unaffected and continues to display the gear set name.
+
+---
+
+## [4.29.2] - 2026-02-25
+### Bug Fixes
+- **Bottom Row Popout**: Reverted the popout rule for bottom-row character sheet items (Main Hand, Off Hand, Ranged, Ammo) that was unintentionally changed. They now correctly dock vertically by default as they used to.
+- **Bottom Row Tooltip Overlap**: Fixed an issue where the new tooltip overlap-protection logic would drop tooltips directly onto vertical Weapon/Ammo menus. Tooltips now intelligently push to the left or right side of the menu based on screen position.
+- **Orange Highlight Unequipped**: Fixed the logic for the `TooltipColorUnEquipped` setting. It now successfully detects simple un-enchanted item IDs across characters and correctly highlights items that are in your bags (but not in the active set) in orange on the Set Tooltip.
+
+---
+
 ## [4.29.1] - 2026-02-25
 ### Bug Fixes
 - **Specialization Re-equip Flicker**: Fixed an issue where zoning or reloading would cause ItemRack to aggressively re-equip spec-tied gear sets, overwriting manual gear changes (like equipping a shield).
@@ -12,7 +26,7 @@ All notable changes to the TBC Anniversary port of ItemRack will be documented i
 ### Improvements
 - **Optimized Popout Menus**: Redesigned the popout menu (`BuildMenu`) logic to handle high item counts (like multiple necklaces/rings).
   - **Dynamic Wrapping**: Menus now automatically wrap into multiple columns when item counts are high (4/8/12/24 items), keeping the menu compact.
-  - **Always to the Side**: Handled the "Always go to either side" rule for character sheet popouts. Weapon and Ammo slots now grow horizontally to the Left or Right instead of downwards, preventing them from covering lower equipment slots or going off-screen.
+  - **Always to the Side**: Handled the "Always go to either side" rule for character sheet popouts on the left and right sides of the window. Weapon and Ammo slots deliberately remain untouched and continue to dock vertically.
   - **Screen Space Awareness**: Menus now calculate their height against the screen resolution, automatically adjusting column counts to ensure the entire menu remains visible and accessible.
 - **Enhanced Tooltip Anchoring**: Improved `ApplyTooltipAnchor` to protect all ItemRack toolbar buttons. Tooltips now intelligently anchor away from screen edges and Blizzard's default UI elements to prevent overlap.
 

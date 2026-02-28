@@ -222,6 +222,7 @@ ItemRackSettings = {
 	LeftSlotsGoRight = "OFF", -- whether left-side character slots dock their menus to the RIGHT instead of left
 	RightSlotsGoLeft = "OFF", -- whether right-side character slots dock their menus to the LEFT instead of right
 	DisableAltClick = "OFF", -- whether to disable Alt+click from toggling auto queue (to allow self cast through)
+	TooltipColorUnEquipped = "OFF", -- whether to highlight unequipped set items in orange
 }
 
 -- these are default items with non-standard behavior
@@ -842,9 +843,10 @@ end
 -- takes two ItemRack-style IDs and returns true if they share the same item-identifying fields (itemID, enchant, gems, suffix, unique)
 -- this is more precise than SameID (which only compares base itemID) but tolerant of item string format changes (Classic 10 fields vs TBC 14 fields)
 function ItemRack.SameExactID(id1,id2)
-	local f1 = id1 and tostring(id1):match(ItemRack.iSPatternItemFieldsFromIR)
-	local f2 = id2 and tostring(id2):match(ItemRack.iSPatternItemFieldsFromIR)
-	return f1 and f2 and f1 == f2
+	if not id1 or not id2 or id1==0 or id2==0 then return false end
+	local f1 = tostring(id1):match(ItemRack.iSPatternItemFieldsFromIR) or tostring(id1)
+	local f2 = tostring(id2):match(ItemRack.iSPatternItemFieldsFromIR) or tostring(id2)
+	return f1 == f2
 end
 
 -- takes an ItemRack-style ID and returns the name, texture, equipslot and quality
@@ -1942,6 +1944,8 @@ function ItemRack.SetTooltip(self,setname)
 							else
 								itemColor = "FF4C80FF"
 							end
+						elseif itemName~="(empty)" and ItemRackSettings.TooltipColorUnEquipped=="ON" and not ItemRack.SameExactID(ItemRack.GetID(i), set[i]) then
+							itemColor = "FFFF8C00"
 						else
 							itemColor = "FFAAAAAA"
 						end
@@ -2141,9 +2145,17 @@ function ItemRack.ApplyTooltipAnchor()
 		if ttL and ttR and ttT and ttB and mL and mR and mT and mB then
 			local overlaps = not (ttR < mL or ttL > mR or ttB > mT or ttT < mB)
 			if overlaps then
-				-- Tooltip is too wide and covers the menu — drop below the menu instead
+				-- Tooltip overlaps the menu. For horizontal menus, dropping below works.
+				-- For vertical menus (like bottom slots), dropping below covers the menu.
+				-- Push to the left/right depending on screen space.
 				GameTooltip:ClearAllPoints()
-				GameTooltip:SetPoint("TOPLEFT", ItemRackMenuFrame, "BOTTOMLEFT", 0, -2)
+				if ItemRackMenuFrame:GetCenter() < GetScreenWidth()/2 then
+					-- Menu is on the left half of the screen, push tooltip to the right of the menu
+					GameTooltip:SetPoint("TOPLEFT", ItemRackMenuFrame, "TOPRIGHT", 2, 0)
+				else
+					-- Menu is on the right half, push tooltip to the left of the menu
+					GameTooltip:SetPoint("TOPRIGHT", ItemRackMenuFrame, "TOPLEFT", -2, 0)
+				end
 			end
 		end
 	end
@@ -2159,12 +2171,8 @@ function ItemRack.DockMenuToCharacterSheet(self)
 	end
 	if slot then
 		if slot==0 or (slot>=16 and slot<=18) then
-			-- Bottom slots (Weapons/Ammo): grow sideways to avoid covering center slots or going off-screen
-			if self:GetCenter() < GetScreenWidth()/2 then
-				ItemRack.DockWindows("TOPRIGHT",self,"TOPLEFT","HORIZONTAL") -- To the Left
-			else
-				ItemRack.DockWindows("TOPLEFT",self,"TOPRIGHT","HORIZONTAL") -- To the Right
-			end
+			-- Bottom/weapon slots: always dock vertically
+			ItemRack.DockWindows("TOPLEFT",self,"BOTTOMLEFT","VERTICAL")
 		else
 			if slot==14 and ItemRackSettings.TrinketMenuMode=="ON" then
 				self = CharacterTrinket0Slot

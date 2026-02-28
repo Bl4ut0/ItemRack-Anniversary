@@ -1,10 +1,26 @@
+## 🚀 New in v4.29.3
+
+### 🐛 Bug Fixes
+- **Macro Text Overlay**: Fixed stray macro/action name text from Blizzard's action bar appearing on ItemRack quick access buttons. Buttons matching action bar slot IDs (e.g., slot 1 = Head) would inherit the macro's name label. The inherited `Name` FontString is now permanently cleared and hidden.
+
+---
+
+## 🚀 New in v4.29.2
+
+### 🐛 Bug Fixes
+- **Bottom Row Popout**: Reverted the popout logic for the bottom row of equipment slots (Weapons & Ammo). They no longer expand sideways and will properly drop down vertically as expected.
+- **Bottom Row Tooltip Overlap**: Corrected the tooltip protection logic so that tooltips for vertical menus push cleanly out to the sides, instead of dropping straight down and obscuring the weapons.
+- **Orange Highlight Fix**: Resolved a bug preventing the `Highlight unequipped in tooltip` option from working out-of-the-box or correctly parsing un-enchanted item IDs. Set Tooltips will now reliably show missing pieces (that are sitting in your bags) in orange.
+
+---
+
 ## 🚀 New in v4.29.1
 
 ### 🐛 Bug Fixes
 - **Specialization Re-equip Fix**: Resolved an issue where switching zones or reloading would aggressively re-equip spec-tied sets, overwriting manual gear changes (like equipping a shield). The system now "primes" its state on startup and uses `.Active` flag tracking to respect manual overrides until a real spec change occurs.
 
 ### 🎨 UI & Quality of Life
-- **Optimized Popout Menus**: Redesigned popout menus (BuildMenu) with dynamic wrapping. High item counts (like necklaces) now wrap into multiple columns, and bottom slots (weapons/ammo) grow horizontally to prevent going off-screen or covering other gear.
+- **Optimized Popout Menus**: Redesigned popout menus (BuildMenu) with dynamic wrapping. High item counts (like necklaces) now wrap into multiple columns, and popouts intelligently default to the left or right of the character sheet (Weapons and Ammo slots deliberately remain untouched and continue to dock vertically).
 - **Enhanced Tooltip Anchoring**: Improved tooltip positioning for all ItemRack toolbar buttons to prevent overlap with menus, action bars, or Blizzard's default UI elements.
 
 ---
