@@ -515,6 +515,8 @@ function ItemRack.UnequipSet(setname)
 		else
 			-- Normal unequip (Top of stack)
 			ItemRackUser.Sets["~Unequip"].oldset = ItemRackUser.Sets[setname].oldset
+			ItemRackUser.Sets["~Unequip"].ShowHelm = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowHelm
+			ItemRackUser.Sets["~Unequip"].ShowCloak = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowCloak
 		end
 		
 		ItemRack.EquipSet("~Unequip")
