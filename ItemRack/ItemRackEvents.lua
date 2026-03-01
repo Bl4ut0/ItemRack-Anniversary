@@ -251,9 +251,23 @@ function ItemRack.InitEvents()
 			shouldBeActive = true
 		elseif eventData.Type == "Buff" then
 			if eventData.Anymount then
-				if isMounted then shouldBeActive = true end
+				if isMounted then
+					if eventData.OnMovement then
+						if GetUnitSpeed("player") > 0 then
+							shouldBeActive = true
+						end
+					else
+						shouldBeActive = true
+					end
+				end
 			elseif eventData.Buff and AuraUtil.FindAuraByName(eventData.Buff, "player") then
-				shouldBeActive = true
+				if eventData.OnMovement then
+					if GetUnitSpeed("player") > 0 then
+						shouldBeActive = true
+					end
+				else
+					shouldBeActive = true
+				end
 			end
 		end
 		
@@ -291,6 +305,12 @@ function ItemRack.RegisterEvents()
 		if eventType=="Buff" then
 			if not frame:IsEventRegistered("UNIT_AURA") then
 				frame:RegisterEvent("UNIT_AURA")
+			end
+			if events[eventName].OnMovement then
+				if not frame:IsEventRegistered("PLAYER_STARTED_MOVING") then
+					frame:RegisterEvent("PLAYER_STARTED_MOVING")
+					frame:RegisterEvent("PLAYER_STOPPED_MOVING")
+				end
 			end
 		elseif eventType=="Stance" then
 			if not frame:IsEventRegistered("UPDATE_SHAPESHIFT_FORM") then
@@ -346,6 +366,12 @@ function ItemRack.ProcessingFrameOnEvent(self,event,...)
 	local events = ItemRackEvents
 	local startBuff, startZone, startStance, eventType
 	local arg1, arg2 = ...;
+
+	if event == "UNIT_AURA" and arg1 == "player" then
+		ItemRack.StartTimer("EventsBuffTimer")
+	elseif event == "PLAYER_STARTED_MOVING" or event == "PLAYER_STOPPED_MOVING" then
+		ItemRack.StartTimer("EventsBuffTimer")
+	end
 
 	for eventName in pairs(enabled) do
 		eventType = events[eventName].Type
@@ -650,6 +676,9 @@ function ItemRack.ProcessBuffEvent()
 					buff = IsMounted() and not UnitOnTaxi("player")
 				else
 					buff = AuraUtil.FindAuraByName(events[eventName].Buff,"player")
+				end
+				if buff and events[eventName].OnMovement then
+					buff = GetUnitSpeed("player") > 0
 				end
 				setname = ItemRackUser.Events.Set[eventName]
 				isSetEquipped = ItemRack.IsSetEquipped(setname)

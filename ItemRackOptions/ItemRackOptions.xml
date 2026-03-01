@@ -2817,12 +2817,24 @@
 									</OnClick>
 								</Scripts>
 							</CheckButton>
+							<CheckButton name="ItemRackOptEventEditBuffOnMovement" inherits="ItemRackOptSimpleCheckButton">
+								<Size>
+									<AbsDimension x="26" y="26"/>
+								</Size>
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffAnyMount" relativePoint="BOTTOMLEFT">
+										<Offset x="0" y="6"/>
+									</Anchor>
+								</Anchors>
+							</CheckButton>
 							<CheckButton name="ItemRackOptEventEditBuffNotInPVP" inherits="ItemRackOptSimpleCheckButton">
 								<Size>
 									<AbsDimension x="26" y="26"/>
 								</Size>
 								<Anchors>
-									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffAnyMount" relativePoint="BOTTOMLEFT"/>
+									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffOnMovement" relativePoint="BOTTOMLEFT">
+										<Offset x="0" y="6"/>
+									</Anchor>
 								</Anchors>
 							</CheckButton>
 							<CheckButton name="ItemRackOptEventEditBuffNotInPVE" inherits="ItemRackOptSimpleCheckButton">
@@ -2830,7 +2842,9 @@
 									<AbsDimension x="26" y="26"/>
 								</Size>
 								<Anchors>
-									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffNotInPVP" relativePoint="BOTTOMLEFT"/>
+									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffNotInPVP" relativePoint="BOTTOMLEFT">
+										<Offset x="0" y="6"/>
+									</Anchor>
 								</Anchors>
 							</CheckButton>
 							<CheckButton name="ItemRackOptEventEditBuffUnequip" inherits="ItemRackOptSimpleCheckButton">
@@ -2838,7 +2852,9 @@
 									<AbsDimension x="26" y="26"/>
 								</Size>
 								<Anchors>
-									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffNotInPVE" relativePoint="BOTTOMLEFT"/>
+									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffNotInPVE" relativePoint="BOTTOMLEFT">
+										<Offset x="0" y="6"/>
+									</Anchor>
 								</Anchors>
 							</CheckButton>
 						</Frames>

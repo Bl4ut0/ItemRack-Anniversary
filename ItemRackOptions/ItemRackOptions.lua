@@ -69,6 +69,7 @@ ItemRack.CheckButtonLabels = {
 	["ItemRackOptShowCloakText"] = "Show Cloak",
 	["ItemRackOptEventEditBuffAnyMountText"] = "Any mount",
 	["ItemRackOptEventEditBuffUnequipText"] = "Unequip when buff fades",
+	["ItemRackOptEventEditBuffOnMovementText"] = "On Movement",
 	["ItemRackOptEventEditBuffNotInPVPText"] = "Except in PVP instances",
 	["ItemRackOptEventEditBuffNotInPVEText"] = "Except in PVE instances",
 	["ItemRackOptEventEditStanceUnequipText"] = "Unequip on leaving stance",
@@ -621,7 +622,7 @@ function ItemRackOpt.ValidateSetButtons()
 			if ItemRackOpt.Inv[i].selected then
 				ItemRackOptSetsSaveButton:Enable()
 				break
-			end
+						end
 		end
 	end
 	if ItemRackUser.Sets[setname] then
@@ -648,8 +649,7 @@ function ItemRackOpt.ValidateSetButtons()
 end
 
 function ItemRackOpt.ShowCloakHelm()
-	local setname = ItemRackOptSetsName:GetText()
-
+	local setname = ItemRackUser.CurrentSet
 	if setname ~= ItemRackUser.CurrentSet then
 		return
 	end
@@ -1830,6 +1830,9 @@ function ItemRackOpt.EventListOnEnter(self,child)
 		else
 			desc = desc.."gaining the buff "..event.Buff
 		end
+		if event.OnMovement then
+			desc = desc.."\n|cFF888888Unequip on movement."
+		end
 	elseif eventType=="Stance" then
 		if event.Stance == 0 then
 			desc = desc.."leaving forms."
@@ -1931,6 +1934,7 @@ function ItemRackOpt.EventEditClearFrame()
 	ItemRackOptEventEditTypeDropText:SetText("Pick one")
 	ItemRackOptEventEditBuffName:SetText("")
 	ItemRackOptEventEditBuffAnyMount:SetChecked(false)
+	ItemRackOptEventEditBuffOnMovement:SetChecked(false)
 	ItemRackOptEventEditBuffUnequip:SetChecked(false)
 	ItemRackOptEventEditBuffNotInPVP:SetChecked(false)
 	ItemRackOptEventEditBuffNotInPVE:SetChecked(false)
@@ -1955,12 +1959,13 @@ function ItemRackOpt.EventEditPopulateFrame()
 		ItemRackOptEventEditNameEdit:SetText(eventName)
 		ItemRackOptEventEditNameEdit:SetCursorPosition(0)
 		ItemRackOptEventEditTypeDropText:SetText(event.Type)
-		ItemRackOptEventEditBuffName:SetText(event.Buff or "")
-		ItemRackOptEventEditBuffName:SetCursorPosition(0)
 		if event.Anymount then
 			ItemRackOptEventEditBuffAnyMount:SetChecked(true)
-			ItemRackOptEventEditBuffName:SetText("Any mount")
+			ItemRackOptEventEditBuffName:SetText("")
+		else
+			ItemRackOptEventEditBuffName:SetText(event.Buff or "")
 		end
+		ItemRackOptEventEditBuffOnMovement:SetChecked(event.OnMovement)
 		ItemRackOptEventEditBuffUnequip:SetChecked(event.Unequip)
 		ItemRackOptEventEditBuffNotInPVP:SetChecked(event.NotInPVP)
 		ItemRackOptEventEditBuffNotInPVE:SetChecked(event.NotInPVE)
@@ -2134,8 +2139,11 @@ function ItemRackOpt.EventEditSave(override)
 	local event=ItemRackEvents[eventName]
 	event.Type = ItemRackOptEventEditTypeDropText:GetText()
 	if event.Type=="Buff" then
+		if ItemRackOptEventEditBuffName:GetText() ~= "" and not ItemRackOptEventEditBuffAnyMount:GetChecked() then
+			event.Buff = ItemRackOptEventEditBuffName:GetText()
+		end
 		event.Anymount = ItemRackOptEventEditBuffAnyMount:GetChecked()
-		event.Buff = ItemRackOptEventEditBuffName:GetText()
+		event.OnMovement = ItemRackOptEventEditBuffOnMovement:GetChecked()
 		event.Unequip = ItemRackOptEventEditBuffUnequip:GetChecked()
 		event.NotInPVP = ItemRackOptEventEditBuffNotInPVP:GetChecked()
 		event.NotInPVE = ItemRackOptEventEditBuffNotInPVE:GetChecked()
