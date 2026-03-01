@@ -6,6 +6,9 @@ All notable changes to the TBC Anniversary port of ItemRack will be documented i
 ### Bug Fixes
 - **Macro Text Overlay on Buttons**: Fixed an issue where macro/action name text from Blizzard's action bar could appear overlaid on ItemRack quick access buttons. Since ItemRack buttons inherit `ActionBarButtonTemplate`, the template's `Name` FontString would display macro names from matching action bar slot IDs (e.g., a macro in slot 1 showing its name on the Head slot button). The `Name` FontString is now cleared, hidden, and permanently blocked from future writes on slots 0-19. Slot 20 (Set Button) is unaffected and continues to display the gear set name.
 
+### Changed
+- Added support for tracking instance types in Zone events (`ItemRackEvents.lua`). You can now just enter `arena`, `pvp`, `party`, or `raid` in the Zone event textbook and it properly works across all localized clients. (Thanks to [UDrew](https://github.com/UDrew/ItemRack-Anniversary/commit/a226d36ad1b1903c29e8fb357b41033320af415e) for the fork and foundation!)
+
 ---
 
 ## [4.29.2] - 2026-02-25
@@ -41,7 +44,6 @@ All notable changes to the TBC Anniversary port of ItemRack will be documented i
 
 ### Changed
 - Improved macro functionality: `ItemRack.CreateMacro()` now uses a more flexible regex `string.find(text, "#showtooltip")` to detect proper macro prefixes and preserves spacing before tooltips, fixing issues with `#showtooltip` breaking.
-- Added support for tracking instance types in Zone events (`ItemRackEvents.lua`). You can now just enter `arena`, `pvp`, `party`, or `raid` in the Zone event textbook and it properly works across all localized clients. (Thanks to [UDrew](https://github.com/UDrew/ItemRack-Anniversary/commit/a226d36ad1b1903c29e8fb357b41033320af415e) for the fork and foundation!)
 
 ### Improvements
 - **Tooltip Highlight Unequipped**: Added a new setting "Highlight unequipped in tooltip" to the Options pane. When viewing a set's minimap or on-screen tooltip, items that are taking up inventory space but are not currently equipped are drawn in **Orange**, making it easy to see what items aren't on your character.
