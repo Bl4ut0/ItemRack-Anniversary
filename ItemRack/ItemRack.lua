@@ -225,18 +225,6 @@ ItemRackSettings = {
 	TooltipColorUnEquipped = "OFF", -- whether to highlight unequipped set items in orange
 }
 
--- these are default items with non-standard behavior
---   keep = 1/nil whether to suspend auto queue while equipped
---   priority = 1/nil whether to equip as it comes off cooldown even if equipped is off cooldown waiting to be used
---   delay = time(seconds) after use before swapping out
-ItemRackItems = {
-	["11122"] = { keep=1 }, -- carrot on a stick
-	["13209"] = { keep=1 }, -- seal of the dawn
-	["19812"] = { keep=1 }, -- rune of the dawn
-	["12846"] = { keep=1 }, -- argent dawn commission
-	["25653"] = { keep=1 }, -- riding crop
-}
-
 ItemRack.NoTitansGrip = {
 	["Polearms"] = 1, -- reverted in 3.4.1 to block Polearms from Titan's Grip again
 	["Fishing Poles"] = 1,
@@ -723,6 +711,97 @@ function ItemRack.InitCore()
 	ItemRackSettings.LeftSlotsGoRight = ItemRackSettings.LeftSlotsGoRight or "ON" -- 4.28
 	ItemRackSettings.RightSlotsGoLeft = ItemRackSettings.RightSlotsGoLeft or "OFF" -- 4.27.3
 	ItemRackSettings.CharacterSheetMenusLeft = nil -- removed in 4.27.3, replaced with per-side toggles
+	
+	-- (Temporary?) function to update all queues to tables for 
+	-- the per-set queue settings: delay, priority, and pause.
+	if not isAlreadyMigrated() then
+		ItemRack.MigrateQueues()
+	end
+end
+
+-- Check if we've already migrated by looking at the first entry
+-- in the first queue we find (global or per-set).  If it's already
+-- setup as a table, we assume we already migrated instead of looping through
+-- all the tables everytime we init.
+function isAlreadyMigrated()
+	-- Check global queues
+	for slot, q in pairs(ItemRackUser.Queues) do
+		if q and type(q) == "table" then
+			for _, entry in ipairs(q) do
+				if entry ~= 0 and type(entry) == "table" then
+					-- Found an entry and it's a table = we're on new format
+					return true
+				elseif entry ~= 0 then
+					-- Found an entry but it's not a table = we're on old format
+					return false
+				end
+			end
+		end
+	end
+	
+	-- Check per-set queues
+	for _, set in pairs(ItemRackUser.Sets) do
+		if set.Queues then
+			for slot, q in pairs(set.Queues) do
+				if q and type(q) == "table" then
+					for _, entry in ipairs(q) do
+						if entry ~= 0 and type(entry) == "table" then
+							-- Found an entry and it's a table = we're on new format
+							return true
+						elseif entry ~= 0 then
+							-- Found an entry but it's not a table = we're on old format
+							return false
+						end
+					end
+				end
+			end
+		end
+	end
+	
+	-- No queues found at all, or all queues are empty = nothing to migrate, so just mark true
+	return true
+end
+
+-- Convert the global and per-set queues to the new table
+-- format to store the per-set queue settings: delay, priority, and pause. 
+function ItemRack.MigrateQueues()
+	-- Migrate global queues
+	for slot, q in pairs(ItemRackUser.Queues) do
+		migrateQueue(q)
+	end
+	
+	-- Migrate per-set queues
+	for _, set in pairs(ItemRackUser.Sets) do
+		if set.Queues then
+			for slot, q in pairs(set.Queues) do
+				migrateQueue(q)
+			end
+		end
+	end
+
+	-- Clear ItemRackItems since it should now be redundant with the information being stored in the queues
+	ItemRackItems = {}
+end
+
+-- Find every queue entry and lookup if there are currently any 
+-- ItemRackItems values to transfer, otherwise set to defaults.
+function migrateQueue(queue)
+	if not queue then 
+		return 
+	end
+	for i, entry in ipairs(queue) do
+		if type(entry) ~= "table" then
+			local id = entry
+			local baseID = ItemRack.GetIRString(id, true)
+			local settings = (ItemRackItems and ItemRackItems[baseID]) or {}
+			queue[i] = {
+				id = id,
+				priority = settings.priority or false,
+				keep = settings.keep or false,
+				delay = settings.delay or 0,
+			}
+		end
+	end
 end
 
 function ItemRack.Print(msg)
@@ -2573,7 +2652,7 @@ function ItemRack.ResetEverything()
 	StaticPopupDialogs["ItemRackCONFIRMRESET"] = {
 		text = "This will restore ItemRack to its default state, wiping all sets, buttons, events and settings.\nThe UI will be reloaded. Continue?",
 		button1 = "Yes", button2 = "No", timeout = 0, hideOnEscape = 1, showAlert = 1,
-		OnAccept = function() ItemRackUser=nil ItemRackSettings=nil ItemRackItems=nil ItemRackEvents=nil ReloadUI() end
+		OnAccept = function() ItemRackUser=nil ItemRackSettings=nil ItemRackEvents=nil ReloadUI() end
 	}
 	StaticPopup_Show("ItemRackCONFIRMRESET")
 end
