@@ -737,17 +737,6 @@ function ItemRack.UpdateCurrentSet()
 	if setname and setname ~= _G.CUSTOM then
 		local equipped = ItemRack.IsSetEquipped(setname)
 		
-		-- If the set is linked to an active event (e.g. Zoomies, Drinking), trust it even if IsSetEquipped fails.
-		-- This works around API glitches where IsSetEquipped returns false despite the gear being worn.
-		if not equipped and ItemRackEvents then
-			for eventName, eventData in pairs(ItemRackEvents) do
-				if eventData.Active and ItemRackUser.Events.Set[eventName] == setname then
-					equipped = true
-					break
-				end
-			end
-		end
-
 		if equipped then
 			texture = ItemRack.GetTextureBySlot(20)
 		else
