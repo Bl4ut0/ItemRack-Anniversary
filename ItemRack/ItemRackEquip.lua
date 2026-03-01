@@ -453,7 +453,9 @@ function ItemRack.IsSetEquipped(setname,exact)
 		local check11_12 = (set[11] and set[12])
 		local check13_14 = (set[13] and set[14])
 		
+		local anyChecked = false
 		for i in pairs(set) do
+			anyChecked = true
 			id = ItemRack.GetID(i)
 			local match = false
 			
@@ -473,7 +475,8 @@ function ItemRack.IsSetEquipped(setname,exact)
 			
 			if not match then return false end
 		end
-		return true
+		
+		return anyChecked
 	end
 end
 
@@ -515,6 +518,10 @@ function ItemRack.UnequipSet(setname)
 		else
 			-- Normal unequip (Top of stack)
 			ItemRackUser.Sets["~Unequip"].oldset = ItemRackUser.Sets[setname].oldset
+			if ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset] then
+				ItemRackUser.Sets["~Unequip"].ShowHelm = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowHelm
+				ItemRackUser.Sets["~Unequip"].ShowCloak = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowCloak
+			end
 		end
 		
 		ItemRack.EquipSet("~Unequip")

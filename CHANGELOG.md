@@ -2,6 +2,13 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.29.4] - 2026-03-01
+### Bug Fixes
+- **"Custom" Set Indicator**: Fixed a bug where the UI would refuse to update the set name to "Custom" when manually changing a piece of gear, getting "stuck" on the previous set's name. This occurred because Active Events (such as Mounting or Drinking) were forcefully suppressing the gear mismatch logic. Events will now properly unhook their gear UI lock if they detect you've actively swapped out any of the underlying event items.
+- **Helm & Cloak Unequip**: Fixed an issue where the Show/Hide Helm and Cloak settings were being forgotten when unequipping a set to restore the previous gear. The fallback set (`~Unequip`) now correctly inherits the visibility settings of the previous set. (Thanks to [UDrew](https://github.com/UDrew/ItemRack-Anniversary/pull/3) for the fix!)
+
+---
+
 ## [4.29.3] - 2026-02-28
 ### Bug Fixes
 - **Macro Text Overlay on Buttons**: Fixed an issue where macro/action name text from Blizzard's action bar could appear overlaid on ItemRack quick access buttons. Since ItemRack buttons inherit `ActionBarButtonTemplate`, the template's `Name` FontString would display macro names from matching action bar slot IDs (e.g., a macro in slot 1 showing its name on the Head slot button). The `Name` FontString is now cleared, hidden, and permanently blocked from future writes on slots 0-19. Slot 20 (Set Button) is unaffected and continues to display the gear set name.
