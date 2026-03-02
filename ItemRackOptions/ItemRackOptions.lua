@@ -80,6 +80,10 @@ ItemRack.CheckButtonLabels = {
 	["ItemRackOptEventEditSpec1Text"] = "Primary Spec",
 	["ItemRackOptEventEditSpec2Text"] = "Secondary Spec",
 	["ItemRackOptEventEditSpecializationUnequipText"] = "Unequip when leaving spec",
+	["ItemRackOptEventEditBuffDisableSoundText"] = "Disable sound on equip",
+	["ItemRackOptEventEditStanceDisableSoundText"] = "Disable sound on equip",
+	["ItemRackOptEventEditZoneDisableSoundText"] = "Disable sound on equip",
+	["ItemRackOptEventEditSpecializationDisableSoundText"] = "Disable sound on equip",
 }
 
 ItemRack.SetnameBlacklist = {
@@ -177,6 +181,7 @@ function ItemRackOpt.OnLoad(self)
 		{type="check",optset=ItemRackSettings,variable="NotifyThirty",label="Notify at 30",tooltip="Announce when an item you used is at 30 seconds cooldown."},
 		{type="check",optset=ItemRackSettings,variable="NotifyChatAlso",label="Notify chat also",tooltip="Send cooldown notifications to chat also."},
 		{type="check",optset=ItemRackSettings,variable="ShowSetInTooltip",label="Show set info in tooltips",tooltip="Show which set an item belongs to in the tooltip."},
+		{type="check",optset=ItemRackSettings,variable="DisableSwapSound",label="Disable swap sounds",tooltip="Silences the audio when ItemRack automatically swaps gear."},
 		{type="check",optset=ItemRackSettings,variable="TooltipColorUnEquipped",depend="ShowSetInTooltip",label="Highlight unequipped in tooltip",tooltip="Show items that are in your bags but not currently equipped as Orange in the set tooltip."},
 		{type="check",optset=ItemRackSettings,variable="ShowTooltips",label="Show tooltips",tooltip="Show tooltips like the one you're reading now."},
 		{type="check",optset=ItemRackSettings,variable="TinyTooltips",depend="ShowTooltips",label="Tiny Tooltips",tooltip="Shrink item tooltips to display only name, cooldown and durability."},
@@ -1936,18 +1941,22 @@ function ItemRackOpt.EventEditClearFrame()
 	ItemRackOptEventEditBuffAnyMount:SetChecked(false)
 	ItemRackOptEventEditBuffOnMovement:SetChecked(false)
 	ItemRackOptEventEditBuffUnequip:SetChecked(false)
+	ItemRackOptEventEditBuffDisableSound:SetChecked(false)
 	ItemRackOptEventEditBuffNotInPVP:SetChecked(false)
 	ItemRackOptEventEditBuffNotInPVE:SetChecked(false)
 	ItemRackOptEventEditStanceName:SetText("")
 	ItemRackOptEventEditStanceUnequip:SetChecked(false)
+	ItemRackOptEventEditStanceDisableSound:SetChecked(false)
 	ItemRackOptEventEditStanceNotInPVP:SetChecked(false)
 	ItemRackOptEventEditZoneEditBox:SetText("")
 	ItemRackOptEventEditZoneUnequip:SetChecked(false)
+	ItemRackOptEventEditZoneDisableSound:SetChecked(false)
 	ItemRackOptEventEditScriptTrigger:SetText("")
 	ItemRackOptEventEditScriptEditBox:SetText("")
 	ItemRackOptEventEditSpec1:SetChecked(false)
 	ItemRackOptEventEditSpec2:SetChecked(false)
 	ItemRackOptEventEditSpecializationUnequip:SetChecked(false)
+	ItemRackOptEventEditSpecializationDisableSound:SetChecked(false)
 end
 
 function ItemRackOpt.EventEditPopulateFrame()
@@ -1967,14 +1976,17 @@ function ItemRackOpt.EventEditPopulateFrame()
 		end
 		ItemRackOptEventEditBuffOnMovement:SetChecked(event.OnMovement)
 		ItemRackOptEventEditBuffUnequip:SetChecked(event.Unequip)
+		ItemRackOptEventEditBuffDisableSound:SetChecked(event.DisableSound)
 		ItemRackOptEventEditBuffNotInPVP:SetChecked(event.NotInPVP)
 		ItemRackOptEventEditBuffNotInPVE:SetChecked(event.NotInPVE)
 		ItemRackOptEventEditStanceName:SetText(event.Stance or "")
 		ItemRackOptEventEditStanceUnequip:SetChecked(event.Unequip)
+		ItemRackOptEventEditStanceDisableSound:SetChecked(event.DisableSound)
 		ItemRackOptEventEditStanceNotInPVP:SetChecked(event.NotInPVP)
 		ItemRackOptEventEditZoneEditBox:SetText(ItemRackOpt.ConvertZoneTableToList(event.Zones))
 		ItemRackOptEventEditZoneEditBox:SetCursorPosition(0)
 		ItemRackOptEventEditZoneUnequip:SetChecked(event.Unequip)
+		ItemRackOptEventEditZoneDisableSound:SetChecked(event.DisableSound)
 		ItemRackOptEventEditScriptTrigger:SetText(event.Trigger or "")
 		ItemRackOptEventEditScriptTrigger:SetCursorPosition(0)
 		ItemRackOptEventEditScriptEditBox:SetText(event.Script or "")
@@ -1984,6 +1996,7 @@ function ItemRackOpt.EventEditPopulateFrame()
 			if event.Spec == 2 then ItemRackOptEventEditSpec2:SetChecked(true) end
 		end
 		ItemRackOptEventEditSpecializationUnequip:SetChecked(event.Unequip)
+		ItemRackOptEventEditSpecializationDisableSound:SetChecked(event.DisableSound)
 	else
 		ItemRackOptEventEditNameEdit:SetFocus()
 	end
@@ -2145,6 +2158,7 @@ function ItemRackOpt.EventEditSave(override)
 		event.Anymount = ItemRackOptEventEditBuffAnyMount:GetChecked()
 		event.OnMovement = ItemRackOptEventEditBuffOnMovement:GetChecked()
 		event.Unequip = ItemRackOptEventEditBuffUnequip:GetChecked()
+		event.DisableSound = ItemRackOptEventEditBuffDisableSound:GetChecked()
 		event.NotInPVP = ItemRackOptEventEditBuffNotInPVP:GetChecked()
 		event.NotInPVE = ItemRackOptEventEditBuffNotInPVE:GetChecked()
 	elseif event.Type=="Stance" then
@@ -2153,13 +2167,16 @@ function ItemRackOpt.EventEditSave(override)
 			event.Stance = tonumber(event.Stance)
 		end
 		event.Unequip = ItemRackOptEventEditStanceUnequip:GetChecked()
+		event.DisableSound = ItemRackOptEventEditStanceDisableSound:GetChecked()
 		event.NotInPVP = ItemRackOptEventEditStanceNotInPVP:GetChecked()
 	elseif event.Type=="Zone" then
 		event.Unequip = ItemRackOptEventEditZoneUnequip:GetChecked()
+		event.DisableSound = ItemRackOptEventEditZoneDisableSound:GetChecked()
 		event.Zones = {}
 		ItemRackOpt.ConvertZoneListToTable(ItemRackOptEventEditZoneEditBox:GetText(),event.Zones)
 	elseif event.Type=="Specialization" then
 		event.Unequip = ItemRackOptEventEditSpecializationUnequip:GetChecked()
+		event.DisableSound = ItemRackOptEventEditSpecializationDisableSound:GetChecked()
 		if ItemRackOptEventEditSpec1:GetChecked() then event.Spec = 1
 		elseif ItemRackOptEventEditSpec2:GetChecked() then event.Spec = 2
 		end

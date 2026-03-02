@@ -2,6 +2,16 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.29.5] - 2026-03-02
+### Bug Fixes
+- **Gear Swap Stalls**: Fixed a major bug where swapping Specializations back and forth would permanently lock the `SetsWaiting` queue, requiring players to cast a spell or enter combat to jog the queue. The queue now correctly processes back-to-back swaps when the inventory lock clears.
+- **Jumping / Momentum Stalls**: Fixed an issue where jumping or falling while relying on an "On Movement" event would abruptly trigger a "stopped moving" event and un-equip gear while you were still in the air. ItemRack now uses a `MovementPollingTimer` to correctly wait until your speed reaches 0 before triggering off-movement swaps.
+
+### Improvements
+- **Disable Swap Sounds**: Added a robust audio toggling system:
+  1. **Global Setting**: A new "Disable swap sounds" checkbox in the main options menu will silence all automated and manual gear swaps.
+  2. **Per-Event Toggles**: A new "Disable sound on equip" checkbox is available in the Event Editor for Buffs, Stances, Zones, and Specializations, allowing you to mute specific automated events without affecting manual clicks.
+
 ## [4.29.4] - 2026-03-01
 ### Improvements
 - **"On Movement" Event Toggle**: Added a new checkbox to the Event Edit panel for "Buff" events (like Mounting). When "On Movement" is checked together with "Any mount" or a specific buff constraint, the event will *only* keep your gear swapped while you are actively moving. This prevents your mount speed gear from staying on when you stop to gather a node or attack a mob. (Suggested by [xeropresence](https://github.com/Bl4ut0/ItemRack-Anniversary/issues/4))

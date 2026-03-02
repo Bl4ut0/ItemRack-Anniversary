@@ -371,6 +371,9 @@ function ItemRack.ProcessingFrameOnEvent(self,event,...)
 		ItemRack.StartTimer("EventsBuffTimer")
 	elseif event == "PLAYER_STARTED_MOVING" or event == "PLAYER_STOPPED_MOVING" then
 		ItemRack.StartTimer("EventsBuffTimer")
+		if event == "PLAYER_STOPPED_MOVING" and GetUnitSpeed("player") > 0 then
+			ItemRack.StartTimer("MovementPollingTimer")
+		end
 	end
 
 	for eventName in pairs(enabled) do
@@ -420,6 +423,7 @@ function ItemRack.ProcessStanceEvent()
 
 	local currentStance = GetShapeshiftForm()
 	local stance, setToEquip, setToUnequip, setname, skip
+	local disableSoundEquip, disableSoundUnequip
 
 	for eventName in pairs(enabled) do
 		if events[eventName].Type=="Stance" then
@@ -439,6 +443,7 @@ function ItemRack.ProcessStanceEvent()
 					if not events[eventName].Active then
 						if not ItemRack.IsSetEquipped(setname) then
 							setToEquip = setname
+							disableSoundEquip = events[eventName].DisableSound
 						end
 						events[eventName].Active = true
 					end
@@ -446,21 +451,23 @@ function ItemRack.ProcessStanceEvent()
 					if events[eventName].Active then
 						if events[eventName].Unequip then
 							setToUnequip = setname
+							disableSoundUnequip = events[eventName].DisableSound
 						end
 						events[eventName].Active = nil
 					elseif events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
 						-- Fallback for consistency
 						setToUnequip = setname
+						disableSoundUnequip = events[eventName].DisableSound
 					end
 				end
 			end
 		end
 	end
 	if setToUnequip then
-		ItemRack.UnequipSet(setToUnequip)
+		ItemRack.UnequipSet(setToUnequip, disableSoundUnequip)
 	end
 	if setToEquip then
-		ItemRack.EquipSet(setToEquip)
+		ItemRack.EquipSet(setToEquip, disableSoundEquip)
 	end
 end
 
@@ -471,6 +478,7 @@ function ItemRack.ProcessZoneEvent()
 	local currentZone = GetRealZoneText()
 	local currentSubZone = GetSubZoneText()
 	local setToEquip, setToUnequip, setname
+	local disableSoundEquip, disableSoundUnequip
 	local _, instanceType = IsInInstance()
 
 	for eventName in pairs(enabled) do
@@ -485,6 +493,7 @@ function ItemRack.ProcessZoneEvent()
 				if not events[eventName].Active then
 					if not ItemRack.IsSetEquipped(setname) then
 						setToEquip = setname
+						disableSoundEquip = events[eventName].DisableSound
 					end
 					events[eventName].Active = true
 				end
@@ -492,20 +501,22 @@ function ItemRack.ProcessZoneEvent()
 				if events[eventName].Active then
 					if events[eventName].Unequip then
 						setToUnequip = setname
+						disableSoundUnequip = events[eventName].DisableSound
 					end
 					events[eventName].Active = nil
 				elseif events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
 					-- Fallback for consistency (e.g. reload UI while in zone then leave)
 					setToUnequip = setname
+					disableSoundUnequip = events[eventName].DisableSound
 				end
 			end
 		end
 	end
 	if setToUnequip then
-		ItemRack.UnequipSet(setToUnequip)
+		ItemRack.UnequipSet(setToUnequip, disableSoundUnequip)
 	end
 	if setToEquip then
-		ItemRack.EquipSet(setToEquip)
+		ItemRack.EquipSet(setToEquip, disableSoundEquip)
 	end
 end
 
@@ -525,6 +536,7 @@ function ItemRack.ProcessSpecializationEvent()
 	ItemRack.LastLastSpec = currentSpec
 	
 	local setToEquip, setToUnequip, setname
+	local disableSoundEquip, disableSoundUnequip
 	
 	for eventName in pairs(enabled) do
 		if events[eventName].Type=="Specialization" and events[eventName].Spec then
@@ -534,17 +546,20 @@ function ItemRack.ProcessSpecializationEvent()
 				if not events[eventName].Active then
 					setToEquip = setname
 					events[eventName].Active = true
+					disableSoundEquip = events[eventName].DisableSound
 				end
 			-- Unequip sets for other specs if they're equipped
 			elseif events[eventName].Spec ~= currentSpec then
 				if events[eventName].Active then
 					if events[eventName].Unequip then
 						setToUnequip = setname
+						disableSoundUnequip = events[eventName].DisableSound
 					end
 					events[eventName].Active = nil
 				elseif events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
 					-- Fallback for consistency
 					setToUnequip = setname
+					disableSoundUnequip = events[eventName].DisableSound
 				end
 			end
 		end
@@ -552,12 +567,12 @@ function ItemRack.ProcessSpecializationEvent()
 	
 	-- Unequip first, then equip (to avoid conflicts)
 	if setToUnequip then
-		ItemRack.UnequipSet(setToUnequip)
+		ItemRack.UnequipSet(setToUnequip, disableSoundUnequip)
 	end
 	if setToEquip then
 		if not ItemRack.IsSetEquipped(setToEquip) then
 			ItemRack.Print("Spec changed! Equipping set: "..setToEquip)
-			ItemRack.EquipSet(setToEquip)
+			ItemRack.EquipSet(setToEquip, disableSoundEquip)
 			
 			-- Dual-Wield Awareness: Schedule a delayed re-check for weapon slots
 			ItemRack.ScheduleDualWieldRetry(setToEquip)
@@ -689,20 +704,20 @@ function ItemRack.ProcessBuffEvent()
 				if buff then
 					if not events[eventName].Active then
 						if not isSetEquipped then
-							ItemRack.EquipSet(setname)
+							ItemRack.EquipSet(setname, events[eventName].DisableSound)
 						end
 						events[eventName].Active = true
 					end
 				elseif not buff then
 					if events[eventName].Active then
 						if events[eventName].Unequip then
-							ItemRack.UnequipSet(setname)
+							ItemRack.UnequipSet(setname, events[eventName].DisableSound)
 						end
 						events[eventName].Active = nil
 					elseif isSetEquipped and events[eventName].Unequip then
 						-- Fallback: If we didn't track it as active but the set IS equipped, unequip it
 						-- This handles cases like reloading UI while mounted
-						ItemRack.UnequipSet(setname)
+						ItemRack.UnequipSet(setname, events[eventName].DisableSound)
 					end
 				end
 			end

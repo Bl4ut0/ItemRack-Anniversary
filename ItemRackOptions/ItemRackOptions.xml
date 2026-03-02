@@ -2857,6 +2857,16 @@
 									</Anchor>
 								</Anchors>
 							</CheckButton>
+							<CheckButton name="ItemRackOptEventEditBuffDisableSound" inherits="ItemRackOptSimpleCheckButton">
+								<Size>
+									<AbsDimension x="26" y="26"/>
+								</Size>
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffUnequip" relativePoint="BOTTOMLEFT">
+										<Offset x="0" y="6"/>
+									</Anchor>
+								</Anchors>
+							</CheckButton>
 						</Frames>
 					</Frame>
 
@@ -2916,6 +2926,16 @@
 								</Size>
 								<Anchors>
 									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditStanceNotInPVP" relativePoint="BOTTOMLEFT"/>
+								</Anchors>
+							</CheckButton>
+							<CheckButton name="ItemRackOptEventEditStanceDisableSound" inherits="ItemRackOptSimpleCheckButton">
+								<Size>
+									<AbsDimension x="26" y="26"/>
+								</Size>
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditStanceUnequip" relativePoint="BOTTOMLEFT">
+										<Offset x="0" y="6"/>
+									</Anchor>
 								</Anchors>
 							</CheckButton>
 						</Frames>
@@ -3051,6 +3071,16 @@
 									</Anchor>
 								</Anchors>
 							</CheckButton>
+							<CheckButton name="ItemRackOptEventEditZoneDisableSound" inherits="ItemRackOptSimpleCheckButton">
+								<Size>
+									<AbsDimension x="26" y="26"/>
+								</Size>
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditZoneUnequip" relativePoint="BOTTOMLEFT">
+										<Offset x="0" y="6"/>
+									</Anchor>
+								</Anchors>
+							</CheckButton>
 						</Frames>
 					</Frame>
 					
@@ -3105,6 +3135,19 @@
 								<Anchors>
 									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditSpec2" relativePoint="BOTTOMLEFT">
 										<Offset x="0" y="-12"/>
+									</Anchor>
+								</Anchors>
+								<NormalFont style="GameFontHighlightSmall"/>
+								<HighlightFont style="GameFontHighlightSmall"/>
+								<DisabledFont style="GameFontDisableSmall"/>
+							</CheckButton>
+							<CheckButton name="ItemRackOptEventEditSpecializationDisableSound" inherits="ItemRackOptSimpleCheckButton">
+								<Size>
+									<AbsDimension x="26" y="26"/>
+								</Size>
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditSpecializationUnequip" relativePoint="BOTTOMLEFT">
+										<Offset x="0" y="6"/>
 									</Anchor>
 								</Anchors>
 								<NormalFont style="GameFontHighlightSmall"/>

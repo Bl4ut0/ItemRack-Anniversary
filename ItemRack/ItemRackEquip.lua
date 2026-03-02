@@ -115,6 +115,7 @@ ItemRack.eqBackOfTheBusOffset = 100
 function ItemRack.ProcessSetsWaiting()
 	local setwaiting = ItemRack.SetsWaiting[1][1]
 	local whichequip = ItemRack.SetsWaiting[1][2]
+	local disableSound = ItemRack.SetsWaiting[1][3]
 	table.remove(ItemRack.SetsWaiting,1)
 	
 	-- Safety: Skip sets that no longer exist (prevents getting stuck)
@@ -126,17 +127,17 @@ function ItemRack.ProcessSetsWaiting()
 		return
 	end
 	
-	whichequip(setwaiting)
+	whichequip(setwaiting, disableSound)
 end
 
-function ItemRack.AddSetToSetsWaiting(setwaiting,whichequip)
+function ItemRack.AddSetToSetsWaiting(setwaiting,whichequip,disableSound)
 	local wait = ItemRack.SetsWaiting
 	for i in pairs(wait) do
 		if wait[i][1]==setwaiting and wait[i][2]==whichequip then
 			return
 		end
 	end
-	table.insert(wait,{setwaiting,whichequip})
+	table.insert(wait,{setwaiting,whichequip,disableSound})
 end
 
 function ItemRack.OrderSwaps(swap)
@@ -152,14 +153,14 @@ function ItemRack.OrderSwaps(swap)
 	end
 end
 
-function ItemRack.EquipSet(setname)
+function ItemRack.EquipSet(setname, disableSound)
 	if not setname or not ItemRackUser.Sets[setname] then
 		ItemRack.Print("Set \""..tostring(setname).."\" doesn't exist.")
 		return
 	end
 	if ItemRack.NowCasting or ItemRack.AnythingLocked() then
 		-- a swap is in progress, add this set to the wait list and leave
-		ItemRack.AddSetToSetsWaiting(setname,ItemRack.EquipSet)
+		ItemRack.AddSetToSetsWaiting(setname,ItemRack.EquipSet, disableSound)
 		return
 	end
 	local set = ItemRackUser.Sets[setname]
@@ -239,7 +240,7 @@ function ItemRack.EquipSet(setname)
 
 	ItemRack.OrderSwaps(swap) -- bump items with unique gems to the end of the line
 
-	ItemRack.IterateSwapList(setname) -- run SwapList swaps
+	ItemRack.IterateSwapList(setname, disableSound) -- run SwapList swaps
 	if not next(swap) then
 		ItemRack.EndSetSwap(setname)
 		return -- leave if swap completed on first pass
@@ -249,6 +250,7 @@ function ItemRack.EquipSet(setname)
 	-- With ItemRack.SetSwapping defined, ITEM_LOCK_CHANGED will call LockChangedDuringSetSwap()
 	-- to determine when to run a second pass.
 	ItemRack.SetSwapping = setname
+	ItemRack.SetSwappingDisableSound = disableSound
 end
 
 function ItemRack.AnythingLocked()
@@ -272,16 +274,29 @@ end
 function ItemRack.LockChangedDuringSetSwap()
 	if not ItemRack.AnythingLocked() then
 		local setname = ItemRack.SetSwapping
+		local disableSound = ItemRack.SetSwappingDisableSound
 		ItemRack.SetSwapping = nil
-		ItemRack.IterateSwapList(setname)
+		ItemRack.SetSwappingDisableSound = nil
+		ItemRack.IterateSwapList(setname, disableSound)
 		ItemRack.EndSetSwap(setname)
+		
+		if #ItemRack.SetsWaiting > 0 and not ItemRack.NowCasting then
+			ItemRack.ProcessSetsWaiting()
+		end
 	end
 end
 
-function ItemRack.IterateSwapList(setname)
+function ItemRack.IterateSwapList(setname, disableSound)
  
 	local set = ItemRackUser.Sets[setname]
 	local swap = ItemRack.SwapList
+
+	local useSound = GetCVar("Sound_EnableSFX")
+	local overrideSound = false
+	if (disableSound or ItemRackSettings.DisableSwapSound == "ON") and useSound == "1" then
+		SetCVar("Sound_EnableSFX", "0")
+		overrideSound = true
+	end
 
 	ItemRack.AbortSwap = nil
 	ItemRack.ClearLockList()
@@ -361,6 +376,7 @@ function ItemRack.IterateSwapList(setname)
 	if ItemRack.AbortSwap then
 		ItemRack.Print("Swap stopped. "..(ItemRack.AbortReasons[ItemRack.AbortSwap] or ""))
 	end
+	if overrideSound then SetCVar("Sound_EnableSFX", "1") end
 end
 
 function ItemRack.EndSetSwap(setname)
@@ -480,10 +496,10 @@ function ItemRack.IsSetEquipped(setname,exact)
 	end
 end
 
-function ItemRack.UnequipSet(setname)
+function ItemRack.UnequipSet(setname, disableSound)
 	if setname and ItemRackUser.Sets[setname] and ItemRackUser.Sets[setname].old then
 		if ItemRack.AnythingLocked() then
-			ItemRack.AddSetToSetsWaiting(setname,ItemRack.UnequipSet)
+			ItemRack.AddSetToSetsWaiting(setname,ItemRack.UnequipSet, disableSound)
 			return
 		end
 		
@@ -524,16 +540,16 @@ function ItemRack.UnequipSet(setname)
 			end
 		end
 		
-		ItemRack.EquipSet("~Unequip")
+		ItemRack.EquipSet("~Unequip", disableSound)
 	end
 end
 
-function ItemRack.ToggleSet(setname,exact)
+function ItemRack.ToggleSet(setname,exact,disableSound)
 	if ItemRack.IsSetEquipped(setname,exact) then
 --		print("remove "..setname)
-		ItemRack.UnequipSet(setname)
+		ItemRack.UnequipSet(setname,disableSound)
 	else
 --		print("equip "..setname)
-		ItemRack.EquipSet(setname)
+		ItemRack.EquipSet(setname,disableSound)
 	end
 end
