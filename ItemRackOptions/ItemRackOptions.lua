@@ -69,6 +69,7 @@ ItemRack.CheckButtonLabels = {
 	["ItemRackOptShowCloakText"] = "Show Cloak",
 	["ItemRackOptEventEditBuffAnyMountText"] = "Any mount",
 	["ItemRackOptEventEditBuffUnequipText"] = "Unequip when buff fades",
+	["ItemRackOptEventEditBuffOnMovementText"] = "On Movement",
 	["ItemRackOptEventEditBuffNotInPVPText"] = "Except in PVP instances",
 	["ItemRackOptEventEditBuffNotInPVEText"] = "Except in PVE instances",
 	["ItemRackOptEventEditStanceUnequipText"] = "Unequip on leaving stance",
@@ -79,6 +80,10 @@ ItemRack.CheckButtonLabels = {
 	["ItemRackOptEventEditSpec1Text"] = "Primary Spec",
 	["ItemRackOptEventEditSpec2Text"] = "Secondary Spec",
 	["ItemRackOptEventEditSpecializationUnequipText"] = "Unequip when leaving spec",
+	["ItemRackOptEventEditBuffDisableSoundText"] = "Disable sound on equip",
+	["ItemRackOptEventEditStanceDisableSoundText"] = "Disable sound on equip",
+	["ItemRackOptEventEditZoneDisableSoundText"] = "Disable sound on equip",
+	["ItemRackOptEventEditSpecializationDisableSoundText"] = "Disable sound on equip",
 }
 
 ItemRack.SetnameBlacklist = {
@@ -176,6 +181,7 @@ function ItemRackOpt.OnLoad(self)
 		{type="check",optset=ItemRackSettings,variable="NotifyThirty",label="Notify at 30",tooltip="Announce when an item you used is at 30 seconds cooldown."},
 		{type="check",optset=ItemRackSettings,variable="NotifyChatAlso",label="Notify chat also",tooltip="Send cooldown notifications to chat also."},
 		{type="check",optset=ItemRackSettings,variable="ShowSetInTooltip",label="Show set info in tooltips",tooltip="Show which set an item belongs to in the tooltip."},
+		{type="check",optset=ItemRackSettings,variable="DisableSwapSound",label="Disable swap sounds",tooltip="Silences the audio when ItemRack automatically swaps gear."},
 		{type="check",optset=ItemRackSettings,variable="TooltipColorUnEquipped",depend="ShowSetInTooltip",label="Highlight unequipped in tooltip",tooltip="Show items that are in your bags but not currently equipped as Orange in the set tooltip."},
 		{type="check",optset=ItemRackSettings,variable="ShowTooltips",label="Show tooltips",tooltip="Show tooltips like the one you're reading now."},
 		{type="check",optset=ItemRackSettings,variable="TinyTooltips",depend="ShowTooltips",label="Tiny Tooltips",tooltip="Shrink item tooltips to display only name, cooldown and durability."},
@@ -621,7 +627,7 @@ function ItemRackOpt.ValidateSetButtons()
 			if ItemRackOpt.Inv[i].selected then
 				ItemRackOptSetsSaveButton:Enable()
 				break
-			end
+						end
 		end
 	end
 	if ItemRackUser.Sets[setname] then
@@ -648,8 +654,7 @@ function ItemRackOpt.ValidateSetButtons()
 end
 
 function ItemRackOpt.ShowCloakHelm()
-	local setname = ItemRackOptSetsName:GetText()
-
+	local setname = ItemRackUser.CurrentSet
 	if setname ~= ItemRackUser.CurrentSet then
 		return
 	end
@@ -1826,6 +1831,9 @@ function ItemRackOpt.EventListOnEnter(self,child)
 		else
 			desc = desc.."gaining the buff "..event.Buff
 		end
+		if event.OnMovement then
+			desc = desc.."\n|cFF888888Unequip on movement."
+		end
 	elseif eventType=="Stance" then
 		if event.Stance == 0 then
 			desc = desc.."leaving forms."
@@ -1927,19 +1935,24 @@ function ItemRackOpt.EventEditClearFrame()
 	ItemRackOptEventEditTypeDropText:SetText("Pick one")
 	ItemRackOptEventEditBuffName:SetText("")
 	ItemRackOptEventEditBuffAnyMount:SetChecked(false)
+	ItemRackOptEventEditBuffOnMovement:SetChecked(false)
 	ItemRackOptEventEditBuffUnequip:SetChecked(false)
+	ItemRackOptEventEditBuffDisableSound:SetChecked(false)
 	ItemRackOptEventEditBuffNotInPVP:SetChecked(false)
 	ItemRackOptEventEditBuffNotInPVE:SetChecked(false)
 	ItemRackOptEventEditStanceName:SetText("")
 	ItemRackOptEventEditStanceUnequip:SetChecked(false)
+	ItemRackOptEventEditStanceDisableSound:SetChecked(false)
 	ItemRackOptEventEditStanceNotInPVP:SetChecked(false)
 	ItemRackOptEventEditZoneEditBox:SetText("")
 	ItemRackOptEventEditZoneUnequip:SetChecked(false)
+	ItemRackOptEventEditZoneDisableSound:SetChecked(false)
 	ItemRackOptEventEditScriptTrigger:SetText("")
 	ItemRackOptEventEditScriptEditBox:SetText("")
 	ItemRackOptEventEditSpec1:SetChecked(false)
 	ItemRackOptEventEditSpec2:SetChecked(false)
 	ItemRackOptEventEditSpecializationUnequip:SetChecked(false)
+	ItemRackOptEventEditSpecializationDisableSound:SetChecked(false)
 end
 
 function ItemRackOpt.EventEditPopulateFrame()
@@ -1951,21 +1964,25 @@ function ItemRackOpt.EventEditPopulateFrame()
 		ItemRackOptEventEditNameEdit:SetText(eventName)
 		ItemRackOptEventEditNameEdit:SetCursorPosition(0)
 		ItemRackOptEventEditTypeDropText:SetText(event.Type)
-		ItemRackOptEventEditBuffName:SetText(event.Buff or "")
-		ItemRackOptEventEditBuffName:SetCursorPosition(0)
 		if event.Anymount then
 			ItemRackOptEventEditBuffAnyMount:SetChecked(true)
-			ItemRackOptEventEditBuffName:SetText("Any mount")
+			ItemRackOptEventEditBuffName:SetText("")
+		else
+			ItemRackOptEventEditBuffName:SetText(event.Buff or "")
 		end
+		ItemRackOptEventEditBuffOnMovement:SetChecked(event.OnMovement)
 		ItemRackOptEventEditBuffUnequip:SetChecked(event.Unequip)
+		ItemRackOptEventEditBuffDisableSound:SetChecked(event.DisableSound)
 		ItemRackOptEventEditBuffNotInPVP:SetChecked(event.NotInPVP)
 		ItemRackOptEventEditBuffNotInPVE:SetChecked(event.NotInPVE)
 		ItemRackOptEventEditStanceName:SetText(event.Stance or "")
 		ItemRackOptEventEditStanceUnequip:SetChecked(event.Unequip)
+		ItemRackOptEventEditStanceDisableSound:SetChecked(event.DisableSound)
 		ItemRackOptEventEditStanceNotInPVP:SetChecked(event.NotInPVP)
 		ItemRackOptEventEditZoneEditBox:SetText(ItemRackOpt.ConvertZoneTableToList(event.Zones))
 		ItemRackOptEventEditZoneEditBox:SetCursorPosition(0)
 		ItemRackOptEventEditZoneUnequip:SetChecked(event.Unequip)
+		ItemRackOptEventEditZoneDisableSound:SetChecked(event.DisableSound)
 		ItemRackOptEventEditScriptTrigger:SetText(event.Trigger or "")
 		ItemRackOptEventEditScriptTrigger:SetCursorPosition(0)
 		ItemRackOptEventEditScriptEditBox:SetText(event.Script or "")
@@ -1975,6 +1992,7 @@ function ItemRackOpt.EventEditPopulateFrame()
 			if event.Spec == 2 then ItemRackOptEventEditSpec2:SetChecked(true) end
 		end
 		ItemRackOptEventEditSpecializationUnequip:SetChecked(event.Unequip)
+		ItemRackOptEventEditSpecializationDisableSound:SetChecked(event.DisableSound)
 	else
 		ItemRackOptEventEditNameEdit:SetFocus()
 	end
@@ -2130,9 +2148,13 @@ function ItemRackOpt.EventEditSave(override)
 	local event=ItemRackEvents[eventName]
 	event.Type = ItemRackOptEventEditTypeDropText:GetText()
 	if event.Type=="Buff" then
+		if ItemRackOptEventEditBuffName:GetText() ~= "" and not ItemRackOptEventEditBuffAnyMount:GetChecked() then
+			event.Buff = ItemRackOptEventEditBuffName:GetText()
+		end
 		event.Anymount = ItemRackOptEventEditBuffAnyMount:GetChecked()
-		event.Buff = ItemRackOptEventEditBuffName:GetText()
+		event.OnMovement = ItemRackOptEventEditBuffOnMovement:GetChecked()
 		event.Unequip = ItemRackOptEventEditBuffUnequip:GetChecked()
+		event.DisableSound = ItemRackOptEventEditBuffDisableSound:GetChecked()
 		event.NotInPVP = ItemRackOptEventEditBuffNotInPVP:GetChecked()
 		event.NotInPVE = ItemRackOptEventEditBuffNotInPVE:GetChecked()
 	elseif event.Type=="Stance" then
@@ -2141,13 +2163,16 @@ function ItemRackOpt.EventEditSave(override)
 			event.Stance = tonumber(event.Stance)
 		end
 		event.Unequip = ItemRackOptEventEditStanceUnequip:GetChecked()
+		event.DisableSound = ItemRackOptEventEditStanceDisableSound:GetChecked()
 		event.NotInPVP = ItemRackOptEventEditStanceNotInPVP:GetChecked()
 	elseif event.Type=="Zone" then
 		event.Unequip = ItemRackOptEventEditZoneUnequip:GetChecked()
+		event.DisableSound = ItemRackOptEventEditZoneDisableSound:GetChecked()
 		event.Zones = {}
 		ItemRackOpt.ConvertZoneListToTable(ItemRackOptEventEditZoneEditBox:GetText(),event.Zones)
 	elseif event.Type=="Specialization" then
 		event.Unequip = ItemRackOptEventEditSpecializationUnequip:GetChecked()
+		event.DisableSound = ItemRackOptEventEditSpecializationDisableSound:GetChecked()
 		if ItemRackOptEventEditSpec1:GetChecked() then event.Spec = 1
 		elseif ItemRackOptEventEditSpec2:GetChecked() then event.Spec = 2
 		end

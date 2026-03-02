@@ -223,6 +223,7 @@ ItemRackSettings = {
 	RightSlotsGoLeft = "OFF", -- whether right-side character slots dock their menus to the LEFT instead of right
 	DisableAltClick = "OFF", -- whether to disable Alt+click from toggling auto queue (to allow self cast through)
 	TooltipColorUnEquipped = "OFF", -- whether to highlight unequipped set items in orange
+	DisableSwapSound = "OFF", -- whether to silence audio when ItemRack automatically swaps gear
 }
 
 ItemRack.NoTitansGrip = {
@@ -1685,6 +1686,14 @@ function ItemRack.EquipItemByID(id,slot)
 	if ItemRack.NowCasting or (not ItemRack.SlotInfo[slot].swappable and (UnitAffectingCombat("player") or ItemRack.IsPlayerReallyDead()) ) then
 		ItemRack.AddToCombatQueue(slot,id)
 	elseif not GetCursorInfo() and not SpellIsTargeting() then
+		local disableSound = ItemRackSettings.DisableSwapSound == "ON"
+		local useSound = GetCVar("Sound_EnableSFX")
+		local overrideSound = false
+		if disableSound and useSound == "1" then
+			SetCVar("Sound_EnableSFX", "0")
+			overrideSound = true
+		end
+		
 		if id~=0 then -- not an empty slot
 			local _,b,s = ItemRack.FindItem(id)
 			if b then
@@ -1717,6 +1726,8 @@ function ItemRack.EquipItemByID(id,slot)
 				ItemRack.Print("Not enough room to perform swap.")
 			end
 		end
+		
+		if overrideSound then SetCVar("Sound_EnableSFX", "1") end
 	end
 end
 
