@@ -399,6 +399,21 @@ function ItemRack.OnPlayerLogin()
 	ItemRack.InitCore()
 	ItemRack.InitButtons()
 	ItemRack.InitEvents()
+	
+	-- Check LibSoundIndex presence
+	C_Timer.After(3, function()
+		if ItemRackSettings.DisableSwapSound == "ON" and not (LibStub and LibStub("LibSoundIndex-1.0", true)) then
+			StaticPopupDialogs["ITEMRACK_MISSING_LSI"] = {
+				text = "ItemRack: 'Disable swap sounds' is enabled, but the required library (LibSoundIndex) is missing.\n\nItemRack will still function normally but will fall back to modifying the game's SFX CVar, which mutes all sounds during equipment swaps.\n\nPlease install LibSoundIndex for a seamless audio experience.",
+				button1 = "OK",
+				timeout = 0,
+				whileDead = true,
+				hideOnEscape = true,
+				preferredIndex = 3,
+			}
+			StaticPopup_Show("ITEMRACK_MISSING_LSI")
+		end
+	end)
 end
 
 function ItemRack.OnPlayerLogout()
@@ -733,6 +748,13 @@ function ItemRack.Print(msg)
 end
 
 function ItemRack.UpdateCurrentSet()
+	local useSound = GetCVar("Sound_EnableSFX")
+	local overrideSound = false
+	if ItemRackSettings.DisableActionBarSound == "ON" and useSound == "1" then
+		SetCVar("Sound_EnableSFX", "0")
+		overrideSound = true
+	end
+
 	local texture = "Interface\\AddOns\\ItemRack\\ItemRackIcon"
 	local setname = ItemRackUser.CurrentSet or _G.CUSTOM
 	if setname and setname ~= _G.CUSTOM then
@@ -754,6 +776,8 @@ function ItemRack.UpdateCurrentSet()
 	end
 	ItemRack.Broker.icon = texture
 	ItemRack.Broker.text = setname
+
+	if overrideSound then SetCVar("Sound_EnableSFX", "1") end
 end
 
 --[[ Item info gathering ]]
@@ -1228,6 +1252,13 @@ function ItemRack.BuildMenu(id,menuInclude,masqueGroup)
 		menuInclude = ItemRack.menuInclude
 	end
 
+	local useSound = GetCVar("Sound_EnableSFX")
+	local overrideSound = false
+	if ItemRackSettings.DisableActionBarSound == "ON" and useSound == "1" then
+		SetCVar("Sound_EnableSFX", "0")
+		overrideSound = true
+	end
+
 	local showButtonMenu = (ItemRackButtonMenu and ItemRack.menuMovable) and (IsAltKeyDown() or ItemRackUser.Locked=="OFF")
 
 	for i in pairs(ItemRack.Menu) do
@@ -1426,6 +1457,8 @@ function ItemRack.BuildMenu(id,menuInclude,masqueGroup)
 			end
 		end
 	end
+
+	if overrideSound then SetCVar("Sound_EnableSFX", "1") end
 end
 
 function ItemRack.UpdateMenuCooldowns()
@@ -1602,6 +1635,56 @@ function ItemRack.MenuOnClick(self,button)
 	end
 end
 
+-- UI SoundKit constants that fire during gear swaps
+ItemRack.SwapUISounds = {
+	"IG_BACKPACK_OPEN",          -- Bag opens during item move
+	"IG_BACKPACK_CLOSE",         -- Bag closes after item move
+	"IG_ABILITY_ICON_DROP",      -- Action bar spell swap
+	"IG_CHARACTER_INFO_OPEN",    -- Character panel opens
+	"IG_CHARACTER_INFO_CLOSE",   -- Character panel closes
+	"PUT_DOWN_GEMS",             -- Gem/item putdown
+	"PICK_UP_GEMS",              -- Gem/item pickup
+	"PUT_DOWN_SMALL_CHAIN",      -- Chain item putdown
+}
+
+-- Mute all swap-related sounds using LibSoundIndex
+-- Returns: LSI reference (truthy) if surgical muting was used, nil otherwise
+function ItemRack.MuteSwapSounds(duration)
+	duration = duration or 1.5
+	local LSI = LibStub and LibStub("LibSoundIndex-1.0", true)
+	if not LSI then return nil end
+
+	-- Mute equip material sounds (armor foley, weapon sheathe/unsheathe)
+	LSI:MuteEquipCategory("ALL_EQUIP")
+
+	-- Mute UI sounds that fire during item moves
+	for _, soundKit in ipairs(ItemRack.SwapUISounds) do
+		LSI:MuteSoundKit(soundKit)
+	end
+
+	-- Auto-unmute after duration
+	if ItemRack.SwapMuteTimer then
+		ItemRack.SwapMuteTimer:Cancel()
+	end
+	ItemRack.SwapMuteTimer = C_Timer.NewTimer(duration, function()
+		ItemRack.UnmuteSwapSounds()
+		ItemRack.SwapMuteTimer = nil
+	end)
+
+	return LSI
+end
+
+-- Unmute all swap-related sounds
+function ItemRack.UnmuteSwapSounds()
+	local LSI = LibStub and LibStub("LibSoundIndex-1.0", true)
+	if not LSI then return end
+
+	LSI:UnmuteEquipCategory("ALL_EQUIP")
+	for _, soundKit in ipairs(ItemRack.SwapUISounds) do
+		LSI:UnmuteSoundKit(soundKit)
+	end
+end
+
 function ItemRack.EquipItemByID(id,slot)
 	if not id then return end
 	if ItemRack.NowCasting or (not ItemRack.SlotInfo[slot].swappable and (UnitAffectingCombat("player") or ItemRack.IsPlayerReallyDead()) ) then
@@ -1611,8 +1694,12 @@ function ItemRack.EquipItemByID(id,slot)
 		local useSound = GetCVar("Sound_EnableSFX")
 		local overrideSound = false
 		if disableSound and useSound == "1" then
-			SetCVar("Sound_EnableSFX", "0")
-			overrideSound = true
+			-- Try surgical muting via LibSoundIndex
+			if not ItemRack.MuteSwapSounds(1.5) then
+				-- Fallback: blunt CVar mute (silences ALL SFX)
+				SetCVar("Sound_EnableSFX", "0")
+				overrideSound = true
+			end
 		end
 		
 		if id~=0 then -- not an empty slot
@@ -1648,7 +1735,24 @@ function ItemRack.EquipItemByID(id,slot)
 			end
 		end
 		
-		if overrideSound then SetCVar("Sound_EnableSFX", "1") end
+		-- CVar fallback restore
+		if overrideSound then
+			if ItemRack.CVarMuteTimer then
+				ItemRack.CVarMuteTimer:Cancel()
+			end
+			ItemRack.CVarMuteTimer = C_Timer.NewTimer(0.5, function()
+				SetCVar("Sound_EnableSFX", "1")
+				ItemRack.CVarMuteTimer = nil
+			end)
+		end
+	end
+end
+
+function ItemRack.PollMovement()
+	-- If speed is 0, they have landed and lost momentum. Re-evaluate Buffs and stop timer.
+	if GetUnitSpeed("player") == 0 then
+		ItemRack.ProcessBuffEvent()
+		ItemRack.StopTimer("MovementPollingTimer")
 	end
 end
 

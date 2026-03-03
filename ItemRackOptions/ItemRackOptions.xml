@@ -1340,6 +1340,13 @@
 					<Button name="ItemRackOptResetBar" inherits="ItemRackOptListButtonTemplate" text="Reset Buttons"/>
 					<Button name="ItemRackOptResetEvents" inherits="ItemRackOptListButtonTemplate" text="Reset Events"/>
 					<Button name="ItemRackOptResetEverything" inherits="ItemRackOptListButtonTemplate" text="Reset Everything"/>
+					<Button name="ItemRackOptSoundSettings" inherits="ItemRackOptListButtonTemplate" text="Sound Settings">
+						<Scripts>
+							<OnClick>
+								ItemRackOpt.ToggleSoundSettings()
+							</OnClick>
+						</Scripts>
+					</Button>
 					<Slider name="ItemRackOptButtonSpacingSlider" inherits="ItemRackOptSliderTemplate"/>
 					<Slider name="ItemRackOptAlphaSlider" inherits="ItemRackOptSliderTemplate"/>
 					<Slider name="ItemRackOptMainScaleSlider" inherits="ItemRackOptSliderTemplate"/>
@@ -2857,16 +2864,6 @@
 									</Anchor>
 								</Anchors>
 							</CheckButton>
-							<CheckButton name="ItemRackOptEventEditBuffDisableSound" inherits="ItemRackOptSimpleCheckButton">
-								<Size>
-									<AbsDimension x="26" y="26"/>
-								</Size>
-								<Anchors>
-									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffUnequip" relativePoint="BOTTOMLEFT">
-										<Offset x="0" y="6"/>
-									</Anchor>
-								</Anchors>
-							</CheckButton>
 						</Frames>
 					</Frame>
 
@@ -2926,16 +2923,6 @@
 								</Size>
 								<Anchors>
 									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditStanceNotInPVP" relativePoint="BOTTOMLEFT"/>
-								</Anchors>
-							</CheckButton>
-							<CheckButton name="ItemRackOptEventEditStanceDisableSound" inherits="ItemRackOptSimpleCheckButton">
-								<Size>
-									<AbsDimension x="26" y="26"/>
-								</Size>
-								<Anchors>
-									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditStanceUnequip" relativePoint="BOTTOMLEFT">
-										<Offset x="0" y="6"/>
-									</Anchor>
 								</Anchors>
 							</CheckButton>
 						</Frames>
@@ -3071,16 +3058,6 @@
 									</Anchor>
 								</Anchors>
 							</CheckButton>
-							<CheckButton name="ItemRackOptEventEditZoneDisableSound" inherits="ItemRackOptSimpleCheckButton">
-								<Size>
-									<AbsDimension x="26" y="26"/>
-								</Size>
-								<Anchors>
-									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditZoneUnequip" relativePoint="BOTTOMLEFT">
-										<Offset x="0" y="6"/>
-									</Anchor>
-								</Anchors>
-							</CheckButton>
 						</Frames>
 					</Frame>
 					
@@ -3135,19 +3112,6 @@
 								<Anchors>
 									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditSpec2" relativePoint="BOTTOMLEFT">
 										<Offset x="0" y="-12"/>
-									</Anchor>
-								</Anchors>
-								<NormalFont style="GameFontHighlightSmall"/>
-								<HighlightFont style="GameFontHighlightSmall"/>
-								<DisabledFont style="GameFontDisableSmall"/>
-							</CheckButton>
-							<CheckButton name="ItemRackOptEventEditSpecializationDisableSound" inherits="ItemRackOptSimpleCheckButton">
-								<Size>
-									<AbsDimension x="26" y="26"/>
-								</Size>
-								<Anchors>
-									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditSpecializationUnequip" relativePoint="BOTTOMLEFT">
-										<Offset x="0" y="6"/>
 									</Anchor>
 								</Anchors>
 								<NormalFont style="GameFontHighlightSmall"/>
@@ -3310,6 +3274,95 @@
 					<OnHide>
 						ItemRackOpt.EventEditOnHide()
 					</OnHide>
+				</Scripts>
+			</Frame>
+
+			<Frame name="ItemRackOptSubFrame9" inherits="ItemRackOptSubFrameTemplate">
+				<Layers>
+					<Layer level="ARTWORK">
+						<FontString name="ItemRackOptSoundSettingsLabel" inherits="GameFontNormal" text="Sound Settings">
+							<Anchors>
+								<Anchor point="TOP">
+									<Offset x="0" y="-12"/>
+								</Anchor>
+							</Anchors>
+						</FontString>
+						<FontString name="ItemRackOptSoundActiveFramework" inherits="GameFontHighlightSmall" text="">
+							<Anchors>
+								<Anchor point="TOP" relativeTo="ItemRackOptSoundSettingsLabel" relativePoint="BOTTOM">
+									<Offset x="0" y="-2"/>
+								</Anchor>
+							</Anchors>
+							<Color r="0.5" g="0.5" b="0.5"/>
+						</FontString>
+					</Layer>
+				</Layers>
+				<Frames>
+					<ScrollFrame name="ItemRackOptSoundListScrollFrame" inherits="FauxScrollFrameTemplate">
+						<Anchors>
+							<Anchor point="TOPLEFT">
+								<Offset x="-3" y="-36"/>
+							</Anchor>
+							<Anchor point="BOTTOMRIGHT">
+								<Offset x="-27" y="38"/>
+							</Anchor>
+						</Anchors>
+						<Scripts>
+							<OnVerticalScroll>
+								FauxScrollFrame_OnVerticalScroll(self, offset, 24, ItemRackOpt.SoundListScrollFrameUpdate)
+							</OnVerticalScroll>
+						</Scripts>
+					</ScrollFrame>
+					<Button name="ItemRackOptSoundList1" inherits="ItemRackOptTemplate" id="1">
+						<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSubFrame9"><Offset x="12" y="-36"/></Anchor></Anchors>
+					</Button>
+					<Button name="ItemRackOptSoundList2" inherits="ItemRackOptTemplate" id="2">
+						<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundList1" relativePoint="BOTTOMLEFT"/></Anchors>
+					</Button>
+					<Button name="ItemRackOptSoundList3" inherits="ItemRackOptTemplate" id="3">
+						<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundList2" relativePoint="BOTTOMLEFT"/></Anchors>
+					</Button>
+					<Button name="ItemRackOptSoundList4" inherits="ItemRackOptTemplate" id="4">
+						<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundList3" relativePoint="BOTTOMLEFT"/></Anchors>
+					</Button>
+					<Button name="ItemRackOptSoundList5" inherits="ItemRackOptTemplate" id="5">
+						<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundList4" relativePoint="BOTTOMLEFT"/></Anchors>
+					</Button>
+					<Button name="ItemRackOptSoundList6" inherits="ItemRackOptTemplate" id="6">
+						<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundList5" relativePoint="BOTTOMLEFT"/></Anchors>
+					</Button>
+					<Button name="ItemRackOptSoundList7" inherits="ItemRackOptTemplate" id="7">
+						<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundList6" relativePoint="BOTTOMLEFT"/></Anchors>
+					</Button>
+					<Button name="ItemRackOptSoundList8" inherits="ItemRackOptTemplate" id="8">
+						<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundList7" relativePoint="BOTTOMLEFT"/></Anchors>
+					</Button>
+					<Button name="ItemRackOptSoundList9" inherits="ItemRackOptTemplate" id="9">
+						<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundList8" relativePoint="BOTTOMLEFT"/></Anchors>
+					</Button>
+					<Button name="ItemRackOptSoundList10" inherits="ItemRackOptTemplate" id="10">
+						<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundList9" relativePoint="BOTTOMLEFT"/></Anchors>
+					</Button>
+					<Button name="ItemRackOptSoundBack" inherits="UIPanelButtonTemplate" text="Back">
+						<Size>
+							<AbsDimension x="80" y="22"/>
+						</Size>
+						<Anchors>
+							<Anchor point="BOTTOM">
+								<Offset x="0" y="12"/>
+							</Anchor>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								ItemRackOpt.ToggleSoundSettings()
+							</OnClick>
+						</Scripts>
+					</Button>
+				</Frames>
+				<Scripts>
+					<OnShow>
+						ItemRackOpt.SoundListOnShow()
+					</OnShow>
 				</Scripts>
 			</Frame>
 		</Frames>

@@ -293,9 +293,16 @@ function ItemRack.IterateSwapList(setname, disableSound)
 
 	local useSound = GetCVar("Sound_EnableSFX")
 	local overrideSound = false
+	local usedSurgicalMute = false
 	if (disableSound or ItemRackSettings.DisableSwapSound == "ON") and useSound == "1" then
-		SetCVar("Sound_EnableSFX", "0")
-		overrideSound = true
+		-- Try surgical muting via LibSoundIndex (mutes equip and UI sounds)
+		if ItemRack.MuteSwapSounds(1.5) then
+			usedSurgicalMute = true
+		else
+			-- Fallback: blunt CVar mute (silences ALL SFX)
+			SetCVar("Sound_EnableSFX", "0")
+			overrideSound = true
+		end
 	end
 
 	ItemRack.AbortSwap = nil
@@ -376,7 +383,16 @@ function ItemRack.IterateSwapList(setname, disableSound)
 	if ItemRack.AbortSwap then
 		ItemRack.Print("Swap stopped. "..(ItemRack.AbortReasons[ItemRack.AbortSwap] or ""))
 	end
-	if overrideSound then SetCVar("Sound_EnableSFX", "1") end
+	-- CVar fallback restore
+	if overrideSound then
+		if ItemRack.CVarMuteTimer then
+			ItemRack.CVarMuteTimer:Cancel()
+		end
+		ItemRack.CVarMuteTimer = C_Timer.NewTimer(0.5, function()
+			SetCVar("Sound_EnableSFX", "1")
+			ItemRack.CVarMuteTimer = nil
+		end)
+	end
 end
 
 function ItemRack.EndSetSwap(setname)

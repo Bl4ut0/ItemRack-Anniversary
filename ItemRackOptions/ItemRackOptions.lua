@@ -7,7 +7,7 @@ ItemRackOpt = {
 	SetList = {}, -- numerically-indexed list of set names
 	selectedIcon = 0,
 	prevFrame = nil, -- previous subframe a frame should return to (ItemRackOptSubFrame1-x)
-	numSubFrames = 8, -- number of subframes
+	numSubFrames = 9, -- number of subframes
 	slotOrder = {1,2,3,15,5,4,19,9,16,17,18,0,14,13,12,11,8,7,6,10,6,7,8,11,12,13,14,0,18,17,16,9,19,4,5,15,3,2},
 	currentMarquee = 1,
 	SpecDirty = false,
@@ -80,10 +80,6 @@ ItemRack.CheckButtonLabels = {
 	["ItemRackOptEventEditSpec1Text"] = "Primary Spec",
 	["ItemRackOptEventEditSpec2Text"] = "Secondary Spec",
 	["ItemRackOptEventEditSpecializationUnequipText"] = "Unequip when leaving spec",
-	["ItemRackOptEventEditBuffDisableSoundText"] = "Disable sound on equip",
-	["ItemRackOptEventEditStanceDisableSoundText"] = "Disable sound on equip",
-	["ItemRackOptEventEditZoneDisableSoundText"] = "Disable sound on equip",
-	["ItemRackOptEventEditSpecializationDisableSoundText"] = "Disable sound on equip",
 }
 
 ItemRack.SetnameBlacklist = {
@@ -208,6 +204,7 @@ function ItemRackOpt.OnLoad(self)
 		{type="button",button=ItemRackOptResetBar,label="Reset Buttons",tooltip="Remove all buttons and restore to default alpha and scale.",combatlock=1},
 		{type="button",button=ItemRackOptResetEvents,label="Reset Events",tooltip="Restore default events or wipe all events to default settings."},
 		{type="button",button=ItemRackOptResetEverything,label="Reset Everything",tooltip="Wipe all settings, sets and events to restore mod to a default state.",combatlock=1},
+		{type="button",button=ItemRackOptSoundSettings,label="Sound Settings",tooltip="Open sound settings to control swap and action bar sounds per event."},
 	}
 
 	ItemRackOpt.InitializeSliders()
@@ -1031,9 +1028,26 @@ end
 function ItemRackOpt.OptListCheckButtonOnClick(self,override)
 	local button = override and override or self
 	local check = button:GetChecked() and "ON" or "OFF"
+
+	-- Sound List checkboxes: bypass OptInfo lookup (uses wrong scroll frame offset)
+	local parentName = button:GetParent() and button:GetParent():GetName() or ""
+	if string.find(parentName, "^ItemRackOptSoundList") then
+		if button.OnClickAction then
+			button.OnClickAction()
+		end
+		return
+	end
+
 	local idx = button:GetParent():GetID() + FauxScrollFrame_GetOffset(ItemRackOptListScrollFrame)
-	local opt = ItemRackOpt.OptInfo[idx]
-	if opt and opt.variable then
+	local opt = ItemRackOpt.OptInfo and ItemRackOpt.OptInfo[idx]
+	if not opt then
+		-- Non-OptInfo context: use OnClickAction if set
+		if button.OnClickAction then
+			button.OnClickAction()
+		end
+		return
+	end
+	if opt.variable then
 		opt.optset[opt.variable] = check
 	end
 	if opt.variable=="MenuOnRight" then
@@ -1088,7 +1102,7 @@ end
 
 function ItemRackOpt.OptListOnClick(self)
 	local check = _G[self:GetName().."CheckButton"]
-	if check and check:IsVisible() and check:IsEnabled()==true then
+	if check and check:IsVisible() and check:IsEnabled() then
 		check:SetChecked(not check:GetChecked())
 		ItemRackOpt.OptListCheckButtonOnClick(self,check)
 	end
@@ -1138,6 +1152,16 @@ function ItemRackOpt.ShowPrevSubFrame()
 		ItemRackOpt.prevFrame:Show()
 	else
 		ItemRackOptSubFrame1:Show()
+	end
+end
+
+function ItemRackOpt.ToggleSoundSettings()
+	if ItemRackOptSubFrame9:IsVisible() then
+		ItemRackOptSubFrame9:Hide()
+		ItemRackOptSubFrame1:Show()
+	else
+		ItemRackOpt.HideCurrentSubFrame()
+		ItemRackOptSubFrame9:Show()
 	end
 end
 
@@ -1444,6 +1468,89 @@ function ItemRackOpt.AddToSortList(sortList,id)
 	if not found then
 		table.insert(sortList,id)
 	end
+end
+
+function ItemRackOpt.SoundListScrollFrameUpdate()
+	local offset = FauxScrollFrame_GetOffset(ItemRackOptSoundListScrollFrame)
+	local activeEvents = {}
+	
+	-- Gather all enabled events
+	for eventName, eventData in pairs(ItemRackUser.Events.Enabled) do
+		if ItemRackEvents[eventName] then
+			table.insert(activeEvents, eventName)
+		end
+	end
+	table.sort(activeEvents)
+	
+	-- We have 2 global sounds + the dynamically enabled events
+	local totalItems = 2 + #activeEvents
+	FauxScrollFrame_Update(ItemRackOptSoundListScrollFrame, totalItems, 10, 24)
+	
+	local button, checkText
+	for i = 1, 10 do
+		local idx = offset + i
+		button = _G["ItemRackOptSoundList"..i]
+		if idx <= totalItems then
+			-- Hide unused elements from the template
+			_G["ItemRackOptSoundList"..i.."Label"]:Hide()
+			_G["ItemRackOptSoundList"..i.."NumberLabel"]:Hide()
+			_G["ItemRackOptSoundList"..i.."Underline"]:Hide()
+			
+			checkText = _G["ItemRackOptSoundList"..i.."CheckText"]
+			local thisCheck = _G["ItemRackOptSoundList"..i.."CheckButton"]
+			
+			-- Position checkbox on the left, text to the right
+			thisCheck:ClearAllPoints()
+			thisCheck:SetPoint("LEFT", button, "LEFT", 2, 0)
+			checkText:ClearAllPoints()
+			checkText:SetPoint("LEFT", thisCheck, "RIGHT", 2, 0)
+			checkText:SetWidth(120)
+			
+			button:Show()
+			thisCheck:Show()
+			checkText:Show()
+			if idx == 1 then
+				checkText:SetText("Disable Swap Sounds")
+				checkText:SetTextColor(1, 0.82, 0) -- Gold for global
+				thisCheck:SetChecked(ItemRackSettings.DisableSwapSound == "ON")
+				thisCheck.OnClickAction = function()
+					ItemRackSettings.DisableSwapSound = thisCheck:GetChecked() and "ON" or "OFF"
+					if ItemRackSettings.DisableSwapSound == "ON" and not (LibStub and LibStub("LibSoundIndex-1.0", true)) then
+						StaticPopup_Show("ITEMRACK_MISSING_LSI")
+					end
+				end
+			elseif idx == 2 then
+				checkText:SetText("Silence Action Bar")
+				checkText:SetTextColor(1, 0.82, 0)
+				thisCheck:SetChecked(ItemRackSettings.DisableActionBarSound == "ON")
+				thisCheck.OnClickAction = function()
+					ItemRackSettings.DisableActionBarSound = thisCheck:GetChecked() and "ON" or "OFF"
+				end
+			else
+				local evName = activeEvents[idx - 2]
+				checkText:SetText(evName)
+				checkText:SetTextColor(1, 1, 1)
+				thisCheck:SetChecked(ItemRackEvents[evName].DisableSound)
+				thisCheck.OnClickAction = function()
+					ItemRackEvents[evName].DisableSound = thisCheck:GetChecked()
+				end
+			end
+		else
+			button:Hide()
+		end
+	end
+end
+
+function ItemRackOpt.SoundListOnShow()
+	local lsi = LibStub and LibStub("LibSoundIndex-1.0", true)
+	if lsi then
+		ItemRackOptSoundActiveFramework:SetText("Active Mute Framework: LibSoundIndex")
+		ItemRackOptSoundActiveFramework:SetTextColor(0.2, 1.0, 0.2)
+	else
+		ItemRackOptSoundActiveFramework:SetText("Active Mute Framework: CVar Fallback")
+		ItemRackOptSoundActiveFramework:SetTextColor(1.0, 0.5, 0.0)
+	end
+	ItemRackOpt.SoundListScrollFrameUpdate()
 end
 
 function ItemRackOpt.SortListScrollFrameUpdate()
@@ -1981,12 +2088,12 @@ function ItemRackOpt.EventEditPopulateFrame()
 		ItemRackOptEventEditBuffNotInPVE:SetChecked(event.NotInPVE)
 		ItemRackOptEventEditStanceName:SetText(event.Stance or "")
 		ItemRackOptEventEditStanceUnequip:SetChecked(event.Unequip)
-		ItemRackOptEventEditStanceDisableSound:SetChecked(event.DisableSound)
+		ItemRackOptEventEditStanceUnequip:SetChecked(event.Unequip)
 		ItemRackOptEventEditStanceNotInPVP:SetChecked(event.NotInPVP)
 		ItemRackOptEventEditZoneEditBox:SetText(ItemRackOpt.ConvertZoneTableToList(event.Zones))
 		ItemRackOptEventEditZoneEditBox:SetCursorPosition(0)
 		ItemRackOptEventEditZoneUnequip:SetChecked(event.Unequip)
-		ItemRackOptEventEditZoneDisableSound:SetChecked(event.DisableSound)
+		ItemRackOptEventEditZoneUnequip:SetChecked(event.Unequip)
 		ItemRackOptEventEditScriptTrigger:SetText(event.Trigger or "")
 		ItemRackOptEventEditScriptTrigger:SetCursorPosition(0)
 		ItemRackOptEventEditScriptEditBox:SetText(event.Script or "")
@@ -1996,7 +2103,7 @@ function ItemRackOpt.EventEditPopulateFrame()
 			if event.Spec == 2 then ItemRackOptEventEditSpec2:SetChecked(true) end
 		end
 		ItemRackOptEventEditSpecializationUnequip:SetChecked(event.Unequip)
-		ItemRackOptEventEditSpecializationDisableSound:SetChecked(event.DisableSound)
+		ItemRackOptEventEditSpecializationUnequip:SetChecked(event.Unequip)
 	else
 		ItemRackOptEventEditNameEdit:SetFocus()
 	end
@@ -2158,7 +2265,7 @@ function ItemRackOpt.EventEditSave(override)
 		event.Anymount = ItemRackOptEventEditBuffAnyMount:GetChecked()
 		event.OnMovement = ItemRackOptEventEditBuffOnMovement:GetChecked()
 		event.Unequip = ItemRackOptEventEditBuffUnequip:GetChecked()
-		event.DisableSound = ItemRackOptEventEditBuffDisableSound:GetChecked()
+		event.Unequip = ItemRackOptEventEditBuffUnequip:GetChecked()
 		event.NotInPVP = ItemRackOptEventEditBuffNotInPVP:GetChecked()
 		event.NotInPVE = ItemRackOptEventEditBuffNotInPVE:GetChecked()
 	elseif event.Type=="Stance" then
@@ -2167,16 +2274,16 @@ function ItemRackOpt.EventEditSave(override)
 			event.Stance = tonumber(event.Stance)
 		end
 		event.Unequip = ItemRackOptEventEditStanceUnequip:GetChecked()
-		event.DisableSound = ItemRackOptEventEditStanceDisableSound:GetChecked()
+		event.Unequip = ItemRackOptEventEditStanceUnequip:GetChecked()
 		event.NotInPVP = ItemRackOptEventEditStanceNotInPVP:GetChecked()
 	elseif event.Type=="Zone" then
 		event.Unequip = ItemRackOptEventEditZoneUnequip:GetChecked()
-		event.DisableSound = ItemRackOptEventEditZoneDisableSound:GetChecked()
+		event.Unequip = ItemRackOptEventEditZoneUnequip:GetChecked()
 		event.Zones = {}
 		ItemRackOpt.ConvertZoneListToTable(ItemRackOptEventEditZoneEditBox:GetText(),event.Zones)
 	elseif event.Type=="Specialization" then
 		event.Unequip = ItemRackOptEventEditSpecializationUnequip:GetChecked()
-		event.DisableSound = ItemRackOptEventEditSpecializationDisableSound:GetChecked()
+		event.Unequip = ItemRackOptEventEditSpecializationUnequip:GetChecked()
 		if ItemRackOptEventEditSpec1:GetChecked() then event.Spec = 1
 		elseif ItemRackOptEventEditSpec2:GetChecked() then event.Spec = 2
 		end
@@ -2256,3 +2363,4 @@ function ItemRackOpt.FloatingEditorOnHide()
 	ItemRackOptEventEditScriptEditBackdrop:Show()
 	ItemRackOptEventEditScriptEditScrollFrame:Show()
 end
+

@@ -229,6 +229,7 @@ function ItemRack.InitEvents()
 	ItemRack.CreateTimer("EventsZoneTimer",ItemRack.ProcessZoneEvent,.16)
 	ItemRack.CreateTimer("CheckForMountedEvents",ItemRack.CheckForMountedEvents,.5,1)
 	ItemRack.CreateTimer("SpecChangeTimer",ItemRack.ProcessSpecializationEvent,0.5,1)
+	ItemRack.CreateTimer("MovementPollingTimer",ItemRack.PollMovement,.2,1)
 	
 	-- Prime all events to prevent redundant swaps on login/reload
 	local getSpec = GetActiveTalentGroup or (C_Talent and C_Talent.GetActiveTalentGroup)

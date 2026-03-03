@@ -11,6 +11,7 @@ All notable changes to the TBC Anniversary port of ItemRack will be documented i
 - **Disable Swap Sounds**: Added a robust audio toggling system:
   1. **Global Setting**: A new "Disable swap sounds" checkbox in the main options menu will silence all automated and manual gear swaps.
   2. **Per-Event Toggles**: A new "Disable sound on equip" checkbox is available in the Event Editor for Buffs, Stances, Zones, and Specializations, allowing you to mute specific automated events without affecting manual clicks.
+  3. **LibSoundIndex Integration**: The addon now natively supports `LibSoundIndex-1.0` to perform "surgical muting". When installed, only the sound of the equipment swapping and UI bag drops are muted. If not installed, ItemRack falls back to briefly muting the game's Master SFX CVar during swaps.
 
 ## [4.29.4] - 2026-03-01
 ### Improvements
