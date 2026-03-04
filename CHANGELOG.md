@@ -2,12 +2,24 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
-## [4.29.5] - 2026-03-02
+## [4.29.5] - 2026-03-04
 ### Bug Fixes
+- **Tooltip Frame Error (`GetName` on bad self)**: Fixed an error that could occur when mousing over certain restricted or spoofed game UI frames (like the new `SecureTransferDialog`), which caused the addon's popout menus (`ItemRack.MenuMouseover`) to crash when calling frame methods. Safely wrapped `GetName` and `IsVisible` lookups with `pcall`.
 - **Gear Swap Stalls**: Fixed a major bug where swapping Specializations back and forth would permanently lock the `SetsWaiting` queue, requiring players to cast a spell or enter combat to jog the queue. The queue now correctly processes back-to-back swaps when the inventory lock clears.
 - **Jumping / Momentum Stalls**: Fixed an issue where jumping or falling while relying on an "On Movement" event would abruptly trigger a "stopped moving" event and un-equip gear while you were still in the air. ItemRack now uses a `MovementPollingTimer` to correctly wait until your speed reaches 0 before triggering off-movement swaps.
 
 ### Improvements
+- **Tooltips System Overhaul**:
+  - **Global Toggle**: Added a `Show tooltips` option to completely disable ItemRack's custom tooltips.
+  - **Selective Tiny Tooltips**: Added `Tiny Tooltips on Quick Access Only`. When enabled, the main Set button retains its large informative tooltip, but individual gear slot buttons use tiny tooltips, reducing screen clutter.
+  - **Comparison Overlap Fix**: Fixed an issue where holding Shift to view a popout menu would trigger multiple overlapping "item comparison tooltips" from the default WoW UI. These are now explicitly suppressed.
+- **Audio System Enhancements**:
+  - **Test Environment**: Added a "Test" options panel when `LibSoundIndex` is active, allowing users to manually toggle/test specific audio categories like `BAGS` and `ALL_EQUIP`.
+  - **Get Addon Integration**: If `LibSoundIndex` is missing, the Audio Framework pane now displays a "Get Addon" button with a direct copyable CurseForge link.
+  - **One-Time Warning**: ItemRack now throws a one-time popup warning if you try to enable "Disable swap sounds" without the required library.
+  - **CVar Fallback Tuning**: Increased the fallback CVar audio mute length from 0.5s to 1.5s to completely capture the longer Foley sounds during large swaps.
+- **Shift-Click Equip via Bank**: Holding Shift while clicking an item in an ItemRack popout menu while the bank window is open will now successfully equip the item, overriding the default transfer-to-bank behavior.
+- **Menu Settings Mutual Exclusivity**: The `Menu on Shift` and `Menu on right click` settings are now mutually exclusive, automatically toggling the other off to prevent control conflicts.
 - **Disable Swap Sounds**: Added a robust audio toggling system:
   1. **Global Setting**: A new "Disable swap sounds" checkbox in the main options menu will silence all automated and manual gear swaps.
   2. **Per-Event Toggles**: A new "Disable sound on equip" checkbox is available in the Event Editor for Buffs, Stances, Zones, and Specializations, allowing you to mute specific automated events without affecting manual clicks.

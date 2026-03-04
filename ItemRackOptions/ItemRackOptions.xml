@@ -3301,7 +3301,7 @@
 					<ScrollFrame name="ItemRackOptSoundListScrollFrame" inherits="FauxScrollFrameTemplate">
 						<Anchors>
 							<Anchor point="TOPLEFT">
-								<Offset x="-3" y="-36"/>
+								<Offset x="-3" y="-56"/>
 							</Anchor>
 							<Anchor point="BOTTOMRIGHT">
 								<Offset x="-27" y="38"/>
@@ -3314,7 +3314,7 @@
 						</Scripts>
 					</ScrollFrame>
 					<Button name="ItemRackOptSoundList1" inherits="ItemRackOptTemplate" id="1">
-						<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSubFrame9"><Offset x="12" y="-36"/></Anchor></Anchors>
+						<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSubFrame9"><Offset x="12" y="-56"/></Anchor></Anchors>
 					</Button>
 					<Button name="ItemRackOptSoundList2" inherits="ItemRackOptTemplate" id="2">
 						<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundList1" relativePoint="BOTTOMLEFT"/></Anchors>
@@ -3340,16 +3340,29 @@
 					<Button name="ItemRackOptSoundList9" inherits="ItemRackOptTemplate" id="9">
 						<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundList8" relativePoint="BOTTOMLEFT"/></Anchors>
 					</Button>
-					<Button name="ItemRackOptSoundList10" inherits="ItemRackOptTemplate" id="10">
-						<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundList9" relativePoint="BOTTOMLEFT"/></Anchors>
+
+					<Button name="ItemRackOptSoundTestButton" inherits="UIPanelButtonTemplate" text="Test">
+						<Size>
+							<AbsDimension x="80" y="22"/>
+						</Size>
+						<Anchors>
+							<Anchor point="BOTTOMLEFT">
+								<Offset x="12" y="12"/>
+							</Anchor>
+						</Anchors>
+						<Scripts>
+							<OnClick>
+								ItemRackOpt.ToggleSoundTestSettings()
+							</OnClick>
+						</Scripts>
 					</Button>
 					<Button name="ItemRackOptSoundBack" inherits="UIPanelButtonTemplate" text="Back">
 						<Size>
 							<AbsDimension x="80" y="22"/>
 						</Size>
 						<Anchors>
-							<Anchor point="BOTTOM">
-								<Offset x="0" y="12"/>
+							<Anchor point="BOTTOMRIGHT">
+								<Offset x="-12" y="12"/>
 							</Anchor>
 						</Anchors>
 						<Scripts>
@@ -3379,6 +3392,93 @@
 			</OnMouseUp>
 			<OnShow>
 				ItemRackOpt.OnShow()
+			</OnShow>
+		</Scripts>
+	</Frame>
+
+	<Frame name="ItemRackOptSubFrame10" inherits="ItemRackOptSubFrameTemplate" parent="ItemRackOptFrame">
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString name="ItemRackOptSoundTestLabel" inherits="GameFontNormal" text="Sound Test">
+					<Anchors>
+						<Anchor point="TOP">
+							<Offset x="0" y="-12"/>
+						</Anchor>
+					</Anchors>
+				</FontString>
+				<FontString name="ItemRackOptSoundTestDesc" inherits="GameFontHighlightSmall" text="Toggle specific LibSoundIndex categories.">
+					<Anchors>
+						<Anchor point="TOP" relativeTo="ItemRackOptSoundTestLabel" relativePoint="BOTTOM">
+							<Offset x="0" y="-2"/>
+						</Anchor>
+					</Anchors>
+					<Color r="0.5" g="0.5" b="0.5"/>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Frames>
+			<ScrollFrame name="ItemRackOptSoundTestScrollFrame" inherits="FauxScrollFrameTemplate">
+				<Anchors>
+					<Anchor point="TOPLEFT">
+						<Offset x="-3" y="-56"/>
+					</Anchor>
+					<Anchor point="BOTTOMRIGHT">
+						<Offset x="-27" y="38"/>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnVerticalScroll>
+						FauxScrollFrame_OnVerticalScroll(self, offset, 24, ItemRackOpt.SoundTestScrollFrameUpdate)
+					</OnVerticalScroll>
+				</Scripts>
+			</ScrollFrame>
+			<Button name="ItemRackOptSoundTestList1" inherits="ItemRackOptTemplate" id="1">
+				<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSubFrame10"><Offset x="12" y="-56"/></Anchor></Anchors>
+			</Button>
+			<Button name="ItemRackOptSoundTestList2" inherits="ItemRackOptTemplate" id="2">
+				<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundTestList1" relativePoint="BOTTOMLEFT"/></Anchors>
+			</Button>
+			<Button name="ItemRackOptSoundTestList3" inherits="ItemRackOptTemplate" id="3">
+				<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundTestList2" relativePoint="BOTTOMLEFT"/></Anchors>
+			</Button>
+			<Button name="ItemRackOptSoundTestList4" inherits="ItemRackOptTemplate" id="4">
+				<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundTestList3" relativePoint="BOTTOMLEFT"/></Anchors>
+			</Button>
+			<Button name="ItemRackOptSoundTestList5" inherits="ItemRackOptTemplate" id="5">
+				<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundTestList4" relativePoint="BOTTOMLEFT"/></Anchors>
+			</Button>
+			<Button name="ItemRackOptSoundTestList6" inherits="ItemRackOptTemplate" id="6">
+				<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundTestList5" relativePoint="BOTTOMLEFT"/></Anchors>
+			</Button>
+			<Button name="ItemRackOptSoundTestList7" inherits="ItemRackOptTemplate" id="7">
+				<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundTestList6" relativePoint="BOTTOMLEFT"/></Anchors>
+			</Button>
+			<Button name="ItemRackOptSoundTestList8" inherits="ItemRackOptTemplate" id="8">
+				<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundTestList7" relativePoint="BOTTOMLEFT"/></Anchors>
+			</Button>
+			<Button name="ItemRackOptSoundTestList9" inherits="ItemRackOptTemplate" id="9">
+				<Anchors><Anchor point="TOPLEFT" relativeTo="ItemRackOptSoundTestList8" relativePoint="BOTTOMLEFT"/></Anchors>
+			</Button>
+
+			<Button name="ItemRackOptSoundTestBack" inherits="UIPanelButtonTemplate" text="Back">
+				<Size>
+					<AbsDimension x="80" y="22"/>
+				</Size>
+				<Anchors>
+					<Anchor point="BOTTOM">
+						<Offset x="0" y="12"/>
+					</Anchor>
+				</Anchors>
+				<Scripts>
+					<OnClick>
+						ItemRackOpt.ToggleSoundTestSettings()
+					</OnClick>
+				</Scripts>
+			</Button>
+		</Frames>
+		<Scripts>
+			<OnShow>
+				ItemRackOpt.SoundTestOnShow()
 			</OnShow>
 		</Scripts>
 	</Frame>

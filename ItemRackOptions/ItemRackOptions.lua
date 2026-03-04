@@ -170,24 +170,30 @@ function ItemRackOpt.OnLoad(self)
 
 		{type="label",label="Global Settings"},
 		{type="check",optset=ItemRackSettings,variable="MenuOnShift",label="Menu on Shift",tooltip="Only show menu while Shift is held down."},
-		{type="check",optset=ItemRackSettings,variable="MenuOnRight",label="Menu on right click",tooltip="Open menu by right clicking buttons.",combatlock=1},
+		{type="check",optset=ItemRackSettings,variable="MenuOnRight",label="Menu on right click",tooltip="Open menu by right clicking buttons.\nWhen unchecked, Alt+Right-Click opens the menu.",combatlock=1},
 		{type="check",optset=ItemRackSettings,variable="HideOOC",label="Hide out of combat",tooltip="Hide the buttons while out of combat.",combatlock=1},
 		{type="check",optset=ItemRackSettings,variable="HidePetBattle",label="Hide during pet battles",tooltip="Hide the buttons during a pet battle."},
-		{type="check",optset=ItemRackSettings,variable="Notify",label="Notify when ready",tooltip="Announce when an item you used comes off cooldown."},
-		{type="check",optset=ItemRackSettings,variable="NotifyThirty",label="Notify at 30",tooltip="Announce when an item you used is at 30 seconds cooldown."},
-		{type="check",optset=ItemRackSettings,variable="NotifyChatAlso",label="Notify chat also",tooltip="Send cooldown notifications to chat also."},
-		{type="check",optset=ItemRackSettings,variable="ShowSetInTooltip",label="Show set info in tooltips",tooltip="Show which set an item belongs to in the tooltip."},
-		{type="check",optset=ItemRackSettings,variable="DisableSwapSound",label="Disable swap sounds",tooltip="Silences the audio when ItemRack automatically swaps gear."},
-		{type="check",optset=ItemRackSettings,variable="TooltipColorUnEquipped",depend="ShowSetInTooltip",label="Highlight unequipped in tooltip",tooltip="Show items that are in your bags but not currently equipped as Orange in the set tooltip."},
-		{type="check",optset=ItemRackSettings,variable="ShowTooltips",label="Show tooltips",tooltip="Show tooltips like the one you're reading now."},
-		{type="check",optset=ItemRackSettings,variable="TinyTooltips",depend="ShowTooltips",label="Tiny Tooltips",tooltip="Shrink item tooltips to display only name, cooldown and durability."},
-		{type="check",optset=ItemRackSettings,variable="TooltipFollow",depend="ShowTooltips",label="Tooltips at pointer",tooltip="Show tooltips near the mouse."},
-		{type="check",optset=ItemRackSettings,variable="CooldownCount",label="Cooldown numbers",tooltip="Display the cooldown time as a number over items."},
-		{type="check",optset=ItemRackSettings,variable="LargeNumbers",depend="CooldownCount",label="Large numbers",tooltip="Use a larger font for cooldown numbers."},
-		{type="check",optset=ItemRackSettings,variable="Cooldown90",depend="CooldownCount",label="Countdown at 90",tooltip="Use seconds instead of minutes starting at 90 seconds remaining."},
 		{type="check",optset=ItemRackSettings,variable="AllowEmpty",label="Allow empty slots",tooltip="Add an empty slot to menus of equipped items."},
 		{type="check",optset=ItemRackSettings,variable="AllowHidden",label="Allow hidden items",tooltip="Enable Alt+clicking of menu items to hide/show them in the menu.  Hold Alt as you enter a menu to show all."},
 		{type="check",optset=ItemRackSettings,variable="HideTradables",label="Hide tradables",tooltip="Prevent tradable items from showing up in the menu."},
+
+		{type="label",label="Cooldown Settings"},
+		{type="check",optset=ItemRackSettings,variable="Notify",label="Notify when ready",tooltip="Announce when an item you used comes off cooldown."},
+		{type="check",optset=ItemRackSettings,variable="NotifyThirty",label="Notify at 30",tooltip="Announce when an item you used is at 30 seconds cooldown."},
+		{type="check",optset=ItemRackSettings,variable="NotifyChatAlso",label="Notify chat also",tooltip="Send cooldown notifications to chat also."},
+		{type="check",optset=ItemRackSettings,variable="CooldownCount",label="Cooldown numbers",tooltip="Display the cooldown time as a number over items."},
+		{type="check",optset=ItemRackSettings,variable="LargeNumbers",depend="CooldownCount",label="Large numbers",tooltip="Use a larger font for cooldown numbers."},
+		{type="check",optset=ItemRackSettings,variable="Cooldown90",depend="CooldownCount",label="Countdown at 90",tooltip="Use seconds instead of minutes starting at 90 seconds remaining."},
+
+		{type="label",label="Tooltip Settings"},
+		{type="check",optset=ItemRackSettings,variable="ShowTooltips",label="Show tooltips",tooltip="Show tooltips like the one you're reading now."},
+		{type="check",optset=ItemRackSettings,variable="ShowSetInTooltip",depend="ShowTooltips",label="Show set info in tooltips",tooltip="Show which set an item belongs to in the tooltip."},
+		{type="check",optset=ItemRackSettings,variable="TooltipColorUnEquipped",depend="ShowTooltips",label="Highlight unequipped in tooltip",tooltip="Show items that are in your bags but not currently equipped as Orange in the set tooltip."},
+		{type="check",optset=ItemRackSettings,variable="TinyTooltips",depend="ShowTooltips",label="Tiny Tooltips",tooltip="Shrink item tooltips to display only name, cooldown and durability."},
+		{type="check",optset=ItemRackSettings,variable="TinyTooltipsQuickAccess",depend="ShowTooltips",label="Tiny Tooltips on Quick Access Only",tooltip="Renders normal-sized tooltips for your main Sets button (slot 20), but applies Tiny Tooltips to individual gear slots."},
+		{type="check",optset=ItemRackSettings,variable="TooltipFollow",depend="ShowTooltips",label="Tooltips at pointer",tooltip="Show tooltips near the mouse."},
+
+		{type="label",label="Interface & Misc"},
 		{type="check",optset=ItemRackSettings,variable="ShowMinimap",label="Show minimap button",tooltip="Show the minimap button to access options or change sets."},
 		{type="check",optset=ItemRackSettings,variable="MinimapTooltip",depend="ShowMinimap",label="Show minimap tooltip",tooltip="If tooltips enabled, show what mouse clicks will do when clicking the minimap button."},
 		{type="check",optset=ItemRackSettings,variable="TrinketMenuMode",label="TrinketMenu mode",tooltip="When mouseover of either trinket slot, open anchored to the top trinket.  Left click of a menu item will equip to the top trinket.  Right click will equip to the bottom trinket."},
@@ -1031,9 +1037,9 @@ function ItemRackOpt.OptListCheckButtonOnClick(self,override)
 
 	-- Sound List checkboxes: bypass OptInfo lookup (uses wrong scroll frame offset)
 	local parentName = button:GetParent() and button:GetParent():GetName() or ""
-	if string.find(parentName, "^ItemRackOptSoundList") then
+	if string.find(parentName, "^ItemRackOptSoundList") or string.find(parentName, "^ItemRackOptSoundTestList") then
 		if button.OnClickAction then
-			button.OnClickAction()
+			button.OnClickAction(check) -- Pass the resolved check status ("ON" or "OFF") just in case
 		end
 		return
 	end
@@ -1051,7 +1057,15 @@ function ItemRackOpt.OptListCheckButtonOnClick(self,override)
 		opt.optset[opt.variable] = check
 	end
 	if opt.variable=="MenuOnRight" then
+		if check=="ON" then
+			ItemRackSettings.MenuOnShift = "OFF"
+		end
 		ItemRack.ReflectMenuOnRight()
+	elseif opt.variable=="MenuOnShift" then
+		if check=="ON" and ItemRackSettings.MenuOnRight=="ON" then
+			ItemRackSettings.MenuOnRight = "OFF"
+			ItemRack.ReflectMenuOnRight()
+		end
 	elseif opt.variable=="HideOOC" then
 		ItemRack.ReflectHideOOC()
 	elseif opt.variable=="HidePetBattle" then
@@ -1484,10 +1498,12 @@ function ItemRackOpt.SoundListScrollFrameUpdate()
 	
 	-- We have 2 global sounds + the dynamically enabled events
 	local totalItems = 2 + #activeEvents
-	FauxScrollFrame_Update(ItemRackOptSoundListScrollFrame, totalItems, 10, 24)
+	
+	-- We reduced the display from 10 items to 9 to make room for the two-line Active Framework text
+	FauxScrollFrame_Update(ItemRackOptSoundListScrollFrame, totalItems, 9, 24)
 	
 	local button, checkText
-	for i = 1, 10 do
+	for i = 1, 9 do
 		local idx = offset + i
 		button = _G["ItemRackOptSoundList"..i]
 		if idx <= totalItems then
@@ -1513,9 +1529,9 @@ function ItemRackOpt.SoundListScrollFrameUpdate()
 				checkText:SetText("Disable Swap Sounds")
 				checkText:SetTextColor(1, 0.82, 0) -- Gold for global
 				thisCheck:SetChecked(ItemRackSettings.DisableSwapSound == "ON")
-				thisCheck.OnClickAction = function()
-					ItemRackSettings.DisableSwapSound = thisCheck:GetChecked() and "ON" or "OFF"
-					if ItemRackSettings.DisableSwapSound == "ON" and not (LibStub and LibStub("LibSoundIndex-1.0", true)) then
+				thisCheck.OnClickAction = function(check)
+					ItemRackSettings.DisableSwapSound = check
+					if ItemRackSettings.DisableSwapSound == "ON" and not ItemRackSettings.LSIWarningSeen and not (LibStub and LibStub("LibSoundIndex-1.0", true)) then
 						StaticPopup_Show("ITEMRACK_MISSING_LSI")
 					end
 				end
@@ -1523,16 +1539,16 @@ function ItemRackOpt.SoundListScrollFrameUpdate()
 				checkText:SetText("Silence Action Bar")
 				checkText:SetTextColor(1, 0.82, 0)
 				thisCheck:SetChecked(ItemRackSettings.DisableActionBarSound == "ON")
-				thisCheck.OnClickAction = function()
-					ItemRackSettings.DisableActionBarSound = thisCheck:GetChecked() and "ON" or "OFF"
+				thisCheck.OnClickAction = function(check)
+					ItemRackSettings.DisableActionBarSound = check
 				end
-			else
+			elseif idx <= 2 + #activeEvents then
 				local evName = activeEvents[idx - 2]
 				checkText:SetText(evName)
 				checkText:SetTextColor(1, 1, 1)
 				thisCheck:SetChecked(ItemRackEvents[evName].DisableSound)
-				thisCheck.OnClickAction = function()
-					ItemRackEvents[evName].DisableSound = thisCheck:GetChecked()
+				thisCheck.OnClickAction = function(check)
+					ItemRackEvents[evName].DisableSound = check == "ON"
 				end
 			end
 		else
@@ -1544,13 +1560,117 @@ end
 function ItemRackOpt.SoundListOnShow()
 	local lsi = LibStub and LibStub("LibSoundIndex-1.0", true)
 	if lsi then
-		ItemRackOptSoundActiveFramework:SetText("Active Mute Framework: LibSoundIndex")
+		ItemRackOptSoundActiveFramework:SetText("Active Mute Framework:\nLibSoundIndex")
 		ItemRackOptSoundActiveFramework:SetTextColor(0.2, 1.0, 0.2)
+		ItemRackOptSoundTestButton:SetText("Test")
+		ItemRackOptSoundTestButton:Show()
 	else
-		ItemRackOptSoundActiveFramework:SetText("Active Mute Framework: CVar Fallback")
+		ItemRackOptSoundActiveFramework:SetText("Active Mute Framework:\nCVar Fallback")
 		ItemRackOptSoundActiveFramework:SetTextColor(1.0, 0.5, 0.0)
+		ItemRackOptSoundTestButton:SetText("Get Addon")
+		ItemRackOptSoundTestButton:Show()
 	end
 	ItemRackOpt.SoundListScrollFrameUpdate()
+end
+
+StaticPopupDialogs["ITEMRACK_GET_LSI"] = {
+	text = "LibSoundIndex enhances ItemRack's sound muting.\nCopy the CurseForge link below to install it.",
+	button1 = "Close",
+	hasEditBox = 1,
+	editBoxWidth = 275,
+	OnShow = function(self)
+		self:GetEditBox():SetText("https://www.curseforge.com/wow/addons/libsoundindex")
+		self:GetEditBox():HighlightText()
+		self:GetEditBox():SetFocus()
+	end,
+	EditBoxOnEscapePressed = function(self)
+		self:GetParent():Hide()
+	end,
+	timeout = 0,
+	whileDead = true,
+	hideOnEscape = true,
+	preferredIndex = 3,
+}
+
+function ItemRackOpt.ToggleSoundTestSettings()
+	local lsi = LibStub and LibStub("LibSoundIndex-1.0", true)
+	if not lsi then
+		StaticPopup_Show("ITEMRACK_GET_LSI")
+		return
+	end
+	if ItemRackOptSubFrame10:IsVisible() then
+		ItemRackOptSubFrame10:Hide()
+		ItemRackOptSubFrame9:Show()
+	else
+		ItemRackOptSubFrame9:Hide()
+		ItemRackOptSubFrame10:Show()
+	end
+end
+
+function ItemRackOpt.SoundTestScrollFrameUpdate()
+	local offset = FauxScrollFrame_GetOffset(ItemRackOptSoundTestScrollFrame)
+	local lsi = LibStub and LibStub("LibSoundIndex-1.0", true)
+	local testOptions = lsi and { "Test: ALL_EQUIP", "Test: BAGS", "Test: INTERFACE_GENERAL", "Test: JEWELRY (M3)", "Test: PUT_DOWN_GEMS" } or {}
+	
+	local totalItems = #testOptions
+	FauxScrollFrame_Update(ItemRackOptSoundTestScrollFrame, totalItems, 9, 24)
+	
+	local button, checkText
+	for i = 1, 9 do
+		local idx = offset + i
+		button = _G["ItemRackOptSoundTestList"..i]
+		if idx <= totalItems then
+			_G["ItemRackOptSoundTestList"..i.."Label"]:Hide()
+			_G["ItemRackOptSoundTestList"..i.."NumberLabel"]:Hide()
+			_G["ItemRackOptSoundTestList"..i.."Underline"]:Hide()
+			
+			checkText = _G["ItemRackOptSoundTestList"..i.."CheckText"]
+			local thisCheck = _G["ItemRackOptSoundTestList"..i.."CheckButton"]
+			
+			thisCheck:ClearAllPoints()
+			thisCheck:SetPoint("LEFT", button, "LEFT", 2, 0)
+			checkText:ClearAllPoints()
+			checkText:SetPoint("LEFT", thisCheck, "RIGHT", 2, 0)
+			checkText:SetWidth(120)
+			
+			button:Show()
+			thisCheck:Show()
+			checkText:Show()
+			
+			local testName = testOptions[idx]
+			checkText:SetText(testName)
+			checkText:SetTextColor(0.5, 0.8, 1) -- Light blue for test options
+			
+			-- Ensure ItemRackSettings.TestMutes exists
+			ItemRackSettings.TestMutes = ItemRackSettings.TestMutes or {}
+			thisCheck:SetChecked(ItemRackSettings.TestMutes[testName])
+			
+			thisCheck.OnClickAction = function(check)
+				ItemRackSettings.TestMutes[testName] = (check == "ON")
+				
+				if lsi then
+					local isMuted = ItemRackSettings.TestMutes[testName]
+					if testName == "Test: ALL_EQUIP" then
+						if isMuted then lsi:MuteEquipCategory("ALL_EQUIP") else lsi:UnmuteEquipCategory("ALL_EQUIP") end
+					elseif testName == "Test: BAGS" then
+						if isMuted then lsi:MuteCategory("BAGS") else lsi:UnmuteCategory("BAGS") end
+					elseif testName == "Test: INTERFACE_GENERAL" then
+						if isMuted then lsi:MuteCategory("INTERFACE_GENERAL") else lsi:UnmuteCategory("INTERFACE_GENERAL") end
+					elseif testName == "Test: JEWELRY (M3)" then
+						if isMuted then lsi:MuteMaterial("JEWELRY_EQUIP") else lsi:UnmuteMaterial("JEWELRY_EQUIP") end
+					elseif testName == "Test: PUT_DOWN_GEMS" then
+						if isMuted then lsi:MuteSoundKit("PUT_DOWN_GEMS") else lsi:UnmuteSoundKit("PUT_DOWN_GEMS") end
+					end
+				end
+			end
+		else
+			button:Hide()
+		end
+	end
+end
+
+function ItemRackOpt.SoundTestOnShow()
+	ItemRackOpt.SoundTestScrollFrameUpdate()
 end
 
 function ItemRackOpt.SortListScrollFrameUpdate()
@@ -2265,7 +2385,7 @@ function ItemRackOpt.EventEditSave(override)
 		event.Anymount = ItemRackOptEventEditBuffAnyMount:GetChecked()
 		event.OnMovement = ItemRackOptEventEditBuffOnMovement:GetChecked()
 		event.Unequip = ItemRackOptEventEditBuffUnequip:GetChecked()
-		event.Unequip = ItemRackOptEventEditBuffUnequip:GetChecked()
+		event.DisableSound = ItemRackOptEventEditBuffDisableSound:GetChecked()
 		event.NotInPVP = ItemRackOptEventEditBuffNotInPVP:GetChecked()
 		event.NotInPVE = ItemRackOptEventEditBuffNotInPVE:GetChecked()
 	elseif event.Type=="Stance" then
@@ -2274,16 +2394,16 @@ function ItemRackOpt.EventEditSave(override)
 			event.Stance = tonumber(event.Stance)
 		end
 		event.Unequip = ItemRackOptEventEditStanceUnequip:GetChecked()
-		event.Unequip = ItemRackOptEventEditStanceUnequip:GetChecked()
+		event.DisableSound = ItemRackOptEventEditStanceDisableSound:GetChecked()
 		event.NotInPVP = ItemRackOptEventEditStanceNotInPVP:GetChecked()
 	elseif event.Type=="Zone" then
 		event.Unequip = ItemRackOptEventEditZoneUnequip:GetChecked()
-		event.Unequip = ItemRackOptEventEditZoneUnequip:GetChecked()
+		event.DisableSound = ItemRackOptEventEditZoneDisableSound:GetChecked()
 		event.Zones = {}
 		ItemRackOpt.ConvertZoneListToTable(ItemRackOptEventEditZoneEditBox:GetText(),event.Zones)
 	elseif event.Type=="Specialization" then
 		event.Unequip = ItemRackOptEventEditSpecializationUnequip:GetChecked()
-		event.Unequip = ItemRackOptEventEditSpecializationUnequip:GetChecked()
+		event.DisableSound = ItemRackOptEventEditSpecializationDisableSound:GetChecked()
 		if ItemRackOptEventEditSpec1:GetChecked() then event.Spec = 1
 		elseif ItemRackOptEventEditSpec2:GetChecked() then event.Spec = 2
 		end

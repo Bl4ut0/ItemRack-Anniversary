@@ -684,19 +684,18 @@ function ItemRack.ButtonPostClick(self,button)
 		end
 		
 		
-		-- Plain right-click advances the queue (handles combat queue internally)
-		-- Use the simpler ManualQueueAdvance function that directly finds and equips items
-		if ItemRack.ManualQueueAdvance and ItemRack.ManualQueueAdvance(id) then
-			handled = 1
-		end
-		
-		-- Fallback: If MenuOnRight is ON and nothing was handled, show menu anyway
-		if not handled and ItemRackSettings.MenuOnRight=="ON" then
+		-- Plain right-click advances the queue OR opens the menu based on MenuOnRight setting
+		if ItemRackSettings.MenuOnRight=="ON" then
 			if ItemRackMenuFrame:IsVisible() and ItemRack.menuOpen==id then
 				ItemRackMenuFrame:Hide()
 			else
 				ItemRack.DockMenuToButton(id)
 				ItemRack.BuildMenu(id, nil, 2)
+			end
+		else
+			-- Plain right-click advances the queue (handles combat queue internally)
+			if ItemRack.ManualQueueAdvance and ItemRack.ManualQueueAdvance(id) then
+				handled = 1
 			end
 		end
 	elseif IsShiftKeyDown() then

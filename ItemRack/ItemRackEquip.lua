@@ -388,7 +388,7 @@ function ItemRack.IterateSwapList(setname, disableSound)
 		if ItemRack.CVarMuteTimer then
 			ItemRack.CVarMuteTimer:Cancel()
 		end
-		ItemRack.CVarMuteTimer = C_Timer.NewTimer(0.5, function()
+		ItemRack.CVarMuteTimer = C_Timer.NewTimer(1.5, function()
 			SetCVar("Sound_EnableSFX", "1")
 			ItemRack.CVarMuteTimer = nil
 		end)

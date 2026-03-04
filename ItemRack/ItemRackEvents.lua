@@ -567,11 +567,13 @@ function ItemRack.ProcessSpecializationEvent()
 	end
 	
 	-- Unequip first, then equip (to avoid conflicts)
-	if setToUnequip then
+	local unequipTriggered = false
+	if setToUnequip and setToUnequip ~= setToEquip then
 		ItemRack.UnequipSet(setToUnequip, disableSoundUnequip)
+		unequipTriggered = true
 	end
 	if setToEquip then
-		if not ItemRack.IsSetEquipped(setToEquip) then
+		if not ItemRack.IsSetEquipped(setToEquip) or unequipTriggered then
 			ItemRack.Print("Spec changed! Equipping set: "..setToEquip)
 			ItemRack.EquipSet(setToEquip, disableSoundEquip)
 			
