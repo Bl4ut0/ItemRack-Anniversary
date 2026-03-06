@@ -204,6 +204,9 @@ ItemRackSettings = {
 	NotifyChatAlso = "OFF", -- send cooldown notifications to chat also
 	ShowTooltips = "ON", -- show all itemrack tooltips
 	TinyTooltips = "OFF", -- whether to condense tooltips to most important info
+	TinyTooltipsQuickAccess = "OFF", -- whether to apply tiny tooltips only to quick access (not character sheet menus)
+	TinyTooltipsSubMenusOnly = "OFF", -- whether to restrict tiny tooltips to popup sub-menu items only (not the main slot button)
+	DisableTooltipsInCombat = "OFF", -- whether to hide item tooltips on ItemRack menus/buttons during combat
 	TooltipFollow = "OFF", -- whether tooltip follows pointer
 	CooldownCount = "OFF", -- whether cooldowns displayed numerically over buttons
 	LargeNumbers = "OFF", -- whether cooldown numbers displayed in large font
@@ -742,6 +745,9 @@ function ItemRack.InitCore()
 	ItemRackSettings.HidePetBattle = ItemRackSettings.HidePetBattle or "ON" -- 2.87
 	ItemRackSettings.LeftSlotsGoRight = ItemRackSettings.LeftSlotsGoRight or "ON" -- 4.28
 	ItemRackSettings.RightSlotsGoLeft = ItemRackSettings.RightSlotsGoLeft or "OFF" -- 4.27.3
+	ItemRackSettings.TinyTooltipsQuickAccess = ItemRackSettings.TinyTooltipsQuickAccess or "OFF"
+	ItemRackSettings.TinyTooltipsSubMenusOnly = ItemRackSettings.TinyTooltipsSubMenusOnly or "OFF"
+	ItemRackSettings.DisableTooltipsInCombat = ItemRackSettings.DisableTooltipsInCombat or "OFF"
 	ItemRackSettings.CharacterSheetMenusLeft = nil -- removed in 4.27.3, replaced with per-side toggles
 end
 
@@ -1867,6 +1873,7 @@ end
 -- request a tooltip of an inventory slot
 function ItemRack.InventoryTooltip(self)
 	if ItemRackSettings.ShowTooltips ~= "ON" then return end
+	if ItemRackSettings.DisableTooltipsInCombat == "ON" and ItemRack.inCombat then return end
 	local id = self:GetID()
 	if id==20 then
 		ItemRack.SetTooltip(self,ItemRackUser.CurrentSet)
@@ -1882,6 +1889,7 @@ end
 -- request a tooltip of a menu item (called when hovering over a button in the popout menu of SET NAMES that comes up when clicking the minimap button or bar addon plugin, this is NOT the "Sets" dropdown INSIDE ItemRack's GUI)
 function ItemRack.MenuTooltip(self)
 	if ItemRackSettings.ShowTooltips ~= "ON" then return end
+	if ItemRackSettings.DisableTooltipsInCombat == "ON" and ItemRack.inCombat then return end
 	local id = self:GetID()
 	if ItemRack.menuOpen==20 then
 		ItemRack.SetTooltip(self,ItemRack.Menu[id])
@@ -2035,9 +2043,39 @@ function ItemRack.OnTooltip(self,line1,line2)
 end
 
 function ItemRack.ShrinkTooltip(owner)
-	local isQuickAccess = (owner and type(owner.GetID) == "function" and owner:GetID() < 20)
-	
-	if ItemRackSettings.TinyTooltips=="ON" or (ItemRackSettings.TinyTooltipsQuickAccess=="ON" and isQuickAccess) then
+	-- Determine whether this tooltip should be shrunk based on context
+	local shouldShrink = false
+
+	if ItemRackSettings.TinyTooltips == "ON" then
+		-- Global tiny tooltips: shrink everything
+		shouldShrink = true
+	else
+		-- Check quick-access-only settings
+		if ItemRackSettings.TinyTooltipsQuickAccess == "ON" and owner and type(owner.GetName) == "function" then
+			local ownerName = owner:GetName() or ""
+			local isCharacterMenu = ItemRack.menuDockedTo and string.match(ItemRack.menuDockedTo, "^Character")
+			local isMenuPopupItem = string.match(ownerName, "^ItemRackMenu%d")
+			local isMainSlotButton = string.match(ownerName, "^ItemRackButton%d")
+
+			if not isCharacterMenu then
+				-- Quick access context (not character sheet)
+				if ItemRackSettings.TinyTooltipsSubMenusOnly == "ON" then
+					-- Only shrink popup sub-menu items, not the main slot button
+					shouldShrink = isMenuPopupItem and true or false
+				else
+					-- Shrink both main slot buttons and popup items (but not slot 20)
+					local ownerID = (type(owner.GetID) == "function") and owner:GetID()
+					if isMenuPopupItem then
+						shouldShrink = true
+					elseif isMainSlotButton and ownerID and ownerID < 20 then
+						shouldShrink = true
+					end
+				end
+			end
+		end
+	end
+
+	if shouldShrink then
 		local r,g,b = GameTooltipTextLeft1:GetTextColor()
 		local name = GameTooltipTextLeft1:GetText()
 		local line,charge,durability,cooldown
@@ -2058,8 +2096,9 @@ function ItemRack.ShrinkTooltip(owner)
 				end
 			end
 		end
-		ItemRack.AnchorTooltip(owner)
-		GameTooltip:AddLine(name,r,g,b)
+		-- Use SetText to clear existing content without re-anchoring
+		-- (calling AnchorTooltip here would cause circular anchor errors)
+		GameTooltip:SetText(name or "", r, g, b)
 		GameTooltip:AddLine(charge,1,1,1)
 		GameTooltip:AddLine(durability,1,1,1)
 		GameTooltip:AddLine(cooldown,1,1,1)
