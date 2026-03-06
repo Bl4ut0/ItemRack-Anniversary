@@ -505,9 +505,23 @@ function ItemRack.IsSetEquipped(setname,exact)
 				end
 			end
 			
-			if not match then return false end
+			-- If the slot has a queue, we need to verify that the equipped item is the queue's active item
+			local list = set.Queues
+			if list and #list > 0 then
+				if match then
+					local baseID = ItemRack.GetIRString(GetInventoryItemLink("player",slot),true,true)
+					local start,duration,enable = GetInventoryItemCooldown("player",slot)
+					local ready = ItemRack.ItemNearReady(baseID)
+					local active = ItemRack.AutoQueueItemToEquip(i, baseID, enable, ready)
+					if active and not same(active, id) then
+						match = false   -- list would swap to a different item
+					end
+					-- if active is nil, no swap would occur → keep match as is
+				end
+			end
+			
+			if not match then print(match) return false end
 		end
-		
 		return anyChecked
 	end
 end

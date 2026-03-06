@@ -245,29 +245,39 @@ function ItemRack.ProcessAutoQueue(slot)
 
 	if not list then return end
 
+	local nextItem, nextItemID = ItemRack.AutoQueueItemToEquip(slot, baseID, enable, ready)
+	if nextItem then
+		if GetItemCount(nextItem)>0 and not IsEquippedItem(nextItem) then
+			local _,bag = ItemRack.FindItem(nextItemID)
+			if bag and not (ItemRack.CombatQueue[slot]==nextItemID) then
+				ItemRack.EquipItemByID(nextItemID,slot)
+			end
+		end
+		
+	end
+end
+
+function ItemRack.AutoQueueItemToEquip(slot, baseID, enable, ready)
+	local list = ItemRack.GetQueues()[slot]
 	local candidate
-    -- reuse the loop structure but optimized for auto-queue logic (priority checks etc)
+	-- reuse the loop structure but optimized for auto-queue logic (priority checks etc)
 	for i=1,#(list) do
 		candidate = string.match(list[i].id,"(%d+)")
 		if list[i].id==0 then
-			break
+			return nil
 		elseif ready and candidate==baseID then
-			break
+			return list[i].id
 		else
 			local canSwap = not ready or enable==0 or list[i].priority
 			if canSwap then
 				if ItemRack.ItemNearReady(candidate) then
-					if GetItemCount(candidate)>0 and not IsEquippedItem(candidate) then
-						local _,bag = ItemRack.FindItem(list[i].id)
-						if bag and not (ItemRack.CombatQueue[slot]==list[i].id) then
-							ItemRack.EquipItemByID(list[i].id,slot)
-							break
-						end
-					end
+					return candidate, list[i].id
 				end
 			end
 		end
 	end
+	
+	return nil
 end
 
 function ItemRack.ItemNearReady(id)
