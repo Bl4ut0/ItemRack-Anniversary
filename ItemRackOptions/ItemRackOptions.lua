@@ -189,8 +189,10 @@ function ItemRackOpt.OnLoad(self)
 		{type="check",optset=ItemRackSettings,variable="ShowTooltips",label="Show tooltips",tooltip="Show tooltips like the one you're reading now."},
 		{type="check",optset=ItemRackSettings,variable="ShowSetInTooltip",depend="ShowTooltips",label="Show set info in tooltips",tooltip="Show which set an item belongs to in the tooltip."},
 		{type="check",optset=ItemRackSettings,variable="TooltipColorUnEquipped",depend="ShowTooltips",label="Highlight unequipped in tooltip",tooltip="Show items that are in your bags but not currently equipped as Orange in the set tooltip."},
-		{type="check",optset=ItemRackSettings,variable="TinyTooltips",depend="ShowTooltips",label="Tiny Tooltips",tooltip="Shrink item tooltips to display only name, cooldown and durability."},
-		{type="check",optset=ItemRackSettings,variable="TinyTooltipsQuickAccess",depend="ShowTooltips",label="Tiny Tooltips on Quick Access Only",tooltip="Renders normal-sized tooltips for your main Sets button (slot 20), but applies Tiny Tooltips to individual gear slots."},
+		{type="check",optset=ItemRackSettings,variable="TinyTooltips",depend="ShowTooltips",label="Tiny Tooltips",tooltip="Shrink ALL ItemRack tooltips to display only name, cooldown and durability."},
+		{type="check",optset=ItemRackSettings,variable="TinyTooltipsQuickAccess",depend="ShowTooltips",label="Tiny Tooltips on Quick Access Only",tooltip="Apply tiny tooltips only to quick access buttons and their menus (not character sheet popout menus)."},
+		{type="check",optset=ItemRackSettings,variable="TinyTooltipsSubMenusOnly",depend="TinyTooltipsQuickAccess",label="  Quick Access Sub Menus Only",tooltip="Only apply tiny tooltips to the popup sub-menu items (e.g. the list of trinkets you can swap to), not the main slot button itself."},
+		{type="check",optset=ItemRackSettings,variable="DisableTooltipsInCombat",depend="ShowTooltips",label="Disable tooltips in combat",tooltip="Hide item tooltips on ItemRack menus and buttons while you are in combat."},
 		{type="check",optset=ItemRackSettings,variable="TooltipFollow",depend="ShowTooltips",label="Tooltips at pointer",tooltip="Show tooltips near the mouse."},
 
 		{type="label",label="Interface & Misc"},

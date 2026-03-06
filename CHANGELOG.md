@@ -2,6 +2,15 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.29.6] - 2026-03-06
+### Bug Fixes
+- **Tooltip Circular Anchor Crash**: Fixed `SetPoint would result in anchor family connection` errors that occurred when hovering over item slots in the Options panel or when other addons (e.g. Questie) owned GameTooltip. The `ShrinkTooltip` function was re-anchoring the tooltip to an owner it was already attached to. Now uses `GameTooltip:SetText()` to clear content without re-anchoring.
+- **Character Sheet Tooltip Scoping**: Fixed `Tiny Tooltips on Quick Access Only` incorrectly applying tiny tooltips to character sheet popout menus. The detection used `GetID() < 20` which matched popup menu item IDs. Now uses frame names (`ItemRackMenu` vs `ItemRackButton`) and `menuDockedTo` to properly distinguish quick access menus from character sheet menus.
+
+### New Features
+- **Quick Access Sub Menus Only**: New checkbox nested under "Tiny Tooltips on Quick Access Only". When enabled, only the popup sub-menu items (the list of trinkets/items you can swap to) get tiny tooltips — the main docked slot button retains its full-size tooltip.
+- **Disable Tooltips in Combat**: New checkbox in Tooltip Settings that suppresses item tooltips on ItemRack menus and buttons while you are in combat. UI tooltips (options panel, etc.) are unaffected.
+
 ## [4.29.5] - 2026-03-04
 ### Bug Fixes
 - **Tooltip Frame Error (`GetName` on bad self)**: Fixed an error that could occur when mousing over certain restricted or spoofed game UI frames (like the new `SecureTransferDialog`), which caused the addon's popout menus (`ItemRack.MenuMouseover`) to crash when calling frame methods. Safely wrapped `GetName` and `IsVisible` lookups with `pcall`.
