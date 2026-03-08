@@ -1446,7 +1446,7 @@ function ItemRackOpt.PopulateSortList(slot)
 		local i = 1
 		while i <= #sortList do
 			local entry = sortList[i]
-			if entry == 0 then
+			if entry.id == 0 then
 				-- The "stop queue here" marker
 				if stopMarkerSeen then
 					-- Duplicate stop marker, remove it
@@ -1456,7 +1456,7 @@ function ItemRackOpt.PopulateSortList(slot)
 					i = i + 1
 				end
 			else
-				local baseID = ItemRack.GetIRString(entry, true) -- get base item ID
+				local baseID = ItemRack.GetIRString(entry.id, true) -- get base item ID
 				if seen[baseID] then
 					-- Duplicate item found, remove it
 					table.remove(sortList, i)
@@ -1483,16 +1483,34 @@ function ItemRackOpt.AddToSortList(sortList,id)
 	-- Use base ID comparison to prevent duplicates when full ID strings differ
 	-- (e.g., same item with different player level encoded, or minor ID format differences)
 	for i=1,#(sortList) do
-		if sortList[i] == 0 and id == 0 then
+		if sortList[i].id == 0 and id == 0 then
 			found = true
+			
 			break
-		elseif sortList[i] ~= 0 and id ~= 0 and (sortList[i] == id or ItemRack.SameID(sortList[i], id)) then
+		elseif sortList[i].id ~= 0 and id ~= 0 and (sortList[i].id == id or ItemRack.SameID(sortList[i].id, id)) then
 			found = true
 			break
 		end
 	end
+	
 	if not found then
-		table.insert(sortList,id)
+		local item = {
+		id = id,
+		
+		-- these are default items with non-standard behavior
+		-- keep = 1/nil whether to suspend auto queue while equipped
+		-- priority = 1/nil whether to equip as it comes off cooldown even if equipped is off cooldown waiting to be used
+		-- delay = time(seconds) after use before swapping out
+		keep = 
+			id == "11122" or -- carrot on a stick
+			id == "13209" or -- seal of the dawn
+			id == "19812" or -- rune of the dawn
+			id == "12846" or -- argent dawn commission 
+			id == "25653", -- riding crop
+		priority = false,
+		delay = "0"}
+	
+		table.insert(sortList,item)
 	end
 end
 
@@ -1698,11 +1716,12 @@ function ItemRackOpt.SortListScrollFrameUpdate()
 		item = _G["ItemRackOptSortList"..i]
 		idx = offset + i
 		if sortList and idx<=#(sortList) then
-			if sortList[idx]==0 then
+			if sortList[idx].id==0 then
 				name,texture,quality = "-- stop queue here --","Interface\\Buttons\\UI-GroupLoot-Pass-Up",1
 			else
-				name,texture,_,quality = ItemRack.GetInfoByID(sortList[idx])
+				name,texture,_,quality = ItemRack.GetInfoByID(sortList[idx].id)
 			end
+			
 			_G["ItemRackOptSortList"..i.."Name"]:SetText(name)
 			_G["ItemRackOptSortList"..i.."Icon"]:SetTexture(texture)
 			local r,g,b = GetItemQualityColor(quality or 1)
@@ -1771,10 +1790,11 @@ function ItemRackOpt.ValidateSortButtons()
 		ItemRackOptItemStatsFrame:Show()
 		ItemRackOptSlotQueueName:Hide()
 		ItemRackOptQueueEnable:Hide()
-		local baseID = ItemRack.GetIRString(list[selected],true)
-		ItemRackOptItemStatsPriority:SetChecked(ItemRackItems[baseID] and ItemRackItems[baseID].priority or false)
-		ItemRackOptItemStatsKeepEquipped:SetChecked(ItemRackItems[baseID] and ItemRackItems[baseID].keep or false)
-		ItemRackOptItemStatsDelay:SetText((ItemRackItems[baseID] and ItemRackItems[baseID].delay) or "0")
+		local baseID = ItemRack.GetIRString(list[selected].id,true)
+
+		ItemRackOptItemStatsPriority:SetChecked(list[selected].id ~= "0" and list[selected].priority or false)
+		ItemRackOptItemStatsKeepEquipped:SetChecked(list[selected].id ~= "0" and list[selected].keep or false)
+		ItemRackOptItemStatsDelay:SetText((list[selected].id ~= "0" and list[selected].delay) or "0")
 	else
 		ItemRackOptSortMoveDelete:Disable()
 		ItemRackOptItemStatsFrame:Hide()
@@ -1828,10 +1848,10 @@ function ItemRackOpt.SortListOnEnter(self)
 	local idx = FauxScrollFrame_GetOffset(ItemRackOptSortListScrollFrame) + self:GetID()
 	local list = ItemRack.GetQueues()[ItemRackOpt.SelectedSlot]
 	if list[idx] then
-		if list[idx]==0 then
+		if list[idx].id==0 then
 			ItemRack.OnTooltip(self,"Stop Queue Here","Move this to mark an explicit end to an order. ie, if you have a clickable trinket with a passive effect, and would like to use the passive effect if no better trinkets are off cooldown.")
 		else
-			ItemRack.IDTooltip(self,list[idx])
+			ItemRack.IDTooltip(self,list[idx].id)
 		end
 	end
 end
@@ -1843,46 +1863,22 @@ function ItemRackOpt.SortListOnLeave(self)
 	end
 end
 
--- if an ItemRackItems has no non-default values, remove the entry
-function ItemRackOpt.ItemStatsCleanup(id)
-	if ItemRackItems[id] then
-		local item = ItemRackItems[id]
-		if not item.delay and not item.priority and not item.keep then
-			ItemRackItems[id] = nil
-		end
-	end
-end
-
 function ItemRackOpt.ItemStatsDelayOnTextChanged(self)
-	local baseID = ItemRack.GetIRString(ItemRack.GetQueues()[ItemRackOpt.SelectedSlot][ItemRackOpt.SortSelected],true)
+	local list = ItemRack.GetQueues()[ItemRackOpt.SelectedSlot]
 	local value = tonumber(self:GetText() or "") or 0
-	if value~=0 then
-		if not ItemRackItems[baseID] then
-			ItemRackItems[baseID] = {}
-		end
-		ItemRackItems[baseID].delay = value
-	else
-		if ItemRackItems[baseID] then
-			ItemRackItems[baseID].delay = nil
-		end
-		ItemRackOpt.ItemStatsCleanup(baseID)
-	end
+
+	list[ItemRackOpt.SortSelected].delay = value
 end
 
 function ItemRackOpt.ItemStatsCheckOnClick(self)
-	local baseID = ItemRack.GetIRString(ItemRack.GetQueues()[ItemRackOpt.SelectedSlot][ItemRackOpt.SortSelected],true)
+	local list = ItemRack.GetQueues()[ItemRackOpt.SelectedSlot]
 	local value = self:GetChecked()
 	local which = self==ItemRackOptItemStatsPriority and "priority" or "keep"
-	if value then
-		if not ItemRackItems[baseID] then
-			ItemRackItems[baseID] = {}
-		end
-		ItemRackItems[baseID][which] = 1
+
+	if which == "keep" then
+		list[ItemRackOpt.SortSelected].keep = value
 	else
-		if ItemRackItems[baseID] then
-			ItemRackItems[baseID][which] = nil
-		end
-		ItemRackOpt.ItemStatsCleanup(baseID)
+		list[ItemRackOpt.SortSelected].priority = value
 	end
 end
 

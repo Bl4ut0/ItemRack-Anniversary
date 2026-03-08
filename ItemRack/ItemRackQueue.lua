@@ -69,7 +69,7 @@ function ItemRack.GetNextItemInQueue(slot)
 			local candidate = string.match(list[i],"(%d+)")
 			local count = candidate and GetItemCount(candidate) or 0
 			if candidate and count>0 then
-				return list[i]
+				return list[i].id
 			end
 		else
 			break -- Hit stop marker
@@ -82,7 +82,7 @@ function ItemRack.GetNextItemInQueue(slot)
 			local candidate = string.match(list[i],"(%d+)")
 			local count = candidate and GetItemCount(candidate) or 0
 			if candidate and count>0 then
-				return list[i]
+				return list[i].id
 			end
 		end
 	end
@@ -103,7 +103,7 @@ function ItemRack.ManualQueueAdvance(slot)
 	-- Find current item in queue
 	local currentIdx = 0
 	for i = 1, #list do
-		if list[i] ~= 0 then
+		if list[i].id ~= 0 then
 			local queueBaseID = string.match(tostring(list[i]), "^(%d+)")
 			if queueBaseID == equippedBaseID then
 				currentIdx = i
@@ -188,6 +188,30 @@ function ItemRack.ProcessAutoQueue(slot)
 
 	if not baseID then return end
 	
+	local list = ItemRack.GetQueues()[slot]
+	local keepValue, delayValue, priorityValue
+	
+	-- Find the equipped item in the queue to get its priority/keep/delay settings
+	if list then
+		for i=1, #list do
+			if list[i].id== 0 then
+				-- Stop marker.  If we get here before finding our item, we'll just use defaults 
+				-- since these values probably aren't intentionally set for any item not in our queue.
+				keepValue = false
+				delayValue = 0
+				priorityValue = false
+				break
+			else
+				if list[i].id == equippedBaseID then
+					keepValue = list[i].keep
+					delayValue = list[i].delay
+					priorityValue = list[i].priority
+					break
+				end
+			end
+		end
+	end
+	
 	-- Visual updates logic (keep/delay/buff checks)
 	local buff = GetItemSpell(baseID)
 	if buff and AuraUtil.FindAuraByName(buff,"player") then
@@ -195,18 +219,18 @@ function ItemRack.ProcessAutoQueue(slot)
 		return
 	end
 
-	if ItemRackItems[baseID] then
-		if ItemRackItems[baseID].keep then
-			if icon then icon:SetVertexColor(1,.5,.5) end
+	if keepValue then
+		if icon then icon:SetVertexColor(1,.5,.5) end
+		return
+	end
+	
+	if delayValue then
+		if start>0 and timeLeft>30 and timeLeft <= delayValue then
+			if icon then icon:SetDesaturated(true) end
 			return
 		end
-		if ItemRackItems[baseID].delay then
-			if start>0 and timeLeft>30 and timeLeft<=ItemRackItems[baseID].delay then
-				if icon then icon:SetDesaturated(true) end
-				return
-			end
-		end
 	end
+
 	if icon then
 		icon:SetDesaturated(false)
 		icon:SetVertexColor(1,1,1)
@@ -219,25 +243,24 @@ function ItemRack.ProcessAutoQueue(slot)
 		ItemRack.UpdateCombatQueue()
 	end
 
-	local list = ItemRack.GetQueues()[slot]
 	if not list then return end
 
 	local candidate
     -- reuse the loop structure but optimized for auto-queue logic (priority checks etc)
 	for i=1,#(list) do
-		candidate = string.match(list[i],"(%d+)")
-		if list[i]==0 then
+		candidate = string.match(list[i].id,"(%d+)")
+		if list[i].id==0 then
 			break
 		elseif ready and candidate==baseID then
 			break
 		else
-			local canSwap = not ready or enable==0 or (ItemRackItems[candidate] and ItemRackItems[candidate].priority)
+			local canSwap = not ready or enable==0 or list[i].priority
 			if canSwap then
 				if ItemRack.ItemNearReady(candidate) then
 					if GetItemCount(candidate)>0 and not IsEquippedItem(candidate) then
-						local _,bag = ItemRack.FindItem(list[i])
-						if bag and not (ItemRack.CombatQueue[slot]==list[i]) then
-							ItemRack.EquipItemByID(list[i],slot)
+						local _,bag = ItemRack.FindItem(list[i].id)
+						if bag and not (ItemRack.CombatQueue[slot]==list[i].id) then
+							ItemRack.EquipItemByID(list[i].id,slot)
 							break
 						end
 					end
