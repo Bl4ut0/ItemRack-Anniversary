@@ -2864,6 +2864,7 @@
 									</Anchor>
 								</Anchors>
 							</CheckButton>
+
 						</Frames>
 					</Frame>
 
@@ -2925,6 +2926,7 @@
 									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditStanceNotInPVP" relativePoint="BOTTOMLEFT"/>
 								</Anchors>
 							</CheckButton>
+
 						</Frames>
 					</Frame>
 
@@ -3058,6 +3060,7 @@
 									</Anchor>
 								</Anchors>
 							</CheckButton>
+
 						</Frames>
 					</Frame>
 					
@@ -3118,6 +3121,7 @@
 								<HighlightFont style="GameFontHighlightSmall"/>
 								<DisabledFont style="GameFontDisableSmall"/>
 							</CheckButton>
+
 						</Frames>
 					</Frame>
 

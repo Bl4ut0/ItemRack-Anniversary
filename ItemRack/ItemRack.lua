@@ -424,7 +424,9 @@ function ItemRack.OnPlayerLogin()
 end
 
 function ItemRack.OnPlayerLogout()
-	ItemRack.SetSetBindings()
+	-- Override bindings are runtime-only and don't need saving on logout.
+	-- Set keybinds are stored in ItemRackUser.Sets[name].key and re-applied
+	-- via SetSetBindings() on each login/reload.
 end
 
 function ItemRack.OnEnterWorld(self,event,...)
@@ -1909,6 +1911,9 @@ end
 -- request a tooltip of a straight item id (called when hovering over items from the currently displayed set inside ItemRack's GUI)
 function ItemRack.IDTooltip(self,itemID) --itemID is an ItemRack-style ID
 	if ItemRackSettings.ShowTooltips ~= "ON" then return end
+	-- Clear any stale character-sheet tooltip anchor so it doesn't interfere
+	ItemRack.pendingTooltipAnchor = nil
+	ItemRack.pendingTooltipOwner = nil
 	ItemRack.AnchorTooltip(self)
 	local inv,bag,slot = ItemRack.FindItem(itemID) --try to find the item in the player's equipment and inventory, first tries to find the exact item, then looks for any item with the same baseID
 	if inv then -- item found in player's worn equipment
@@ -1942,7 +1947,16 @@ function ItemRack.ClearTooltip(self)
 end
 
 function ItemRack.AnchorTooltip(owner)
-	if ItemRackMenuFrame and ItemRackMenuFrame:IsVisible() and string.match(ItemRack.menuDockedTo or "","^Character") then
+	-- Character sheet anchoring: only applies when the menu is docked to a character
+	-- sheet slot AND the owner is part of that menu context (a menu popup item or the
+	-- character slot itself). This prevents options-panel or quick-access tooltips from
+	-- incorrectly snapping to character sheet anchor positions.
+	local ownerName = (owner and type(owner.GetName) == "function") and owner:GetName() or ""
+	local isCharacterMenuContext = ItemRackMenuFrame and ItemRackMenuFrame:IsVisible()
+		and string.match(ItemRack.menuDockedTo or "", "^Character")
+		and (string.match(ownerName, "^ItemRackMenu%d") or string.match(ownerName, "^Character"))
+
+	if isCharacterMenuContext then
 		local name = ItemRack.menuDockedTo
 		local slot
 		for i=0,19 do
@@ -2050,15 +2064,17 @@ function ItemRack.ShrinkTooltip(owner)
 		-- Global tiny tooltips: shrink everything
 		shouldShrink = true
 	else
-		-- Check quick-access-only settings
+	-- Check quick-access-only settings
 		if ItemRackSettings.TinyTooltipsQuickAccess == "ON" and owner and type(owner.GetName) == "function" then
 			local ownerName = owner:GetName() or ""
-			local isCharacterMenu = ItemRack.menuDockedTo and string.match(ItemRack.menuDockedTo, "^Character")
+			-- Only apply tiny tooltips when the menu is docked to a quick access button
+			-- (not character sheet popouts, not options panel menus)
+			local isQuickAccessContext = ItemRack.menuDockedTo and string.match(ItemRack.menuDockedTo, "^ItemRackButton%d")
 			local isMenuPopupItem = string.match(ownerName, "^ItemRackMenu%d")
 			local isMainSlotButton = string.match(ownerName, "^ItemRackButton%d")
 
-			if not isCharacterMenu then
-				-- Quick access context (not character sheet)
+			if isQuickAccessContext or isMainSlotButton then
+				-- Quick access context (docked button or its popup menu)
 				if ItemRackSettings.TinyTooltipsSubMenusOnly == "ON" then
 					-- Only shrink popup sub-menu items, not the main slot button
 					shouldShrink = isMenuPopupItem and true or false
@@ -2287,6 +2303,15 @@ function ItemRack.ApplyTooltipAnchor()
 	local anchor = ItemRack.pendingTooltipAnchor
 	local owner = ItemRack.pendingTooltipOwner
 	if not anchor or not owner then return end
+
+	-- Only re-apply if we're still in a character-sheet tooltip context.
+	-- If menuDockedTo has changed (e.g. moved to options panel), the pending
+	-- anchor is stale and should be discarded.
+	if not (ItemRack.menuDockedTo and string.match(ItemRack.menuDockedTo, "^Character")) then
+		ItemRack.pendingTooltipAnchor = nil
+		ItemRack.pendingTooltipOwner = nil
+		return
+	end
 	
 	-- Only apply to ItemRack-related tooltips that aren't the standard action buttons (which handle themselves)
 	local tooltipOwner = GameTooltip:GetOwner()
@@ -2574,7 +2599,6 @@ function ItemRack.ToggleHidden(id)
 end
 
 --[[ Key bindings ]]
-local retryCount = 0
 function ItemRack.SetSetBindings()
 	if InCombatLockdown() then
 		-- Queue to run after combat ends
@@ -2582,39 +2606,39 @@ function ItemRack.SetSetBindings()
 		table.insert(ItemRack.RunAfterCombat, "SetSetBindings")
 		return
 	end
-	if retryCount > 3 then return end
-	local bindingSet = GetCurrentBindingSet()
-	if not bindingSet or not (Enum.BindingSet and tContains(Enum.BindingSet, bindingSet)) then
-		retryCount = retryCount + 1
-		C_Timer.After(5, function()
-			ItemRack.SetSetBindings()
-		end)
-		return
-	else
-		local buttonName,button
-		for i in pairs(ItemRackUser.Sets) do
-			if ItemRackUser.Sets[i].key then
-				buttonName = "ItemRack"..UnitName("player")..GetRealmName()..i
-				button = _G[buttonName] or CreateFrame("Button",buttonName,nil,"SecureActionButtonTemplate")
+	local buttonName,button
+	local bindingsChanged = false
+	for i in pairs(ItemRackUser.Sets) do
+		if ItemRackUser.Sets[i].key then
+			buttonName = "ItemRack"..UnitName("player")..GetRealmName()..i
+			button = _G[buttonName] or CreateFrame("Button",buttonName,nil,"SecureActionButtonTemplate")
 
-				button:SetAttribute("type","macro")
-				local macrotext = ""
-				for slot = 16, 18 do
-					if ItemRackUser.Sets[i].equip[slot] then
-						local name,_,_,_,_,_,_,_,_,_ = GetItemInfo("item:"..ItemRackUser.Sets[i].equip[slot])
-						if name then
-							macrotext = macrotext .. "/equipslot [combat]" .. slot .. " " .. name .. "\n";
-						end
+			button:SetAttribute("type","macro")
+			local macrotext = ""
+			for slot = 16, 18 do
+				if ItemRackUser.Sets[i].equip[slot] then
+					local name,_,_,_,_,_,_,_,_,_ = GetItemInfo("item:"..ItemRackUser.Sets[i].equip[slot])
+					if name then
+						macrotext = macrotext .. "/equipslot [combat]" .. slot .. " " .. name .. "\n";
 					end
 				end
-				button:SetAttribute("macrotext",macrotext)
-				button:SetScript("PostClick", function() ItemRack.RunSetBinding(i) end)
-				SetBindingClick(ItemRackUser.Sets[i].key,buttonName)
 			end
+			button:SetAttribute("macrotext",macrotext)
+			button:SetScript("PostClick", function() ItemRack.RunSetBinding(i) end)
+			-- Clear any conflicting standard binding so our override takes effect
+			local key = ItemRackUser.Sets[i].key
+			if GetBindingAction(key) ~= "" then
+				SetBinding(key, nil)
+				bindingsChanged = true
+			end
+			-- Use override binding (non-priority) so the game can replace it
+			-- via Quick Keybind mode or the Blizzard keybinding panel
+			SetOverrideBindingClick(button, false, key, buttonName)
 		end
-		local bindingSet = GetCurrentBindingSet()
-		SaveBindings(bindingSet)
-		retryCount = 0
+	end
+	-- Batch-save binding changes once at the end rather than per-key
+	if bindingsChanged then
+		SaveBindings(GetCurrentBindingSet())
 	end
 end
 

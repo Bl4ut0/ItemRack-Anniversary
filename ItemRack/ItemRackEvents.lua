@@ -273,7 +273,10 @@ function ItemRack.InitEvents()
 		end
 		
 		if shouldBeActive then
-			eventData.Active = true
+			local setname = ItemRackUser.Events.Set[eventName]
+			if setname and ItemRack.IsSetEquipped(setname) then
+				eventData.Active = true
+			end
 		end
 	end
 
@@ -445,8 +448,8 @@ function ItemRack.ProcessStanceEvent()
 						if not ItemRack.IsSetEquipped(setname) then
 							setToEquip = setname
 							disableSoundEquip = events[eventName].DisableSound
+							events[eventName].Active = true
 						end
-						events[eventName].Active = true
 					end
 				elseif stance~=currentStance then
 					if events[eventName].Active then
@@ -495,8 +498,8 @@ function ItemRack.ProcessZoneEvent()
 					if not ItemRack.IsSetEquipped(setname) then
 						setToEquip = setname
 						disableSoundEquip = events[eventName].DisableSound
+						events[eventName].Active = true
 					end
-					events[eventName].Active = true
 				end
 			else-- if not inZone
 				if events[eventName].Active then
@@ -708,8 +711,8 @@ function ItemRack.ProcessBuffEvent()
 					if not events[eventName].Active then
 						if not isSetEquipped then
 							ItemRack.EquipSet(setname, events[eventName].DisableSound)
+							events[eventName].Active = true
 						end
-						events[eventName].Active = true
 					end
 				elseif not buff then
 					if events[eventName].Active then

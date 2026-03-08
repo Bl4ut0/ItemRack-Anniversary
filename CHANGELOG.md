@@ -2,7 +2,16 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.29.7] - 2026-03-07
+### Bug Fixes
+- **Keybind Conflicts Not Resolved**: Fixed set and slot keybinds failing to override existing bindings. When confirming a keybind conflict, the old binding was never cleared from the Blizzard binding system, and the non-priority override was always shadowed. Now properly calls `SetBinding(key, nil)` + `SaveBindings()` before setting the override.
+- **Keybind Variable Bug**: Fixed `BindSet()` and `BindSlot()` referencing an undefined `buttonName` variable instead of `ItemRackOpt.Binding.buttonName`, which could cause keybind assignment silently fails.
+- **Startup Keybind Conflicts**: Fixed saved set keybinds not working after login/reload if the key was also claimed by a standard Blizzard binding. `SetSetBindings()` now clears conflicting standard bindings before applying overrides.
+
 ## [4.29.6] - 2026-03-06
+### UI Cleanup
+- **Removed Per-Event "Disable swap sounds" Checkboxes**: Removed the redundant "Disable swap sounds" checkbox from the Buff, Stance, Zone, and Specialization event editor panels. Per-event sound muting is already accessible from the Sound Settings submenu in Options.
+
 ### Bug Fixes
 - **Tooltip Circular Anchor Crash**: Fixed `SetPoint would result in anchor family connection` errors that occurred when hovering over item slots in the Options panel or when other addons (e.g. Questie) owned GameTooltip. The `ShrinkTooltip` function was re-anchoring the tooltip to an owner it was already attached to. Now uses `GameTooltip:SetText()` to clear content without re-anchoring.
 - **Character Sheet Tooltip Scoping**: Fixed `Tiny Tooltips on Quick Access Only` incorrectly applying tiny tooltips to character sheet popout menus. The detection used `GetID() < 20` which matched popup menu item IDs. Now uses frame names (`ItemRackMenu` vs `ItemRackButton`) and `menuDockedTo` to properly distinguish quick access menus from character sheet menus.
@@ -31,7 +40,7 @@ All notable changes to the TBC Anniversary port of ItemRack will be documented i
 - **Menu Settings Mutual Exclusivity**: The `Menu on Shift` and `Menu on right click` settings are now mutually exclusive, automatically toggling the other off to prevent control conflicts.
 - **Disable Swap Sounds**: Added a robust audio toggling system:
   1. **Global Setting**: A new "Disable swap sounds" checkbox in the main options menu will silence all automated and manual gear swaps.
-  2. **Per-Event Toggles**: A new "Disable sound on equip" checkbox is available in the Event Editor for Buffs, Stances, Zones, and Specializations, allowing you to mute specific automated events without affecting manual clicks.
+  2. **Per-Event Toggles**: Enabled events are dynamically listed in the Sound Settings submenu, allowing you to mute specific automated events individually without affecting manual clicks.
   3. **LibSoundIndex Integration**: The addon now natively supports `LibSoundIndex-1.0` to perform "surgical muting". When installed, only the sound of the equipment swapping and UI bag drops are muted. If not installed, ItemRack falls back to briefly muting the game's Master SFX CVar during swaps.
 
 ## [4.29.4] - 2026-03-01

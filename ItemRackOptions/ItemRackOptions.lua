@@ -80,6 +80,7 @@ ItemRack.CheckButtonLabels = {
 	["ItemRackOptEventEditSpec1Text"] = "Primary Spec",
 	["ItemRackOptEventEditSpec2Text"] = "Secondary Spec",
 	["ItemRackOptEventEditSpecializationUnequipText"] = "Unequip when leaving spec",
+
 }
 
 ItemRack.SetnameBlacklist = {
@@ -709,13 +710,9 @@ function ItemRackOpt.DeleteSet()
 	if ItemRackUser.Sets[setname] then
 		if not InCombatLockdown() then
 			local buttonName = "ItemRack"..UnitName("player")..GetRealmName()..setname
-			local action = "CLICK "..buttonName..":LeftButton"
-			while GetBindingKey(action) do
-				SetBinding(GetBindingKey(action))
-			end
-			local bindingSet = GetCurrentBindingSet()
-			if bindingSet then
-				SaveBindings(bindingSet)
+			local button = _G[buttonName]
+			if button then
+				ClearOverrideBindings(button)
 			end
 		else
 			ItemRack.Print("Cannot delete set keybindings in combat.")
@@ -1090,6 +1087,15 @@ function ItemRackOpt.OptListCheckButtonOnClick(self,override)
 		ItemRack.ShowMinimap()
 	elseif opt.variable=="EnableQueues" or opt.variable=="EnablePerSetQueues" then
 		ItemRack.UpdateCombatQueue()
+	elseif opt.variable=="TinyTooltips" then
+		if check=="ON" then
+			ItemRackSettings.TinyTooltipsQuickAccess = "OFF"
+			ItemRackSettings.TinyTooltipsSubMenusOnly = "OFF"
+		end
+	elseif opt.variable=="TinyTooltipsQuickAccess" then
+		if check=="ON" then
+			ItemRackSettings.TinyTooltips = "OFF"
+		end
 	elseif opt.variable=="ShowHotKeys" then
 		ItemRack.KeyBindingsChanged()
 	elseif opt.variable=="EnableEvents" then
@@ -1184,7 +1190,7 @@ end
 function ItemRackOpt.BindSet()
 	local setname = ItemRackOptSetsName:GetText()
 	ItemRackOpt.Binding = { type="Set", name="Set \""..setname.."\"", buttonName="ItemRack"..UnitName("player")..GetRealmName()..setname }
-	ItemRackOpt.Binding.button = _G[buttonName] or CreateFrame("Button",ItemRackOpt.Binding.buttonName,nil,"SecureActionButtonTemplate")
+	ItemRackOpt.Binding.button = _G[ItemRackOpt.Binding.buttonName] or CreateFrame("Button",ItemRackOpt.Binding.buttonName,nil,"SecureActionButtonTemplate")
 	
 	ItemRackOptBindFrame:Show()	
 end
@@ -1280,11 +1286,15 @@ end
 function ItemRackOpt.SetKeyBinding()
 	if not InCombatLockdown() and ItemRackOpt.Binding.keyPressed then
 		ItemRackOpt.UnbindKey()
-		SetBindingClick(ItemRackOpt.Binding.keyPressed,ItemRackOpt.Binding.buttonName)
-		local bindingSet = GetCurrentBindingSet()
-		if bindingSet then
-			SaveBindings(bindingSet)
+		-- Clear any conflicting standard binding so our override takes effect
+		local key = ItemRackOpt.Binding.keyPressed
+		if GetBindingAction(key) ~= "" then
+			SetBinding(key, nil)
+			SaveBindings(GetCurrentBindingSet())
 		end
+		local button = _G[ItemRackOpt.Binding.buttonName] or CreateFrame("Button",ItemRackOpt.Binding.buttonName,nil,"SecureActionButtonTemplate")
+		-- Use override binding (non-priority) so the game can replace it
+		SetOverrideBindingClick(button, false, key, ItemRackOpt.Binding.buttonName)
 	else
 		ItemRack.Print("Sorry, you can't bind keys while in combat.")
 	end
@@ -1301,9 +1311,9 @@ end
 
 function ItemRackOpt.UnbindKey()
 	if not InCombatLockdown() and ItemRackOpt.Binding.buttonName then
-		local action = "CLICK "..ItemRackOpt.Binding.buttonName..":LeftButton"
-		while GetBindingKey(action) do
-			SetBinding(GetBindingKey(action))
+		local button = _G[ItemRackOpt.Binding.buttonName]
+		if button then
+			ClearOverrideBindings(button)
 		end
 	end
 	if ItemRackOpt.prevFrame==ItemRackOptSubFrame6 then
@@ -1369,7 +1379,7 @@ end
 
 function ItemRackOpt.BindSlot(slot)
 	ItemRackOpt.Binding = { type="Slot", name=ItemRack.SlotInfo[slot].real, buttonName="ItemRackButton"..slot }
-	ItemRackOpt.Binding.button = _G[buttonName]
+	ItemRackOpt.Binding.button = _G[ItemRackOpt.Binding.buttonName]
 	ItemRackOptBindFrame:Show()	
 end
 
@@ -2170,22 +2180,22 @@ function ItemRackOpt.EventEditClearFrame()
 	ItemRackOptEventEditBuffAnyMount:SetChecked(false)
 	ItemRackOptEventEditBuffOnMovement:SetChecked(false)
 	ItemRackOptEventEditBuffUnequip:SetChecked(false)
-	ItemRackOptEventEditBuffDisableSound:SetChecked(false)
+
 	ItemRackOptEventEditBuffNotInPVP:SetChecked(false)
 	ItemRackOptEventEditBuffNotInPVE:SetChecked(false)
 	ItemRackOptEventEditStanceName:SetText("")
 	ItemRackOptEventEditStanceUnequip:SetChecked(false)
-	ItemRackOptEventEditStanceDisableSound:SetChecked(false)
+
 	ItemRackOptEventEditStanceNotInPVP:SetChecked(false)
 	ItemRackOptEventEditZoneEditBox:SetText("")
 	ItemRackOptEventEditZoneUnequip:SetChecked(false)
-	ItemRackOptEventEditZoneDisableSound:SetChecked(false)
+
 	ItemRackOptEventEditScriptTrigger:SetText("")
 	ItemRackOptEventEditScriptEditBox:SetText("")
 	ItemRackOptEventEditSpec1:SetChecked(false)
 	ItemRackOptEventEditSpec2:SetChecked(false)
 	ItemRackOptEventEditSpecializationUnequip:SetChecked(false)
-	ItemRackOptEventEditSpecializationDisableSound:SetChecked(false)
+
 end
 
 function ItemRackOpt.EventEditPopulateFrame()
@@ -2205,17 +2215,17 @@ function ItemRackOpt.EventEditPopulateFrame()
 		end
 		ItemRackOptEventEditBuffOnMovement:SetChecked(event.OnMovement)
 		ItemRackOptEventEditBuffUnequip:SetChecked(event.Unequip)
-		ItemRackOptEventEditBuffDisableSound:SetChecked(event.DisableSound)
+
 		ItemRackOptEventEditBuffNotInPVP:SetChecked(event.NotInPVP)
 		ItemRackOptEventEditBuffNotInPVE:SetChecked(event.NotInPVE)
 		ItemRackOptEventEditStanceName:SetText(event.Stance or "")
 		ItemRackOptEventEditStanceUnequip:SetChecked(event.Unequip)
-		ItemRackOptEventEditStanceUnequip:SetChecked(event.Unequip)
+
 		ItemRackOptEventEditStanceNotInPVP:SetChecked(event.NotInPVP)
 		ItemRackOptEventEditZoneEditBox:SetText(ItemRackOpt.ConvertZoneTableToList(event.Zones))
 		ItemRackOptEventEditZoneEditBox:SetCursorPosition(0)
 		ItemRackOptEventEditZoneUnequip:SetChecked(event.Unequip)
-		ItemRackOptEventEditZoneUnequip:SetChecked(event.Unequip)
+
 		ItemRackOptEventEditScriptTrigger:SetText(event.Trigger or "")
 		ItemRackOptEventEditScriptTrigger:SetCursorPosition(0)
 		ItemRackOptEventEditScriptEditBox:SetText(event.Script or "")
@@ -2225,7 +2235,7 @@ function ItemRackOpt.EventEditPopulateFrame()
 			if event.Spec == 2 then ItemRackOptEventEditSpec2:SetChecked(true) end
 		end
 		ItemRackOptEventEditSpecializationUnequip:SetChecked(event.Unequip)
-		ItemRackOptEventEditSpecializationUnequip:SetChecked(event.Unequip)
+
 	else
 		ItemRackOptEventEditNameEdit:SetFocus()
 	end
@@ -2387,7 +2397,7 @@ function ItemRackOpt.EventEditSave(override)
 		event.Anymount = ItemRackOptEventEditBuffAnyMount:GetChecked()
 		event.OnMovement = ItemRackOptEventEditBuffOnMovement:GetChecked()
 		event.Unequip = ItemRackOptEventEditBuffUnequip:GetChecked()
-		event.DisableSound = ItemRackOptEventEditBuffDisableSound:GetChecked()
+
 		event.NotInPVP = ItemRackOptEventEditBuffNotInPVP:GetChecked()
 		event.NotInPVE = ItemRackOptEventEditBuffNotInPVE:GetChecked()
 	elseif event.Type=="Stance" then
@@ -2396,16 +2406,16 @@ function ItemRackOpt.EventEditSave(override)
 			event.Stance = tonumber(event.Stance)
 		end
 		event.Unequip = ItemRackOptEventEditStanceUnequip:GetChecked()
-		event.DisableSound = ItemRackOptEventEditStanceDisableSound:GetChecked()
+
 		event.NotInPVP = ItemRackOptEventEditStanceNotInPVP:GetChecked()
 	elseif event.Type=="Zone" then
 		event.Unequip = ItemRackOptEventEditZoneUnequip:GetChecked()
-		event.DisableSound = ItemRackOptEventEditZoneDisableSound:GetChecked()
+
 		event.Zones = {}
 		ItemRackOpt.ConvertZoneListToTable(ItemRackOptEventEditZoneEditBox:GetText(),event.Zones)
 	elseif event.Type=="Specialization" then
 		event.Unequip = ItemRackOptEventEditSpecializationUnequip:GetChecked()
-		event.DisableSound = ItemRackOptEventEditSpecializationDisableSound:GetChecked()
+
 		if ItemRackOptEventEditSpec1:GetChecked() then event.Spec = 1
 		elseif ItemRackOptEventEditSpec2:GetChecked() then event.Spec = 2
 		end
