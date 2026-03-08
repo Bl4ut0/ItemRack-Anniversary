@@ -231,6 +231,17 @@ function ItemRack.InitEvents()
 	ItemRack.CreateTimer("SpecChangeTimer",ItemRack.ProcessSpecializationEvent,0.5,1)
 	ItemRack.CreateTimer("MovementPollingTimer",ItemRack.PollMovement,.2,1)
 	
+	-- Initialize Event Stack and BaseGear set if missing
+	if not ItemRackUser.EventStack then
+		ItemRackUser.EventStack = {}
+	end
+	if not ItemRackUser.Sets["~BaseGear"] then
+		ItemRackUser.Sets["~BaseGear"] = {
+			equip = {},
+			old = {}
+		}
+	end
+
 	-- Prime all events to prevent redundant swaps on login/reload
 	local getSpec = GetActiveTalentGroup or (C_Talent and C_Talent.GetActiveTalentGroup)
 	local currentSpec = getSpec and getSpec()
@@ -363,6 +374,70 @@ function ItemRack.ToggleEvents(self)
 	ItemRack.RegisterEvents()
 end
 
+--[[ Event Stack Architecture ]]
+
+function ItemRack.PushEvent(eventName)
+	if ItemRackUser.EnableEvents == "OFF" then return end
+	
+	local wasEmpty = (#ItemRackUser.EventStack == 0)
+	
+	-- Remove event if it's already in the stack
+	for i = #ItemRackUser.EventStack, 1, -1 do
+		if ItemRackUser.EventStack[i] == eventName then
+			table.remove(ItemRackUser.EventStack, i)
+		end
+	end
+	
+	-- If stack was empty before this push, capture the "adventuring" root state into ~BaseGear
+	if wasEmpty then
+		local baseGear = ItemRackUser.Sets["~BaseGear"].equip
+		for slot = 1, 19 do
+			baseGear[slot] = ItemRack.GetID(slot)
+		end
+		-- Also save helm/cloak visibility
+		ItemRackUser.Sets["~BaseGear"].ShowHelm = ShowingHelm and ShowingHelm() and 1 or 0
+		ItemRackUser.Sets["~BaseGear"].ShowCloak = ShowingCloak and ShowingCloak() and 1 or 0
+	end
+	
+	table.insert(ItemRackUser.EventStack, eventName)
+	
+	local setname = ItemRackUser.Events.Set[eventName]
+	if setname then
+		local disableSound = ItemRackEvents[eventName] and ItemRackEvents[eventName].DisableSound
+		ItemRack.EquipSet(setname, disableSound)
+	end
+end
+
+function ItemRack.PopEvent(eventName)
+	-- Remove the event from the stack
+	for i = #ItemRackUser.EventStack, 1, -1 do
+		if ItemRackUser.EventStack[i] == eventName then
+			table.remove(ItemRackUser.EventStack, i)
+		end
+	end
+	
+	local disableSound = ItemRackEvents[eventName] and ItemRackEvents[eventName].DisableSound
+	
+	-- If stack has remaining events, equip the top one
+	if #ItemRackUser.EventStack > 0 then
+		local topEvent = ItemRackUser.EventStack[#ItemRackUser.EventStack]
+		local topSet = ItemRackUser.Events.Set[topEvent]
+		if topSet then
+			ItemRack.EquipSet(topSet, disableSound)
+		end
+	else
+		-- Stack is empty, return to the root ~BaseGear
+		ItemRack.EquipSet("~BaseGear", disableSound)
+		
+		-- Clear the BaseGear so we don't accumulate stale visual states (like ShowHelm) when we shouldn't
+		for slot = 1, 19 do
+			ItemRackUser.Sets["~BaseGear"].equip[slot] = nil
+		end
+		ItemRackUser.Sets["~BaseGear"].ShowHelm = nil
+		ItemRackUser.Sets["~BaseGear"].ShowCloak = nil
+	end
+end
+
 --[[ Event processing ]]
 
 function ItemRack.ProcessingFrameOnEvent(self,event,...)
@@ -426,8 +501,7 @@ function ItemRack.ProcessStanceEvent()
 	local events = ItemRackEvents
 
 	local currentStance = GetShapeshiftForm()
-	local stance, setToEquip, setToUnequip, setname, skip
-	local disableSoundEquip, disableSoundUnequip
+	local stance, eventToEquip, eventToUnequip, setname, skip
 
 	for eventName in pairs(enabled) do
 		if events[eventName].Type=="Stance" then
@@ -446,32 +520,29 @@ function ItemRack.ProcessStanceEvent()
 				if stance==currentStance then
 					if not events[eventName].Active then
 						if not ItemRack.IsSetEquipped(setname) then
-							setToEquip = setname
-							disableSoundEquip = events[eventName].DisableSound
+							eventToEquip = eventName
 							events[eventName].Active = true
 						end
 					end
 				elseif stance~=currentStance then
 					if events[eventName].Active then
 						if events[eventName].Unequip then
-							setToUnequip = setname
-							disableSoundUnequip = events[eventName].DisableSound
+							eventToUnequip = eventName
 						end
 						events[eventName].Active = nil
 					elseif events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
 						-- Fallback for consistency
-						setToUnequip = setname
-						disableSoundUnequip = events[eventName].DisableSound
+						eventToUnequip = eventName
 					end
 				end
 			end
 		end
 	end
-	if setToUnequip then
-		ItemRack.UnequipSet(setToUnequip, disableSoundUnequip)
+	if eventToUnequip then
+		ItemRack.PopEvent(eventToUnequip)
 	end
-	if setToEquip then
-		ItemRack.EquipSet(setToEquip, disableSoundEquip)
+	if eventToEquip then
+		ItemRack.PushEvent(eventToEquip)
 	end
 end
 
@@ -481,8 +552,7 @@ function ItemRack.ProcessZoneEvent()
 
 	local currentZone = GetRealZoneText()
 	local currentSubZone = GetSubZoneText()
-	local setToEquip, setToUnequip, setname
-	local disableSoundEquip, disableSoundUnequip
+	local eventToEquip, eventToUnequip, setname
 	local _, instanceType = IsInInstance()
 
 	for eventName in pairs(enabled) do
@@ -497,30 +567,32 @@ function ItemRack.ProcessZoneEvent()
 				-- Issue #5: Always attempt to equip if we enter/change to a matching zone,
 				-- even if we were already in another matching zone previously.
 				if not ItemRack.IsSetEquipped(setname) then
-					setToEquip = setname
-					disableSoundEquip = events[eventName].DisableSound
+					if events[eventName].Active then
+						-- Already active but gear is missing. Just equip it directly without pushing again.
+						ItemRack.EquipSet(setname, events[eventName].DisableSound)
+					else
+						eventToEquip = eventName
+					end
 				end
 				events[eventName].Active = true
 			else-- if not inZone
 				if events[eventName].Active then
 					if events[eventName].Unequip then
-						setToUnequip = setname
-						disableSoundUnequip = events[eventName].DisableSound
+						eventToUnequip = eventName
 					end
 					events[eventName].Active = nil
 				elseif events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
 					-- Fallback for consistency (e.g. reload UI while in zone then leave)
-					setToUnequip = setname
-					disableSoundUnequip = events[eventName].DisableSound
+					eventToUnequip = eventName
 				end
 			end
 		end
 	end
-	if setToUnequip then
-		ItemRack.UnequipSet(setToUnequip, disableSoundUnequip)
+	if eventToUnequip then
+		ItemRack.PopEvent(eventToUnequip)
 	end
-	if setToEquip then
-		ItemRack.EquipSet(setToEquip, disableSoundEquip)
+	if eventToEquip then
+		ItemRack.PushEvent(eventToEquip)
 	end
 end
 
@@ -539,8 +611,7 @@ function ItemRack.ProcessSpecializationEvent()
 	if ItemRack.LastLastSpec == currentSpec then return end
 	ItemRack.LastLastSpec = currentSpec
 	
-	local setToEquip, setToUnequip, setname
-	local disableSoundEquip, disableSoundUnequip
+	local eventToEquip, eventToUnequip, setname
 	
 	for eventName in pairs(enabled) do
 		if events[eventName].Type=="Specialization" and events[eventName].Spec then
@@ -548,22 +619,19 @@ function ItemRack.ProcessSpecializationEvent()
 			-- Always equip the set for the current spec
 			if events[eventName].Spec == currentSpec then
 				if not events[eventName].Active then
-					setToEquip = setname
+					eventToEquip = eventName
 					events[eventName].Active = true
-					disableSoundEquip = events[eventName].DisableSound
 				end
 			-- Unequip sets for other specs if they're equipped
 			elseif events[eventName].Spec ~= currentSpec then
 				if events[eventName].Active then
 					if events[eventName].Unequip then
-						setToUnequip = setname
-						disableSoundUnequip = events[eventName].DisableSound
+						eventToUnequip = eventName
 					end
 					events[eventName].Active = nil
 				elseif events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
 					-- Fallback for consistency
-					setToUnequip = setname
-					disableSoundUnequip = events[eventName].DisableSound
+					eventToUnequip = eventName
 				end
 			end
 		end
@@ -571,14 +639,15 @@ function ItemRack.ProcessSpecializationEvent()
 	
 	-- Unequip first, then equip (to avoid conflicts)
 	local unequipTriggered = false
-	if setToUnequip and setToUnequip ~= setToEquip then
-		ItemRack.UnequipSet(setToUnequip, disableSoundUnequip)
+	if eventToUnequip and eventToUnequip ~= eventToEquip then
+		ItemRack.PopEvent(eventToUnequip)
 		unequipTriggered = true
 	end
-	if setToEquip then
+	if eventToEquip then
+		local setToEquip = ItemRackUser.Events.Set[eventToEquip]
 		if not ItemRack.IsSetEquipped(setToEquip) or unequipTriggered then
 			ItemRack.Print("Spec changed! Equipping set: "..setToEquip)
-			ItemRack.EquipSet(setToEquip, disableSoundEquip)
+			ItemRack.PushEvent(eventToEquip)
 			
 			-- Dual-Wield Awareness: Schedule a delayed re-check for weapon slots
 			ItemRack.ScheduleDualWieldRetry(setToEquip)
@@ -710,20 +779,20 @@ function ItemRack.ProcessBuffEvent()
 				if buff then
 					if not events[eventName].Active then
 						if not isSetEquipped then
-							ItemRack.EquipSet(setname, events[eventName].DisableSound)
+							ItemRack.PushEvent(eventName)
 							events[eventName].Active = true
 						end
 					end
 				elseif not buff then
 					if events[eventName].Active then
 						if events[eventName].Unequip then
-							ItemRack.UnequipSet(setname, events[eventName].DisableSound)
+							ItemRack.PopEvent(eventName)
 						end
 						events[eventName].Active = nil
 					elseif isSetEquipped and events[eventName].Unequip then
 						-- Fallback: If we didn't track it as active but the set IS equipped, unequip it
 						-- This handles cases like reloading UI while mounted
-						ItemRack.UnequipSet(setname, events[eventName].DisableSound)
+						ItemRack.PopEvent(eventName)
 					end
 				end
 			end
