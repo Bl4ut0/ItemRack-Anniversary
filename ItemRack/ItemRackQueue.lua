@@ -249,12 +249,16 @@ function ItemRack.AutoQueueItemToEquip(slot, baseID, enable, ready)
 	local list = ItemRack.GetQueues()[slot]
 	local candidate
 	-- reuse the loop structure but optimized for auto-queue logic (priority checks etc)
+	-- This will return nil if no new item should be equipped.  
+	--    - This is either because there is no auto queue or what we have equipped is already what we want.
 	for i=1,#(list) do
 		candidate = string.match(list[i].id,"(%d+)")
+		-- If there is nothing at the top of our queue, return nil.
 		if list[i].id==0 then
 			return nil
+		-- If baseID is near ready but our candidate IS baseID, return nil.
 		elseif ready and candidate==baseID then
-			return list[i].id
+			return nil
 		else
 			local canSwap = not ready or enable==0 or list[i].priority
 			if canSwap then

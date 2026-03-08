@@ -522,6 +522,7 @@ function ItemRack.IsSetEquipped(setname,exact)
 			
 			if not match then return false end
 		end
+		
 		return anyChecked
 	end
 end
