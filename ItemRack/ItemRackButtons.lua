@@ -928,6 +928,22 @@ function ItemRack.KeyBindingsChanged()
 			end
 		end
 	end
+
+	-- Sync set keybindings if initiated
+	if ItemRack.BindingsInitialized then
+		for i in pairs(ItemRackUser.Sets) do
+			local buttonName = "ItemRack"..UnitName("player")..GetRealmName()..i
+			if _G[buttonName] then
+				local boundKey = GetBindingKey("CLICK "..buttonName..":LeftButton")
+				if boundKey and boundKey ~= "" then
+					ItemRackUser.Sets[i].key = boundKey
+				elseif not boundKey then
+					-- If unbound via game UI, clear natively
+					ItemRackUser.Sets[i].key = nil
+				end
+			end
+		end
+	end
 end
 
 function ItemRack.ResetButtons()

@@ -1286,15 +1286,11 @@ end
 function ItemRackOpt.SetKeyBinding()
 	if not InCombatLockdown() and ItemRackOpt.Binding.keyPressed then
 		ItemRackOpt.UnbindKey()
-		-- Clear any conflicting standard binding so our override takes effect
-		local key = ItemRackOpt.Binding.keyPressed
-		if GetBindingAction(key) ~= "" then
-			SetBinding(key, nil)
-			SaveBindings(GetCurrentBindingSet())
+		SetBindingClick(ItemRackOpt.Binding.keyPressed,ItemRackOpt.Binding.buttonName)
+		local bindingSet = GetCurrentBindingSet()
+		if bindingSet then
+			SaveBindings(bindingSet)
 		end
-		local button = _G[ItemRackOpt.Binding.buttonName] or CreateFrame("Button",ItemRackOpt.Binding.buttonName,nil,"SecureActionButtonTemplate")
-		-- Use override binding (non-priority) so the game can replace it
-		SetOverrideBindingClick(button, false, key, ItemRackOpt.Binding.buttonName)
 	else
 		ItemRack.Print("Sorry, you can't bind keys while in combat.")
 	end
@@ -1311,9 +1307,9 @@ end
 
 function ItemRackOpt.UnbindKey()
 	if not InCombatLockdown() and ItemRackOpt.Binding.buttonName then
-		local button = _G[ItemRackOpt.Binding.buttonName]
-		if button then
-			ClearOverrideBindings(button)
+		local action = "CLICK "..ItemRackOpt.Binding.buttonName..":LeftButton"
+		while GetBindingKey(action) do
+			SetBinding(GetBindingKey(action))
 		end
 	end
 	if ItemRackOpt.prevFrame==ItemRackOptSubFrame6 then

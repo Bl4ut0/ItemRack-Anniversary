@@ -2704,20 +2704,29 @@ function ItemRack.SetSetBindings()
 			end
 			button:SetAttribute("macrotext",macrotext)
 			button:SetScript("PostClick", function() ItemRack.RunSetBinding(i) end)
-			-- Clear any conflicting standard binding so our override takes effect
+			
 			local key = ItemRackUser.Sets[i].key
-			if GetBindingAction(key) ~= "" then
-				SetBinding(key, nil)
-				bindingsChanged = true
+			
+			-- Only import key on first pass if there's no standard binding already. Overwrites game defaults if imported.
+			if not ItemRack.BindingsInitialized then
+				if not GetBindingKey("CLICK "..buttonName..":LeftButton") then
+					SetBindingClick(key, buttonName)
+					bindingsChanged = true
+				end
+			else
+				SetBindingClick(key, buttonName)
 			end
-			-- Use override binding (non-priority) so the game can replace it
-			-- via Quick Keybind mode or the Blizzard keybinding panel
-			SetOverrideBindingClick(button, false, key, buttonName)
 		end
 	end
+	
+	ItemRack.BindingsInitialized = true
+	
 	-- Batch-save binding changes once at the end rather than per-key
 	if bindingsChanged then
-		SaveBindings(GetCurrentBindingSet())
+		local bindingSet = GetCurrentBindingSet()
+		if bindingSet then
+			SaveBindings(bindingSet)
+		end
 	end
 end
 
