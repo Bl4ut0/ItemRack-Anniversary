@@ -178,8 +178,7 @@ function ItemRack.InitButtons()
 		end
 		button:RegisterForDrag("LeftButton","RightButton")
 		button:RegisterForClicks("LeftButtonUp","RightButtonUp")
---		button:SetAttribute("alt-slot*",ATTRIBUTE_NOOP)
---		button:SetAttribute("shift-slot*",ATTRIBUTE_NOOP)
+		button:SetScript("PreClick", ItemRack.ButtonPreClick)
 		ItemRack.MenuMouseoverFrames["ItemRackButton"..i]=1
 
 		if ItemRack.MasqueGroups and ItemRack.MasqueGroups[1] then
@@ -238,7 +237,7 @@ end
 function ItemRack.UpdateDisableAltClick()
 	if not InCombatLockdown() then
 		for i=0,19 do
-			_G["ItemRackButton"..i]:SetAttribute("alt-type1",ItemRackSettings.DisableAltClick=="OFF" and ATTRIBUTE_NOOP or nil)
+			_G["ItemRackButton"..i]:SetAttribute("alt-type1",ItemRackSettings.DisableAltClick=="OFF" and "" or nil)
 		end
 	end
 end
@@ -661,6 +660,27 @@ end
 
 --[[ Using buttons ]]
 
+function ItemRack.ButtonPreClick(self,button)
+	local id = self:GetID()
+	if button=="LeftButton" and IsAltKeyDown() then
+		if id<20 and ItemRackSettings.DisableAltClick=="OFF" then
+			if not ItemRack.GetQueues()[id] then
+				LoadAddOn("ItemRackOptions")
+				ItemRackOptFrame:Show()
+				ItemRackOpt.TabOnClick(self,4)
+				ItemRackOpt.SetupQueue(id)
+			end
+			ItemRack.GetQueuesEnabled()[id] = not ItemRack.GetQueuesEnabled()[id]
+			if ItemRackOptSubFrame7 and ItemRackOptSubFrame7:IsVisible() and ItemRackOpt.SelectedSlot==id then
+				ItemRackOptQueueEnable:SetChecked(ItemRack.GetQueuesEnabled()[id])
+			end
+			ItemRack.UpdateCombatQueue()
+		elseif id==20 then
+			ItemRack.ToggleEvents(self)
+		end
+	end
+end
+
 function ItemRack.ButtonPostClick(self,button)
 	if self.OriginalSetChecked then self:OriginalSetChecked(false) end
 	local id = self:GetID()
@@ -710,21 +730,7 @@ function ItemRack.ButtonPostClick(self,button)
 			ItemRack.UnequipSet(ItemRackUser.CurrentSet)
 		end
 	elseif IsAltKeyDown() then
-		if id<20 and ItemRackSettings.DisableAltClick=="OFF" then
-			if not ItemRack.GetQueues()[id] then
-				LoadAddOn("ItemRackOptions")
-				ItemRackOptFrame:Show()
-				ItemRackOpt.TabOnClick(self,4)
-				ItemRackOpt.SetupQueue(id)
-			end
-			ItemRack.GetQueuesEnabled()[id] = not ItemRack.GetQueuesEnabled()[id]
-			if ItemRackOptSubFrame7 and ItemRackOptSubFrame7:IsVisible() and ItemRackOpt.SelectedSlot==id then
-				ItemRackOptQueueEnable:SetChecked(ItemRack.GetQueuesEnabled()[id])
-			end
-			ItemRack.UpdateCombatQueue()
-		elseif id==20 then
-			ItemRack.ToggleEvents(self)
-		end
+		-- Alt-LeftClick handled in PreClick to avoid SecureActionButton interference
 	elseif id<20 then
 		ItemRack.ReflectItemUse(id)
 	elseif id==20 then
