@@ -197,6 +197,7 @@ ItemRackUser = {
 ItemRackSettings = {
 	MenuOnShift = "OFF", -- open menus on shift only
 	MenuOnRight = "OFF", -- open menus on right-click only
+	RightClickUse = "OFF", -- use the item on right-click instead of manually advancing the queue
 	HideOOC = "OFF", -- hide dockable buttons when out of combat
 	HidePetBattle = "ON", -- hide dockable buttons during pet battles
 	Notify = "ON", -- notify when a used item comes off cooldown

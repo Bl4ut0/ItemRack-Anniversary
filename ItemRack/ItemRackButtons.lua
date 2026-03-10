@@ -692,6 +692,9 @@ function ItemRack.ButtonPostClick(self,button)
 				ItemRack.DockMenuToButton(id)
 				ItemRack.BuildMenu(id, nil, 2)
 			end
+		elseif ItemRackSettings.RightClickUse=="ON" then
+			-- Right-click uses the item instead of advancing the auto queue
+			ItemRack.ReflectItemUse(id)
 		else
 			-- Plain right-click advances the queue (handles combat queue internally)
 			if ItemRack.ManualQueueAdvance and ItemRack.ManualQueueAdvance(id) then
