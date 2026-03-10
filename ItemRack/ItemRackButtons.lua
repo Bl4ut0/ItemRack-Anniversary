@@ -169,6 +169,10 @@ function ItemRack.InitButtons()
 			if i<20 then
 			button:SetAttribute("type",nil)
 			button:SetAttribute("type1","item")
+			-- Trinket slots: right-click also uses the item via the secure handler
+			if i==13 or i==14 then
+				button:SetAttribute("type2","item")
+			end
 			button:SetAttribute("slot",i)
 			-- TBC Anniversary: Also set "item" attribute as string for SecureCmdItemParse
 			button:SetAttribute("item", tostring(i))
