@@ -692,6 +692,9 @@ function ItemRack.ButtonPostClick(self,button)
 				ItemRack.DockMenuToButton(id)
 				ItemRack.BuildMenu(id, nil, 2)
 			end
+		elseif ItemRackSettings.RightClickUse=="ON" then
+			-- Right-click uses the item instead of advancing the auto queue
+			ItemRack.ReflectItemUse(id)
 		else
 			-- Plain right-click advances the queue (handles combat queue internally)
 			if ItemRack.ManualQueueAdvance and ItemRack.ManualQueueAdvance(id) then
@@ -925,6 +928,22 @@ function ItemRack.KeyBindingsChanged()
 			else
 				hotkey:SetText("")
 				hotkey:Hide()
+			end
+		end
+	end
+
+	-- Sync set keybindings if initiated
+	if ItemRack.BindingsInitialized then
+		for i in pairs(ItemRackUser.Sets) do
+			local buttonName = "ItemRack"..UnitName("player")..GetRealmName()..i
+			if _G[buttonName] then
+				local boundKey = GetBindingKey("CLICK "..buttonName..":LeftButton")
+				if boundKey and boundKey ~= "" then
+					ItemRackUser.Sets[i].key = boundKey
+				elseif not boundKey then
+					-- If unbound via game UI, clear natively
+					ItemRackUser.Sets[i].key = nil
+				end
 			end
 		end
 	end

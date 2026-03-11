@@ -202,7 +202,7 @@ function ItemRack.ProcessAutoQueue(slot)
 				priorityValue = false
 				break
 			else
-				if list[i].id == equippedBaseID then
+				if list[i].id == baseID then
 					keepValue = list[i].keep
 					delayValue = list[i].delay
 					priorityValue = list[i].priority

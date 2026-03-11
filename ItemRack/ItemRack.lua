@@ -197,6 +197,7 @@ ItemRackUser = {
 ItemRackSettings = {
 	MenuOnShift = "OFF", -- open menus on shift only
 	MenuOnRight = "OFF", -- open menus on right-click only
+	RightClickUse = "OFF", -- use the item on right-click instead of manually advancing the queue
 	HideOOC = "OFF", -- hide dockable buttons when out of combat
 	HidePetBattle = "ON", -- hide dockable buttons during pet battles
 	Notify = "ON", -- notify when a used item comes off cooldown
@@ -1787,7 +1788,12 @@ end
 function ItemRack.EquipItemByID(id,slot)
 	if not id then return end
 	if ItemRack.NowCasting or (not ItemRack.SlotInfo[slot].swappable and (UnitAffectingCombat("player") or ItemRack.IsPlayerReallyDead()) ) then
-		ItemRack.AddToCombatQueue(slot,id)
+		-- Toggle: if the same item is already queued, un-queue it (manual cancel)
+		if ItemRack.CombatQueue[slot] == id then
+			ItemRack.RemoveFromCombatQueue(slot)
+		else
+			ItemRack.AddToCombatQueue(slot,id)
+		end
 	elseif not GetCursorInfo() and not SpellIsTargeting() then
 		local disableSound = ItemRackSettings.DisableSwapSound == "ON"
 		local useSound = GetCVar("Sound_EnableSFX")
@@ -1912,12 +1918,17 @@ function ItemRack.IsPlayerReallyDead()
 end
 
 function ItemRack.AddToCombatQueue(slot,id)
-	if ItemRack.CombatQueue[slot]==id then
-		ItemRack.CombatQueue[slot] = nil
-	else
+	if ItemRack.CombatQueue[slot] ~= id then
 		ItemRack.CombatQueue[slot] = id
+		ItemRack.UpdateCombatQueue()
 	end
-	ItemRack.UpdateCombatQueue()
+end
+
+function ItemRack.RemoveFromCombatQueue(slot)
+	if ItemRack.CombatQueue[slot] ~= nil then
+		ItemRack.CombatQueue[slot] = nil
+		ItemRack.UpdateCombatQueue()
+	end
 end
 
 function ItemRack.UpdateCombatQueue()
@@ -2704,20 +2715,29 @@ function ItemRack.SetSetBindings()
 			end
 			button:SetAttribute("macrotext",macrotext)
 			button:SetScript("PostClick", function() ItemRack.RunSetBinding(i) end)
-			-- Clear any conflicting standard binding so our override takes effect
+			
 			local key = ItemRackUser.Sets[i].key
-			if GetBindingAction(key) ~= "" then
-				SetBinding(key, nil)
-				bindingsChanged = true
+			
+			-- Only import key on first pass if there's no standard binding already. Overwrites game defaults if imported.
+			if not ItemRack.BindingsInitialized then
+				if not GetBindingKey("CLICK "..buttonName..":LeftButton") then
+					SetBindingClick(key, buttonName)
+					bindingsChanged = true
+				end
+			else
+				SetBindingClick(key, buttonName)
 			end
-			-- Use override binding (non-priority) so the game can replace it
-			-- via Quick Keybind mode or the Blizzard keybinding panel
-			SetOverrideBindingClick(button, false, key, buttonName)
 		end
 	end
+	
+	ItemRack.BindingsInitialized = true
+	
 	-- Batch-save binding changes once at the end rather than per-key
 	if bindingsChanged then
-		SaveBindings(GetCurrentBindingSet())
+		local bindingSet = GetCurrentBindingSet()
+		if bindingSet then
+			SaveBindings(bindingSet)
+		end
 	end
 end
 

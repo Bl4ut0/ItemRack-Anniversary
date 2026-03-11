@@ -494,13 +494,13 @@ function ItemRack.ProcessZoneEvent()
 						   events[eventName].Zones[instanceType:gsub("^%l", string.upper)]
 			
 			if inZone then
-				if not events[eventName].Active then
-					if not ItemRack.IsSetEquipped(setname) then
-						setToEquip = setname
-						disableSoundEquip = events[eventName].DisableSound
-						events[eventName].Active = true
-					end
+				-- Issue #5: Always attempt to equip if we enter/change to a matching zone,
+				-- even if we were already in another matching zone previously.
+				if not ItemRack.IsSetEquipped(setname) then
+					setToEquip = setname
+					disableSoundEquip = events[eventName].DisableSound
 				end
+				events[eventName].Active = true
 			else-- if not inZone
 				if events[eventName].Active then
 					if events[eventName].Unequip then
