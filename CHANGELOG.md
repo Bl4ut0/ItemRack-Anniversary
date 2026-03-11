@@ -2,7 +2,7 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
-## [4.30] - 2026-03-11
+## [5.0] - 2026-03-11
 ### 🏗️ New: Adaptive Event Stack (Multi-Level State Recovery)
 - **Event Stack Architecture**: Replaced the old `set.old` single-variable restore system with a fully ordered `ItemRackUser.EventStack`. The addon now remembers a hierarchy of overlapping events (e.g. walking into a City → entering an Arena → entering Combat). When an event ends, it seamlessly restores the gear from the *previous* active event layer instead of blindly reverting to whatever was worn before. This fixes the long-standing issue where overlapping events (Mount + Zone + Combat) would trample each other's gear on unequip.
 - **`PushEvent` / `PopEvent` System**: All four event handlers (Stance, Zone, Specialization, Buff) now use a centralized stack-based equip/unequip flow. `PushEvent(eventName)` adds an event to the stack and equips its set; `PopEvent(eventName)` removes it and restores the previous layer's gear.
