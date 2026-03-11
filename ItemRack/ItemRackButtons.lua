@@ -900,32 +900,33 @@ function ItemRack.WriteCooldown(where,start,duration)
 	if cooldown<3 and not where:GetText() then
 		-- this is a global cooldown. don't display it. not accurate but at least not annoying
 	else
+		local rounded = math.floor(cooldown + 0.5)  -- round to nearest second
 		if ItemRackSettings.LargeNumbers=="ON" then
 			-- Blizzard-style format: mm:ss or h:mm or just seconds
 			local text
-			if cooldown >= 3600 then
-				local h = math.floor(cooldown / 3600)
-				local m = math.floor((cooldown - h * 3600) / 60)
+			if rounded >= 3600 then
+				local h = math.floor(rounded / 3600)
+				local m = math.floor((rounded - h * 3600) / 60)
 				text = string.format("%d:%02d", h, m)
-			elseif (ItemRackSettings.Cooldown90=="ON" and cooldown >= 90) or (ItemRackSettings.Cooldown90=="OFF" and cooldown >= 60) then
-				local m = math.floor(cooldown / 60)
-				local s = math.floor(cooldown - m * 60)
+			elseif (ItemRackSettings.Cooldown90=="ON" and rounded > 90) or (ItemRackSettings.Cooldown90=="OFF" and rounded > 60) then
+				local m = math.floor(rounded / 60)
+				local s = math.floor(rounded - m * 60)
 				text = string.format("%d:%02d", m, s)
 			else
-				text = tostring(math.floor(cooldown + 0.5))
+				text = tostring(rounded)
 			end
 			where:SetText(text)
 			-- Dynamic coloring like Blizzard: white > 60s, yellow < 60s, red < 5s
-			if cooldown < 5 then
+			if rounded < 5 then
 				where:SetTextColor(1, 0.1, 0.1, 1)
-			elseif cooldown < 60 then
+			elseif rounded <= 60 then
 				where:SetTextColor(1, 0.82, 0, 1)
 			else
 				where:SetTextColor(1, 1, 1, 1)
 			end
 		else
 			-- Original small numbers format: "30 s", "2 m", "1 h"
-			where:SetText((cooldown<(ItemRackSettings.Cooldown90=="ON" and 90 or 60) and math.floor(cooldown+.5).." s") or (cooldown<3600 and math.ceil(cooldown/60).." m") or math.ceil(cooldown/3600).." h")
+			where:SetText((rounded<=(ItemRackSettings.Cooldown90=="ON" and 90 or 60) and rounded.." s") or (rounded<3600 and math.ceil(rounded/60).." m") or math.ceil(rounded/3600).." h")
 			where:SetTextColor(1, 1, 1, 1)
 		end
 	end
