@@ -2,6 +2,25 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.30] - 2026-03-11
+### 🏗️ New: Adaptive Event Stack (Multi-Level State Recovery)
+- **Event Stack Architecture**: Replaced the old `set.old` single-variable restore system with a fully ordered `ItemRackUser.EventStack`. The addon now remembers a hierarchy of overlapping events (e.g. walking into a City → entering an Arena → entering Combat). When an event ends, it seamlessly restores the gear from the *previous* active event layer instead of blindly reverting to whatever was worn before. This fixes the long-standing issue where overlapping events (Mount + Zone + Combat) would trample each other's gear on unequip.
+- **`PushEvent` / `PopEvent` System**: All four event handlers (Stance, Zone, Specialization, Buff) now use a centralized stack-based equip/unequip flow. `PushEvent(eventName)` adds an event to the stack and equips its set; `PopEvent(eventName)` removes it and restores the previous layer's gear.
+- **`~BaseGear` Internal Set**: A new internal set is automatically initialized on load as the fallback base layer, ensuring there is always a safe gear state to restore to.
+- **Combat-Safe Stack Restoration**: Fixed a major bug where events ending while in combat (e.g. dropping Mount form) failed to restore the previous gear set and permanently lost track of the active set label. The stack now correctly routes through the combat queue system.
+
+### New: Auto-Queue Aware Set Detection (PR #10)
+- **`IsSetEquipped` Auto-Queue Awareness**: `IsSetEquipped` now checks whether the auto-queue system would swap to a *different* item in any slot before confirming a set is "equipped". This fixes a scenario where two sets using the **same items** but with **different auto-queue configurations** in the same slot were indistinguishable. (Thanks to [UDrew](https://github.com/UDrew) for [PR #10](https://github.com/Bl4ut0/ItemRack-Anniversary/pull/10)!)
+- **`AutoQueueItemToEquip` Extraction**: Refactored `ProcessAutoQueue` to extract a reusable `AutoQueueItemToEquip(slot, baseID, enable, ready)` function. This function returns the item the auto-queue *would* equip next, allowing other systems (like `IsSetEquipped`) to query queue intent without triggering actual swaps.
+
+### Bug Fixes
+- **Event Stack Restoration**: Fixed events popping out-of-order failing to splice hidden gear correctly. The stack now handles arbitrary removal (not just top-of-stack pops).
+- **Quick Access Queue Toggle**: Re-implemented the queue toggle logic for the Quick Access Menu. Holding Alt and Left-Clicking an item in the menu now correctly toggles the auto-queue for that specific slot on/off, and prevents native action bar dragging issues.
+- **Right-Click Queue Advance**: Fixed the Right-Click manual queue cycle. Right-clicking a Quick Access button now correctly advances to the next item in the auto-queue without throwing silent table-to-string coercion errors.
+- **Right-Click Item Use**: Fixed the "Use on Right Click" setting. In modern WoW, ItemRack failed to assign the required `type2` attribute to the SecureActionButtons. Checking this setting now natively tells the engine to trigger item usage on right-click, taking effect immediately.
+- **Menu Cooldown Refresh**: Added safety safeguards to `ItemRack.WriteCooldown` to prevent Lua arithmetic crashes when attempting to draw cooldown rings on empty or invalid quick access menu slots.
+- **Settings Menu**: Moved the "Disable Alt+Click" option from "Interface & Misc" to "Global Settings" to increase visibility and prevent user confusion regarding the Quick Access Menu alt-click features.
+
 ## [4.29.9] - 2026-03-09
 ### Bug Fixes
 - **Keybind Persistence & UI Overrides**: Reverted the core set keybinding logic to use `SetBindingClick` instead of `SetOverrideBindingClick`. This fixes an issue where standard WoW keybindings were fighting ItemRack and being improperly deleted during overlap resolution, while also ensuring that users' saved keybinds correctly restore on login. Both the native game UI and ItemRack Options can now freely edit, delete, and persist set hotkeys synchronously.

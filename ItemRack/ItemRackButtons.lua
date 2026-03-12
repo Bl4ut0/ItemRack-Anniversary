@@ -178,8 +178,7 @@ function ItemRack.InitButtons()
 		end
 		button:RegisterForDrag("LeftButton","RightButton")
 		button:RegisterForClicks("LeftButtonUp","RightButtonUp")
---		button:SetAttribute("alt-slot*",ATTRIBUTE_NOOP)
---		button:SetAttribute("shift-slot*",ATTRIBUTE_NOOP)
+		button:SetScript("PreClick", ItemRack.ButtonPreClick)
 		ItemRack.MenuMouseoverFrames["ItemRackButton"..i]=1
 
 		if ItemRack.MasqueGroups and ItemRack.MasqueGroups[1] then
@@ -225,6 +224,7 @@ function ItemRack.InitButtons()
 	ItemRackFrame:RegisterEvent("UPDATE_BINDINGS")
 	ItemRack.ReflectMainScale()
 	ItemRack.ReflectMenuOnRight()
+	ItemRack.ReflectRightClickUse()
 	ItemRack.ConstructLayout()
 	ItemRack.UpdateButtonCooldowns()
 	ItemRack.ReflectHideOOC()
@@ -238,7 +238,7 @@ end
 function ItemRack.UpdateDisableAltClick()
 	if not InCombatLockdown() then
 		for i=0,19 do
-			_G["ItemRackButton"..i]:SetAttribute("alt-slot*",ItemRackSettings.DisableAltClick=="OFF" and ATTRIBUTE_NOOP or nil)
+			_G["ItemRackButton"..i]:SetAttribute("alt-type1",ItemRackSettings.DisableAltClick=="OFF" and ATTRIBUTE_NOOP or nil)
 		end
 	end
 end
@@ -661,6 +661,27 @@ end
 
 --[[ Using buttons ]]
 
+function ItemRack.ButtonPreClick(self,button)
+	local id = self:GetID()
+	if button=="LeftButton" and IsAltKeyDown() then
+		if id<20 and ItemRackSettings.DisableAltClick=="OFF" then
+			if not ItemRack.GetQueues()[id] then
+				LoadAddOn("ItemRackOptions")
+				ItemRackOptFrame:Show()
+				ItemRackOpt.TabOnClick(self,4)
+				ItemRackOpt.SetupQueue(id)
+			end
+			ItemRack.GetQueuesEnabled()[id] = not ItemRack.GetQueuesEnabled()[id]
+			if ItemRackOptSubFrame7 and ItemRackOptSubFrame7:IsVisible() and ItemRackOpt.SelectedSlot==id then
+				ItemRackOptQueueEnable:SetChecked(ItemRack.GetQueuesEnabled()[id])
+			end
+			ItemRack.UpdateCombatQueue()
+		elseif id==20 then
+			ItemRack.ToggleEvents(self)
+		end
+	end
+end
+
 function ItemRack.ButtonPostClick(self,button)
 	if self.OriginalSetChecked then self:OriginalSetChecked(false) end
 	local id = self:GetID()
@@ -710,21 +731,7 @@ function ItemRack.ButtonPostClick(self,button)
 			ItemRack.UnequipSet(ItemRackUser.CurrentSet)
 		end
 	elseif IsAltKeyDown() then
-		if id<20 and ItemRackSettings.DisableAltClick=="OFF" then
-			if not ItemRack.GetQueues()[id] then
-				LoadAddOn("ItemRackOptions")
-				ItemRackOptFrame:Show()
-				ItemRackOpt.TabOnClick(self,4)
-				ItemRackOpt.SetupQueue(id)
-			end
-			ItemRack.GetQueuesEnabled()[id] = not ItemRack.GetQueuesEnabled()[id]
-			if ItemRackOptSubFrame7 and ItemRackOptSubFrame7:IsVisible() and ItemRackOpt.SelectedSlot==id then
-				ItemRackOptQueueEnable:SetChecked(ItemRack.GetQueuesEnabled()[id])
-			end
-			ItemRack.UpdateCombatQueue()
-		elseif id==20 then
-			ItemRack.ToggleEvents(self)
-		end
+		-- Alt-LeftClick handled in PreClick to avoid SecureActionButton interference
 	elseif id<20 then
 		ItemRack.ReflectItemUse(id)
 	elseif id==20 then
@@ -848,6 +855,20 @@ function ItemRack.ReflectMenuOnRight()
 	end
 end
 
+function ItemRack.ReflectRightClickUse()
+	if not InCombatLockdown() then
+		for i=0,19 do
+			if ItemRackSettings.RightClickUse == "ON" then
+				_G["ItemRackButton"..i]:SetAttribute("type2", "item")
+				_G["ItemRackButton"..i]:SetAttribute("item2", tostring(i))
+			else
+				_G["ItemRackButton"..i]:SetAttribute("type2", nil)
+				_G["ItemRackButton"..i]:SetAttribute("item2", nil)
+			end
+		end
+	end
+end
+
 function ItemRack.ReflectHideOOC()
 	for i in pairs(ItemRackUser.Buttons) do
 		if ItemRackSettings.HideOOC=="ON" and not ItemRack.inCombat then
@@ -871,10 +892,12 @@ end
 --[[ Cooldowns ]]
 
 function ItemRack.WriteCooldown(where,start,duration)
-	local cooldown = duration - (GetTime()-start)
-	if start==0 or ItemRackSettings.CooldownCount=="OFF" then
+	if not start or not duration or start==0 or ItemRackSettings.CooldownCount=="OFF" then
 		where:SetText("")
-	elseif cooldown<3 and not where:GetText() then
+		return
+	end
+	local cooldown = duration - (GetTime()-start)
+	if cooldown<3 and not where:GetText() then
 		-- this is a global cooldown. don't display it. not accurate but at least not annoying
 	else
 		if ItemRackSettings.LargeNumbers=="ON" then

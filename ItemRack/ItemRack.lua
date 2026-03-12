@@ -1667,7 +1667,33 @@ function ItemRack.MenuOnClick(self,button)
 	self:SetChecked(false)
 	local item = ItemRack.Menu[self:GetID()]
 	ItemRack.ClearLockList()
-	if IsAltKeyDown() and ItemRackSettings.AllowHidden=="ON" then
+	if IsAltKeyDown() and ItemRackSettings.DisableAltClick == "OFF" then
+		-- In the Quick Access Menu, Alt-Click toggles the queue for the slot this menu belongs to
+		local slot = ItemRack.menuOpen
+		if slot and slot < 20 then
+			if not ItemRack.GetQueues()[slot] then
+				LoadAddOn("ItemRackOptions")
+				ItemRackOptFrame:Show()
+				ItemRackOpt.TabOnClick(self, 4)
+				ItemRackOpt.SetupQueue(slot)
+			end
+			ItemRack.GetQueuesEnabled()[slot] = not ItemRack.GetQueuesEnabled()[slot]
+			if ItemRackOptSubFrame7 and ItemRackOptSubFrame7:IsVisible() and ItemRackOpt.SelectedSlot == slot then
+				ItemRackOptQueueEnable:SetChecked(ItemRack.GetQueuesEnabled()[slot])
+			end
+			ItemRack.UpdateCombatQueue()
+			
+			-- Workaround: prevent whatever native secure action was queued by immediately equipping the currently worn item
+			if not InCombatLockdown() then
+				local currentID = ItemRack.GetID(slot)
+				if currentID and currentID ~= 0 then
+					ItemRack.EquipItemByID(currentID, slot)
+				end
+			end
+		end
+		-- Re-build the menu to reflect the new gear icon on the main button
+		ItemRack.BuildMenu()
+	elseif IsAltKeyDown() and ItemRackSettings.AllowHidden=="ON" then
 		ItemRack.ToggleHidden(item)
 		ItemRack.BuildMenu()
 	elseif IsShiftKeyDown() and ChatFrame1EditBox:IsVisible() then

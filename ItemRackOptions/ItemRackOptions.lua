@@ -178,6 +178,7 @@ function ItemRackOpt.OnLoad(self)
 		{type="check",optset=ItemRackSettings,variable="AllowEmpty",label="Allow empty slots",tooltip="Add an empty slot to menus of equipped items."},
 		{type="check",optset=ItemRackSettings,variable="AllowHidden",label="Allow hidden items",tooltip="Enable Alt+clicking of menu items to hide/show them in the menu.  Hold Alt as you enter a menu to show all."},
 		{type="check",optset=ItemRackSettings,variable="HideTradables",label="Hide tradables",tooltip="Prevent tradable items from showing up in the menu."},
+		{type="check",optset=ItemRackSettings,variable="DisableAltClick",label="Disable Alt+Click",tooltip="Alt+Click on buttons dragged from the character sheet toggles auto queue for that slot.  Check this to disable that behavior. (ie to use Alt+click to self cast instead.)",combatlock=1},
 
 		{type="label",label="Cooldown Settings"},
 		{type="check",optset=ItemRackSettings,variable="Notify",label="Notify when ready",tooltip="Announce when an item you used comes off cooldown."},
@@ -208,7 +209,6 @@ function ItemRackOpt.OnLoad(self)
 		{type="check",optset=ItemRackSettings,variable="CharacterSheetMenus",label="Character sheet menus",tooltip="While this is checked, mouseover of slots on the character sheet will pop out a menu of items that can go in that slot."},
 		{type="check",optset=ItemRackSettings,variable="LeftSlotsGoRight",depend="CharacterSheetMenus",label="Left slots: menu on right",tooltip="Make left-side character slot menus (Head, Neck, Shoulder, etc.) appear on the RIGHT instead of the left."},
 		{type="check",optset=ItemRackSettings,variable="RightSlotsGoLeft",depend="CharacterSheetMenus",label="Right slots: menu on left",tooltip="Make right-side character slot menus (Hands, Legs, Trinkets, etc.) appear on the LEFT instead of the right."},
-		{type="check",optset=ItemRackSettings,variable="DisableAltClick",label="Disable Alt+Click",tooltip="Alt+Click on buttons dragged from the character sheet toggles auto queue for that slot.  Check this to disable that behavior. (ie to use Alt+click to self cast instead.)",combatlock=1},
 		{type="label",label=""},
 		{type="button",button=ItemRackOptKeyBindings,label="Slot Key Bindings",tooltip="Set key bindings to use slots.",combatlock=1},
 		{type="button",button=ItemRackOptResetBar,label="Reset Buttons",tooltip="Remove all buttons and restore to default alpha and scale.",combatlock=1},
@@ -1066,6 +1066,8 @@ function ItemRackOpt.OptListCheckButtonOnClick(self,override)
 			ItemRackSettings.MenuOnRight = "OFF"
 			ItemRack.ReflectMenuOnRight()
 		end
+	elseif opt.variable=="RightClickUse" then
+		ItemRack.ReflectRightClickUse()
 	elseif opt.variable=="HideOOC" then
 		ItemRack.ReflectHideOOC()
 	elseif opt.variable=="HidePetBattle" then
