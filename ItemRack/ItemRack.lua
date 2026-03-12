@@ -338,6 +338,8 @@ function ItemRack.InitEventHandlers()
 	handler.UNIT_SPELLCAST_SUCCEEDED = ItemRack.OnCastingStop
 	handler.UNIT_SPELLCAST_INTERRUPTED = ItemRack.OnCastingStop
 	handler.UNIT_SPELLCAST_FAILED = ItemRack.OnCastingStop
+	handler.UNIT_SPELLCAST_CHANNEL_START = ItemRack.OnCastingStart
+	handler.UNIT_SPELLCAST_CHANNEL_STOP = ItemRack.OnCastingStop
 	handler.CHARACTER_POINTS_CHANGED = ItemRack.UpdateClassSpecificStuff
 	handler.PLAYER_TALENT_UPDATE = ItemRack.UpdateClassSpecificStuff
 	handler.PLAYER_ENTERING_WORLD = ItemRack.OnEnterWorld
@@ -443,6 +445,13 @@ function ItemRack.OnCastingStart(self,event,unit)
 	if unit=="player" then
 		if CastingInfo() or ChannelInfo() then
 			ItemRack.NowCasting = true
+			--If channeled, let's store the spellName to match it up to the UNIT_SPELLCAST_SUCCEEDED event that immediately gets fired after starting.
+			if ChannelInfo() then
+				local spellName = UnitChannelInfo("player")
+				ItemRack.NowChannelingSpell = spellName
+			else
+				ItemRack.NowChannelingSpell = nil
+			end
 		end
 	end
 end
@@ -452,7 +461,17 @@ function ItemRack.OnCastingStop(self,event,unit)
 		if not ItemRack.NowCasting then
 			return
 		else
+			if ItemRack.NowChannelingSpell then
+				local spellName = UnitChannelInfo("player")
+				if spellName and event == "UNIT_SPELLCAST_SUCCEEDED" and spellName == ItemRack.NowChannelingSpell then
+					--When channeling, a UNIT_SPELLCAST_SUCCEEDED event will fire immediately after starting.
+					--If this comes in for our channeled spell, ignore this event and wait for the UNIT_SPELLCAST_CHANNEL_STOP to fire.
+					return
+				end
+			end
+			
 			ItemRack.NowCasting = nil
+			ItemRack.NowChannelingSpell = nil
 			-- This check is in the event that a successful spellcast puts you in combat
 			if event ~= "UNIT_SPELLCAST_SUCCEEDED" and not ItemRack.inCombat then
 				ItemRack.ProcessCombatQueue()
@@ -712,6 +731,8 @@ function ItemRack.InitCore()
 	ItemRackFrame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
 	ItemRackFrame:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
 	ItemRackFrame:RegisterEvent("UNIT_SPELLCAST_FAILED")
+	ItemRackFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
+	ItemRackFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_STOP")
 	ItemRackFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 	--end
 	ItemRack.StartTimer("CooldownUpdate")
