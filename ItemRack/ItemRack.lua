@@ -40,6 +40,20 @@ local GetNumAddOns = GetNumAddOns or (C_AddOns and C_AddOns.GetNumAddOns)
 local wowver, wowbuild, wowbuilddate, wowtoc = GetBuildInfo()
 ItemRack.Version = GetAddOnMetadata(addonName, "Version")
 
+-- Global Debug System
+-- Usage: ItemRack.Debug("Queue", "some message", someVar)
+-- Enable:  /script ItemRack.DebugTags.Queue = true
+-- Disable: /script ItemRack.DebugTags.Queue = false
+-- Enable all: /script ItemRack.DebugAll = true
+ItemRack.DebugTags = {} -- per-tag toggles, e.g. { Queue = true, Events = true }
+ItemRack.DebugAll = false -- master override to enable all tags
+
+function ItemRack.Debug(tag, ...)
+	if not ItemRack.DebugAll and not ItemRack.DebugTags[tag] then return end
+	local prefix = "|cff00ff00[IR-" .. tag .. "]|r"
+	print(prefix, ...)
+end
+
 -- by Mikinho - Fix for latest update for Classic Era/SoD v11504
 local GetMouseFocus = GetMouseFocus
 if not GetMouseFocus and GetMouseFoci then
@@ -539,12 +553,19 @@ function ItemRack.ProcessCombatQueue()
 	if not ItemRack.IsPlayerReallyDead() and next(ItemRack.CombatQueue) then
 		local combat = ItemRackUser.Sets["~CombatQueue"].equip
 		local queue = ItemRack.CombatQueue
+		ItemRack.AutoQueueFlag = ItemRack.AutoQueueFlag or {}
 		for i in pairs(combat) do
 			combat[i] = nil
 		end
 		for i in pairs(queue) do
-			combat[i] = queue[i]
-			queue[i] = nil
+			-- Skip slots whose auto-queue was disabled after this entry was added
+			if not ItemRack.GetQueuesEnabled()[i] and ItemRack.GetQueues()[i] then
+				queue[i] = nil
+			else
+				combat[i] = queue[i]
+				queue[i] = nil
+			end
+			ItemRack.AutoQueueFlag[i] = nil
 		end
 		ItemRackUser.Sets["~CombatQueue"].oldset = ItemRack.CombatSet
 		ItemRack.UpdateCombatQueue()
@@ -1832,14 +1853,14 @@ function ItemRack.UnmuteSwapSounds()
 	end
 end
 
-function ItemRack.EquipItemByID(id,slot)
+function ItemRack.EquipItemByID(id,slot,isAutoQueue)
 	if not id then return end
 	if ItemRack.NowCasting or (not ItemRack.SlotInfo[slot].swappable and (UnitAffectingCombat("player") or ItemRack.IsPlayerReallyDead()) ) then
 		-- Toggle: if the same item is already queued, un-queue it (manual cancel)
 		if ItemRack.CombatQueue[slot] == id then
 			ItemRack.RemoveFromCombatQueue(slot)
 		else
-			ItemRack.AddToCombatQueue(slot,id)
+			ItemRack.AddToCombatQueue(slot,id,isAutoQueue)
 		end
 	elseif not GetCursorInfo() and not SpellIsTargeting() then
 		local disableSound = ItemRackSettings.DisableSwapSound == "ON"
@@ -1964,9 +1985,11 @@ function ItemRack.IsPlayerReallyDead()
 	return dead
 end
 
-function ItemRack.AddToCombatQueue(slot,id)
+function ItemRack.AddToCombatQueue(slot,id,isAutoQueue)
 	if ItemRack.CombatQueue[slot] ~= id then
 		ItemRack.CombatQueue[slot] = id
+		ItemRack.AutoQueueFlag = ItemRack.AutoQueueFlag or {}
+		ItemRack.AutoQueueFlag[slot] = isAutoQueue
 		ItemRack.UpdateCombatQueue()
 	end
 end
@@ -1974,6 +1997,7 @@ end
 function ItemRack.RemoveFromCombatQueue(slot)
 	if ItemRack.CombatQueue[slot] ~= nil then
 		ItemRack.CombatQueue[slot] = nil
+		if ItemRack.AutoQueueFlag then ItemRack.AutoQueueFlag[slot] = nil end
 		ItemRack.UpdateCombatQueue()
 	end
 end

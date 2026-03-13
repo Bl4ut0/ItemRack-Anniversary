@@ -2,6 +2,11 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.31] - 2026-03-12
+### Bug Fixes
+- **Auto-Queue Pause Ignored**: Fixed a critical bug where pausing a trinket slot's auto-queue (via Alt+Click) while in combat would fail to cancel pending gear swaps. The system now correctly respects the paused state for auto-queued swaps when combat ends, while still permitting manual and Event-driven set swaps to process through the combat queue cleanly.
+- **Zone Event Re-triggering (Issue #5)**: Fixed an issue where moving between two subzones/zones that are *both* part of the same active Zone Event (e.g., from Elwynn Forest to Stormwind City) wouldn't re-equip your event gear if you had temporarily changed it. The addon now consistently re-asserts the zone gear upon every valid zone transition.
+
 ## [4.30] - 2026-03-11
 ### 🏗️ New: Adaptive Event Stack (Multi-Level State Recovery)
 - **Event Stack Architecture**: Replaced the old `set.old` single-variable restore system with a fully ordered `ItemRackUser.EventStack`. The addon now remembers a hierarchy of overlapping events (e.g. walking into a City → entering an Arena → entering Combat). When an event ends, it seamlessly restores the gear from the *previous* active event layer instead of blindly reverting to whatever was worn before. This fixes the long-standing issue where overlapping events (Mount + Zone + Combat) would trample each other's gear on unequip.
