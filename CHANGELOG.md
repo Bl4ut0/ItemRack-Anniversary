@@ -2,8 +2,10 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
-## [4.31] - 2026-03-12
+## [4.31] - 2026-03-13
 ### Bug Fixes
+- **Internal Bag Error on Rapid Set Swaps**: Hardened the set swap pipeline against the WoW client "Internal bag error" that could occur when swapping sets rapidly (2–3 quick swaps). Added a `CursorHasItem()` guard to `AnythingLocked()`, a lock re-check after multi-step swap passes, frame-deferred `SetsWaiting` processing, and a 5-second safety timeout (`StartSetSwapTimeout()`) that force-clears a stuck `SetSwapping` state — preventing the permanent "need to logout" lockup.
+- **OnMovement Zone-Crossing Stutter**: Fixed an issue where crossing a zone boundary (e.g. running out of a town) while mounted with an "On Movement" event active would briefly unequip and re-equip the movement gear set. Zone transitions can cause momentary speed blips or aura flickers that the event system misinterpreted as "player stopped." Added zone-transition awareness: `ProcessBuffEvent` now suppresses OnMovement unequips for 1 second after a `ZONE_CHANGED_NEW_AREA` event, as long as the underlying buff (e.g. mount) is still active. Intentional stops and dismounts still trigger an immediate unequip with zero delay.
 - **Auto-Queue Pause Ignored**: Fixed a critical bug where pausing a trinket slot's auto-queue (via Alt+Click) while in combat would fail to cancel pending gear swaps. The system now correctly respects the paused state for auto-queued swaps when combat ends, while still permitting manual and Event-driven set swaps to process through the combat queue cleanly.
 - **Zone Event Re-triggering (Issue #5)**: Fixed an issue where moving between two subzones/zones that are *both* part of the same active Zone Event (e.g., from Elwynn Forest to Stormwind City) wouldn't re-equip your event gear if you had temporarily changed it. The addon now consistently re-asserts the zone gear upon every valid zone transition.
 

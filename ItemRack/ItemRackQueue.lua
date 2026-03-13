@@ -13,16 +13,16 @@ local IsEquippedItem = _G.IsEquippedItem or (C_Item and C_Item.IsEquippedItem)
 -- Disable: /script ItemRack.DebugTags.Queue = false
 
 function ItemRack.PeriodicQueueCheck()
-	-- Don't process queue during combat, death or while casting
-	if ItemRack.inCombat or ItemRack.IsPlayerReallyDead() or ItemRack.NowCasting then return end
-	
+	if SpellIsTargeting() then
+		ItemRack.Debug("Queue","SpellIsTargeting - skipping queue check")
+		return
+	end
 	-- Only process queues if global EnableQueues is ON and at least one slot is enabled
 	if ItemRackUser.EnableQueues=="ON" then
 		for i,v in pairs(ItemRack.GetQueuesEnabled()) do
 			if v then
 				ItemRack.ProcessAutoQueue(i)
 			end
-		end
 		end
 	else
 		ItemRack.Debug("Queue","Global queues disabled (EnableQueues ~= ON)")
