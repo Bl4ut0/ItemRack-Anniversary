@@ -438,8 +438,10 @@ function ItemRack.ProcessingFrameOnEvent(self,event,...)
 			startStance = 1
 		elseif event=="ZONE_CHANGED_NEW_AREA" and eventType=="Zone" then -- if player move to a new area, toggle set change.
 			startZone = 1
+			ItemRack.LastZoneChangeTime = GetTime() -- Track zone transitions for OnMovement suppression
 		elseif event == "ZONE_CHANGED_INDOORS" and eventType == "Zone" and select(2, IsInInstance()) == "raid" then -- if player change subzone in raid instance, toggle set change, else not.
 			startZone = 1
+			ItemRack.LastZoneChangeTime = GetTime()
 		elseif event == "ACTIVE_TALENT_GROUP_CHANGED" and eventType == "Specialization" then
 			ItemRack.StartTimer("SpecChangeTimer")
 		elseif eventType=="Script" and events[eventName].Trigger==event then
@@ -757,6 +759,11 @@ function ItemRack.ProcessBuffEvent()
 
 	local buff, setname, isSetEquipped, skip
 
+	-- Zone-transition awareness: suppress OnMovement unequips if a zone change
+	-- happened within the last 1 second. Zone boundaries can cause speed blips
+	-- or aura flickers that would otherwise trigger a spurious unequip.
+	local inZoneTransition = ItemRack.LastZoneChangeTime and (GetTime() - ItemRack.LastZoneChangeTime) < 1
+
 	for eventName in pairs(enabled) do
 		if events[eventName].Type=="Buff" then
 			skip = nil
@@ -773,11 +780,16 @@ function ItemRack.ProcessBuffEvent()
 				end
 			end
 			if not skip then
+				-- Determine the underlying buff/mount condition (ignoring movement)
+				local underlyingBuff
 				if events[eventName].Anymount then
-					buff = IsMounted() and not UnitOnTaxi("player")
+					underlyingBuff = IsMounted() and not UnitOnTaxi("player")
 				else
-					buff = AuraUtil.FindAuraByName(events[eventName].Buff,"player")
+					underlyingBuff = AuraUtil.FindAuraByName(events[eventName].Buff,"player")
 				end
+
+				-- Apply OnMovement check: buff is only true if moving
+				buff = underlyingBuff
 				if buff and events[eventName].OnMovement then
 					buff = GetUnitSpeed("player") > 0
 				end
@@ -797,9 +809,19 @@ function ItemRack.ProcessBuffEvent()
 				elseif not buff then
 					if events[eventName].Active then
 						if events[eventName].Unequip then
-							ItemRack.PopEvent(eventName)
+							-- Zone-transition suppression: if this is an OnMovement event and the
+							-- underlying buff is still active but we just crossed a zone boundary,
+							-- skip the unequip. The zone transition likely caused a speed blip
+							-- or aura flicker — not an intentional stop.
+							if events[eventName].OnMovement and underlyingBuff and inZoneTransition then
+								-- Suppress: still mounted, zone boundary artifact. Do nothing.
+							else
+								ItemRack.PopEvent(eventName)
+								events[eventName].Active = nil
+							end
+						else
+							events[eventName].Active = nil
 						end
-						events[eventName].Active = nil
 					elseif isSetEquipped and events[eventName].Unequip then
 						-- Fallback: If we didn't track it as active but the set IS equipped, unequip it
 						-- This handles cases like reloading UI while mounted

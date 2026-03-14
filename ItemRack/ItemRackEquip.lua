@@ -251,21 +251,50 @@ function ItemRack.EquipSet(setname, disableSound)
 	-- to determine when to run a second pass.
 	ItemRack.SetSwapping = setname
 	ItemRack.SetSwappingDisableSound = disableSound
+
+	-- Safety timeout: if SetSwapping is never cleared (e.g. locks never fire for a failed swap),
+	-- force-clear after 5s to prevent the permanent "stuck until logout" state.
+	ItemRack.StartSetSwapTimeout()
+end
+
+-- Starts (or restarts) a 5-second safety timer that force-clears SetSwapping if it
+-- hasn't been resolved by then. Prevents the addon from getting permanently stuck.
+function ItemRack.StartSetSwapTimeout()
+	if ItemRack.SetSwapTimeout then
+		ItemRack.SetSwapTimeout:Cancel()
+	end
+	ItemRack.SetSwapTimeout = C_Timer.NewTimer(5, function()
+		if ItemRack.SetSwapping then
+			ItemRack.Debug("Equip", "SetSwapping safety timeout — force clearing stuck state for:", ItemRack.SetSwapping)
+			ItemRack.SetSwapping = nil
+			ItemRack.SetSwappingDisableSound = nil
+			ItemRack.SetSwapTimeout = nil
+			-- Clear any remaining swap list entries that can't complete
+			for i in pairs(ItemRack.SwapList) do
+				ItemRack.SwapList[i] = nil
+			end
+			-- Try to process any sets that were waiting
+			if #ItemRack.SetsWaiting > 0 and not ItemRack.AnythingLocked() and not ItemRack.NowCasting then
+				ItemRack.ProcessSetsWaiting()
+			end
+		end
+	end)
 end
 
 function ItemRack.AnythingLocked()
-	local isLocked = nil
+	-- Guard: if the cursor is holding an item (e.g. from a failed swap), treat as locked
+	if CursorHasItem() then
+		return 1
+	end
 	for i=1,19 do
 		if IsInventoryItemLocked(i) then
 			return 1
 		end
 	end
-	if not isLocked then
-		for i=0,4 do
-			for j=1,GetContainerNumSlots(i) do
-				if select(3,GetContainerItemInfo(i,j)) then
-					return 1
-				end
+	for i=0,4 do
+		for j=1,GetContainerNumSlots(i) do
+			if select(3,GetContainerItemInfo(i,j)) then
+				return 1
 			end
 		end
 	end
@@ -278,10 +307,27 @@ function ItemRack.LockChangedDuringSetSwap()
 		ItemRack.SetSwapping = nil
 		ItemRack.SetSwappingDisableSound = nil
 		ItemRack.IterateSwapList(setname, disableSound)
+
+		-- Re-check: if the second pass locked new items or left work undone,
+		-- re-enter swap-waiting mode instead of immediately starting the next swap.
+		if next(ItemRack.SwapList) or ItemRack.AnythingLocked() then
+			ItemRack.SetSwapping = setname
+			ItemRack.SetSwappingDisableSound = disableSound
+			-- Restart the safety timeout for this new waiting period
+			ItemRack.StartSetSwapTimeout()
+			return
+		end
+
 		ItemRack.EndSetSwap(setname)
-		
+
 		if #ItemRack.SetsWaiting > 0 and not ItemRack.NowCasting then
-			ItemRack.ProcessSetsWaiting()
+			-- Defer to next frame to let lock state fully settle before starting
+			-- the next swap. This prevents the "Internal bag error" from rapid swaps.
+			C_Timer.After(0, function()
+				if not ItemRack.AnythingLocked() and not ItemRack.NowCasting and #ItemRack.SetsWaiting > 0 then
+					ItemRack.ProcessSetsWaiting()
+				end
+			end)
 		end
 	end
 end
@@ -397,6 +443,11 @@ end
 
 function ItemRack.EndSetSwap(setname)
 	ItemRack.SetSwapping = nil
+	-- Cancel safety timeout since swap completed normally
+	if ItemRack.SetSwapTimeout then
+		ItemRack.SetSwapTimeout:Cancel()
+		ItemRack.SetSwapTimeout = nil
+	end
 	if setname then
 		if not string.match(setname,"^~") then --do not list internal sets, prefixed with ~
 			ItemRackUser.CurrentSet = setname
