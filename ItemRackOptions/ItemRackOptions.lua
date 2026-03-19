@@ -2457,7 +2457,11 @@ function ItemRackOpt.EventEditDelete(override)
 		StaticPopup_Show("ItemRackConfirmEventDelete")
 		return
 	end
-	ItemRackEvents[eventName] = nil
+	if ItemRack.DefaultEvents[eventName] then
+		ItemRack.CopyDefaultEvent(eventName)
+	else
+		ItemRackEvents[eventName] = nil
+	end
 	ItemRackOpt.EventSelected = nil
 	ItemRack.CleanupEvents()
 	ItemRackOpt.PopulateEventList()

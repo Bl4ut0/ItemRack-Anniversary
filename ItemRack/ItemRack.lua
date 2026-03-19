@@ -455,10 +455,10 @@ local loader = CreateFrame("Frame",nil, self, BackdropTemplateMixin and "Backdro
 loader:RegisterEvent("PLAYER_LOGIN")
 loader:SetScript("OnEvent", ItemRack.OnPlayerLogin)
 
-function ItemRack.OnCastingStart(self,event,unit)
+function ItemRack.OnCastingStart(self,event,unit,castID)
 	if unit=="player" then
 		if CastingInfo() or ChannelInfo() then
-			ItemRack.NowCasting = true
+			ItemRack.NowCasting = castID or true
 			--If channeled, let's store the spellName to match it up to the UNIT_SPELLCAST_SUCCEEDED event that immediately gets fired after starting.
 			if ChannelInfo() then
 				local spellName = UnitChannelInfo("player")
@@ -470,9 +470,11 @@ function ItemRack.OnCastingStart(self,event,unit)
 	end
 end
 
-function ItemRack.OnCastingStop(self,event,unit)
+function ItemRack.OnCastingStop(self,event,unit,castID)
 	if unit=="player" then
-		if not ItemRack.NowCasting then
+		-- Use castID to ensure we only clear the current cast. 
+		-- If a new cast has already started, its castID will differ.
+		if not ItemRack.NowCasting or (castID and ItemRack.NowCasting ~= castID and ItemRack.NowCasting ~= true) then
 			return
 		else
 			if ItemRack.NowChannelingSpell then
@@ -486,12 +488,20 @@ function ItemRack.OnCastingStop(self,event,unit)
 			
 			ItemRack.NowCasting = nil
 			ItemRack.NowChannelingSpell = nil
-			-- This check is in the event that a successful spellcast puts you in combat
-			if event ~= "UNIT_SPELLCAST_SUCCEEDED" and not ItemRack.inCombat then
-				ItemRack.ProcessCombatQueue()
-			else
-				ItemRack.OnSpellSucceed()
+
+			-- For weapons, we want to try the swap immediately to hit the window between spamming.
+			-- Standard armor swaps can still wait for the 0.1s timer if needed, 
+			-- but ProcessCombatQueue handles both.
+			ItemRack.ProcessCombatQueue()
+
+			-- Re-evaluate event-based sets (buffs, stances, zone, spec) now that casting has stopped
+			if ItemRack.ProcessBuffEvent then
+				ItemRack.ProcessBuffEvent()
 			end
+
+			-- Start the delayed timer to handle race conditions where combat/casting status blips
+			ItemRack.OnSpellSucceed()
+
 			-- Process any sets that were waiting for casting to end
 			if #(ItemRack.SetsWaiting)>0 and not ItemRack.AnythingLocked() then
 				ItemRack.ProcessSetsWaiting()
@@ -510,7 +520,7 @@ function ItemRack.OnSpellSucceed()
 end
 
 function ItemRack.DelayedCombatQueue()
-	if ItemRack.inCombat or ItemRack.NowCasting then
+	if ItemRack.NowCasting then
 		return
 	end
 	ItemRack.ProcessCombatQueue()
@@ -542,7 +552,18 @@ function ItemRack.OnLeavingCombatOrDeath()
 	if ItemRack.NowCasting then
 		return
 	end
+	
+	-- Re-evaluate event-based sets (buffs, stances, zone, spec) now that combat has stopped
+	-- This handles "On Movement" sets that might need to swap based on current speed
+	if ItemRack.ProcessBuffEvent then
+		ItemRack.ProcessBuffEvent()
+	end
+
 	ItemRack.ProcessCombatQueue()
+	
+	-- Also start delayed timer to ensure any race conditions with InCombatLockdown() are caught
+	ItemRack.StartTimer("DelayedCombatQueue")
+
 	-- Process any sets waiting for combat/casting to end
 	if #(ItemRack.SetsWaiting)>0 and not ItemRack.AnythingLocked() then
 		ItemRack.ProcessSetsWaiting()
@@ -551,6 +572,7 @@ end
 
 function ItemRack.ProcessCombatQueue()
 	if not ItemRack.IsPlayerReallyDead() and next(ItemRack.CombatQueue) then
+		local inCombat = InCombatLockdown()
 		local combat = ItemRackUser.Sets["~CombatQueue"].equip
 		local queue = ItemRack.CombatQueue
 		ItemRack.AutoQueueFlag = ItemRack.AutoQueueFlag or {}
@@ -558,18 +580,23 @@ function ItemRack.ProcessCombatQueue()
 			combat[i] = nil
 		end
 		for i in pairs(queue) do
-			-- Skip slots whose auto-queue was disabled after this entry was added
-			if not ItemRack.GetQueuesEnabled()[i] and ItemRack.GetQueues()[i] then
-				queue[i] = nil
-			else
-				combat[i] = queue[i]
-				queue[i] = nil
+			local canSwap = not inCombat or (i >= 16 and i <= 18)
+			if canSwap then
+				-- Skip slots whose auto-queue was disabled after this entry was added
+				if not ItemRack.GetQueuesEnabled()[i] and ItemRack.GetQueues()[i] then
+					queue[i] = nil
+				else
+					combat[i] = queue[i]
+					queue[i] = nil
+				end
+				ItemRack.AutoQueueFlag[i] = nil
 			end
-			ItemRack.AutoQueueFlag[i] = nil
 		end
-		ItemRackUser.Sets["~CombatQueue"].oldset = ItemRack.CombatSet
-		ItemRack.UpdateCombatQueue()
-		ItemRack.EquipSet("~CombatQueue")
+		if next(combat) then
+			ItemRackUser.Sets["~CombatQueue"].oldset = ItemRack.CombatSet
+			ItemRack.UpdateCombatQueue()
+			ItemRack.EquipSet("~CombatQueue")
+		end
 	end
 
 	local inLockdown = InCombatLockdown()
@@ -1086,6 +1113,11 @@ function ItemRack.FindItem(id,lock)
 			return i
 		end
 	end
+	-- if bank is open, search bank
+	if ItemRack.BankOpen then
+		local b,s = ItemRack.FindInBank(id,lock)
+		if b then return nil,b,s end
+	end
 end
 
 -- searches player's bank and returns bag,slot of a specific ItemRack-style ID (62384:0:4041:4041:0:0:0:0:85:146) or the first matching item with the same base id (62384) if specific id not found
@@ -1100,7 +1132,7 @@ function ItemRack.FindInBank(id,lock)
 		for _,i in pairs(ItemRack.BankSlots) do -- try to find an exact match at first
 			if ItemRack.ValidBag(i) then
 				for j=1,GetContainerNumSlots(i) do
-					if id==getid(i,j) and (not lock or locklist[i][j]) then
+					if id==getid(i,j) and (not lock or not locklist[i][j]) then
 						if lock then locklist[i][j]=1 end
 						return i,j
 					end
@@ -1259,6 +1291,18 @@ function ItemRack.PopulateKnownItems()
 			if id~=0 then
 				if IsEquippableItem(ItemRack.GetIRString(id,true)) then --only proceed if this is an equippable item (test against the baseID of the item)
 					known[id] = i*100+j --we were able to generate a valid ID for this item, so store its location (as a bag container offset)
+				end
+			end
+		end
+	end
+	if ItemRack.BankOpen then
+		for _,i in pairs(ItemRack.BankSlots) do
+			if ItemRack.ValidBag(i) then
+				for j=1,GetContainerNumSlots(i) do
+					id = getid(i,j)
+					if id~=0 and IsEquippableItem(ItemRack.GetIRString(id,true)) then
+						known[id] = i*100+j
+					end
 				end
 			end
 		end
@@ -1748,28 +1792,51 @@ function ItemRack.MenuOnClick(self,button)
 			ItemRackMenuFrame:Hide()
 		end
 	elseif ItemRack.menuOpen<20 then
-		if ItemRack.BankOpen and not IsShiftKeyDown() then
-			if ItemRack.GetCountByID(item)==0 then
+		if ItemRack.BankOpen then
+			if IsShiftKeyDown() then
+				local invSlot = ItemRack.menuOpen
 				local bankBag,bankSlot = ItemRack.FindInBank(item)
 				if bankBag then
-					local freeBag,freeSlot = ItemRack.FindSpace()
-					if freeBag and not SpellIsTargeting() and not GetCursorInfo() then
+					if not SpellIsTargeting() and not GetCursorInfo() then
 						PickupContainerItem(bankBag,bankSlot)
-						PickupContainerItem(freeBag,freeSlot)
-					else
-						ItemRack.Print("Not enough room in bags to pull this item from bank.")
-					end
-				end
-			else
-				local bankBag,bankSlot = ItemRack.FindBankSpace()
-				if bankBag then
-					local _,bag,slot = ItemRack.FindItem(item)
-					if bag and not SpellIsTargeting() and not GetCursorInfo() then
-						PickupContainerItem(bag,slot)
+						PickupInventoryItem(invSlot)
 						PickupContainerItem(bankBag,bankSlot)
 					end
 				else
-					ItemRack.Print("Not enough room in bank to put this item.")
+					local _,bag,slot = ItemRack.FindItem(item)
+					local spaceBag,spaceSlot = ItemRack.FindBankSpace()
+					if bag and spaceBag and not SpellIsTargeting() and not GetCursorInfo() then
+						PickupContainerItem(bag,slot)
+						PickupInventoryItem(invSlot)
+						PickupContainerItem(spaceBag,spaceSlot)
+					else
+						ItemRack.EquipItemByID(item,invSlot)
+					end
+				end
+				ItemRackMenuFrame:Hide()
+			else
+				if ItemRack.GetCountByID(item)==0 then
+					local bankBag,bankSlot = ItemRack.FindInBank(item)
+					if bankBag then
+						local freeBag,freeSlot = ItemRack.FindSpace()
+						if freeBag and not SpellIsTargeting() and not GetCursorInfo() then
+							PickupContainerItem(bankBag,bankSlot)
+							PickupContainerItem(freeBag,freeSlot)
+						else
+							ItemRack.Print("Not enough room in bags to pull this item from bank.")
+						end
+					end
+				else
+					local bankBag,bankSlot = ItemRack.FindBankSpace()
+					if bankBag then
+						local _,bag,slot = ItemRack.FindItem(item)
+						if bag and not SpellIsTargeting() and not GetCursorInfo() then
+							PickupContainerItem(bag,slot)
+							PickupContainerItem(bankBag,bankSlot)
+						end
+					else
+						ItemRack.Print("Not enough room in bank to put this item.")
+					end
 				end
 			end
 		else
@@ -1785,11 +1852,15 @@ function ItemRack.MenuOnClick(self,button)
 			ItemRackMenuFrame:Hide()
 		end
 	elseif ItemRack.menuOpen==20 then
-		if ItemRack.BankOpen and not IsShiftKeyDown() then
-			if ItemRack.MissingItems(item)==1 then
-				ItemRack.GetBankedSet(item)
+		if ItemRack.BankOpen then
+			if IsShiftKeyDown() then
+				ItemRack.EquipSet(item)
 			else
-				ItemRack.PutBankedSet(item)
+				if ItemRack.MissingItems(item)==1 then
+					ItemRack.GetBankedSet(item)
+				else
+					ItemRack.PutBankedSet(item)
+				end
 			end
 		elseif ItemRackSettings.EquipToggle=="ON" then
 			ItemRack.ToggleSet(item)
@@ -1856,10 +1927,9 @@ end
 function ItemRack.EquipItemByID(id,slot,isAutoQueue)
 	if not id then return end
 	if ItemRack.NowCasting or (not ItemRack.SlotInfo[slot].swappable and (UnitAffectingCombat("player") or ItemRack.IsPlayerReallyDead()) ) then
-		-- Toggle: if the same item is already queued, un-queue it (manual cancel)
-		if ItemRack.CombatQueue[slot] == id then
-			ItemRack.RemoveFromCombatQueue(slot)
-		else
+		-- If it's already queued, don't toggle it off (which can happen during spamming)
+		-- Exception: if id is 0 (empty slot), we allow the toggle to cancel a pending swap.
+		if ItemRack.CombatQueue[slot] ~= id or id == 0 then
 			ItemRack.AddToCombatQueue(slot,id,isAutoQueue)
 		end
 	elseif not GetCursorInfo() and not SpellIsTargeting() then
@@ -2084,11 +2154,11 @@ function ItemRack.IDTooltip(self,itemID) --itemID is an ItemRack-style ID
 	else --cannot find the item in player's inventory or worn equipment!
 		bag,slot = ItemRack.FindInBank(itemID) --try to find the item in the player's bank IF they currently have the bank frame open
 		if bag then -- item found in player's bank
-			itemID = GetContainerItemLink(bag,slot) -- grab the itemLink from the found item in the player's bank
+			GameTooltip:SetBagItem(bag,slot)
 		else -- item is completely missing (no such strict OR baseID found anywhere): it's not in inventory, bank or worn items
 			itemID = ItemRack.IRStringToItemString(ItemRack.UpdateIRString(itemID)) -- ensure the stored ID is brought up to date, then generate a regular ItemString from it which can be used to display the required tooltip
+			GameTooltip:SetHyperlink(itemID)
 		end
-		GameTooltip:SetHyperlink(itemID)
 	end
 	ItemRack.ShrinkTooltip(self)
 	GameTooltip:Show()
@@ -2119,6 +2189,7 @@ function ItemRack.AnchorTooltip(owner)
 
 	if isCharacterMenuContext then
 		local name = ItemRack.menuDockedTo
+		local isPopoutButton = string.match(ownerName, "^ItemRackMenu%d")
 		local slot
 		for i=0,19 do
 			if name=="Character"..ItemRack.SlotInfo[i].name then
@@ -2127,19 +2198,41 @@ function ItemRack.AnchorTooltip(owner)
 		end
 		
 		if slot then
-			if slot == 0 or (slot >= 16 and slot <= 18) then
-				GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-			elseif slot==1 or slot==2 or slot==3 or slot==15 or slot==5 or slot==4 or slot==19 or slot==9 then
-				if ItemRackSettings.LeftSlotsGoRight == "ON" then
-					GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+			if isPopoutButton then
+				-- Tooltips for items inside the menu:
+				-- We measure physical screen space using EffectiveScale for reliable placement on scaled/ultrawide UIs.
+				local scale = ItemRackMenuFrame:GetEffectiveScale()
+				local right = (ItemRackMenuFrame:GetRight() or 0) * scale
+				local left = (ItemRackMenuFrame:GetLeft() or 0) * scale
+				
+				local spaceRight = GetScreenWidth() - right
+				local spaceLeft = left
+				
+				if spaceRight >= spaceLeft then
+					GameTooltip:SetOwner(ItemRackMenuFrame, "ANCHOR_RIGHT")
 				else
-					GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
+					GameTooltip:SetOwner(ItemRackMenuFrame, "ANCHOR_LEFT")
 				end
+
+				-- Store vertical owner so ApplyTooltipAnchor can reposition the tooltip
+				-- to align with the specific button instead of the top of the menu frame.
+				ItemRack.pendingTooltipVerticalOwner = owner
 			else
-				if ItemRackSettings.RightSlotsGoLeft == "ON" then
-					GameTooltip:SetOwner(owner, "ANCHOR_BOTTOMLEFT")
-				else
+				-- Tooltips for the character sheet slot itself (when hovering the slot while menu is open):
+				if slot == 0 or (slot >= 16 and slot <= 18) then
 					GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+				elseif slot==1 or slot==2 or slot==3 or slot==15 or slot==5 or slot==4 or slot==19 or slot==9 then
+					if ItemRackSettings.LeftSlotsGoRight == "ON" then
+						GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+					else
+						GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
+					end
+				else
+					if ItemRackSettings.RightSlotsGoLeft == "ON" then
+						GameTooltip:SetOwner(owner, "ANCHOR_BOTTOMLEFT")
+					else
+						GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+					end
 				end
 			end
 		else
@@ -2490,10 +2583,19 @@ function ItemRack.ApplyTooltipAnchor()
 	
 	-- Apply the desired anchor
 	GameTooltip:ClearAllPoints()
+	local verticalOwner = ItemRack.pendingTooltipVerticalOwner
 	if anchor == "ANCHOR_RIGHT" then
-		GameTooltip:SetPoint("TOPLEFT", owner, "TOPRIGHT", 0, 0)
+		local yOffset = 0
+		if verticalOwner and verticalOwner:GetTop() and owner:GetTop() then
+			yOffset = verticalOwner:GetTop() - owner:GetTop()
+		end
+		GameTooltip:SetPoint("TOPLEFT", owner, "TOPRIGHT", 0, yOffset)
 	elseif anchor == "ANCHOR_LEFT" then
-		GameTooltip:SetPoint("TOPRIGHT", owner, "TOPLEFT", 0, 0)
+		local yOffset = 0
+		if verticalOwner and verticalOwner:GetTop() and owner:GetTop() then
+			yOffset = verticalOwner:GetTop() - owner:GetTop()
+		end
+		GameTooltip:SetPoint("TOPRIGHT", owner, "TOPLEFT", 0, yOffset)
 	elseif anchor == "ANCHOR_BOTTOMLEFT" then
 		GameTooltip:SetPoint("TOPLEFT", owner, "BOTTOMLEFT", 0, 0)
 	end
@@ -2515,13 +2617,16 @@ function ItemRack.ApplyTooltipAnchor()
 			if overlaps then
 				-- Tooltip overlaps the menu. For horizontal menus, dropping below works.
 				-- For vertical menus (like bottom slots), dropping below covers the menu.
-				-- Push to the left/right depending on screen space.
+				-- Push to the left/right depending on physical screen space availability.
 				GameTooltip:ClearAllPoints()
-				if ItemRackMenuFrame:GetCenter() < GetScreenWidth()/2 then
-					-- Menu is on the left half of the screen, push tooltip to the right of the menu
+				local spaceRight = GetScreenWidth() - mR
+				local spaceLeft = mL
+				
+				if spaceRight >= spaceLeft then
+					-- More space on the right, push tooltip to the right of the menu
 					GameTooltip:SetPoint("TOPLEFT", ItemRackMenuFrame, "TOPRIGHT", 2, 0)
 				else
-					-- Menu is on the right half, push tooltip to the left of the menu
+					-- More space on the left, push tooltip to the left of the menu
 					GameTooltip:SetPoint("TOPRIGHT", ItemRackMenuFrame, "TOPLEFT", -2, 0)
 				end
 			end

@@ -5,6 +5,16 @@ local LoadAddOn = LoadAddOn or (C_AddOns and C_AddOns.LoadAddOn)
 local loadstring = loadstring or load
 local _refreshMountState = 0
 
+-- Compatibility shim for GetSpellInfo (deprecated in 11.0.0, changed in 1.15.0)
+local GetSpellInfo = GetSpellInfo or function(spellID)
+	if not spellID then return nil end
+	local info = C_Spell and C_Spell.GetSpellInfo(spellID)
+	if info then
+		local subtext = C_Spell.GetSpellSubtext and C_Spell.GetSpellSubtext(spellID)
+		return info.name, subtext, info.iconID, info.castTime, info.minRange, info.maxRange, info.spellID
+	end
+end
+
 --[[ Default event definitions
 
 	Events can be one of four types:
@@ -231,6 +241,7 @@ function ItemRack.InitEvents()
 	ItemRack.CreateTimer("CheckForMountedEvents",ItemRack.CheckForMountedEvents,.5,1)
 	ItemRack.CreateTimer("SpecChangeTimer",ItemRack.ProcessSpecializationEvent,0.5,1)
 	ItemRack.CreateTimer("MovementPollingTimer",ItemRack.PollMovement,.2,1)
+	ItemRack.CreateTimer("OnMovementUnequipTimer",ItemRack.ProcessOnMovementUnequip,.5)
 	
 	-- Initialize Event Stack and BaseGear set if missing
 	if not ItemRackUser.EventStack then
@@ -445,8 +456,28 @@ function ItemRack.ProcessingFrameOnEvent(self,event,...)
 		elseif event == "ACTIVE_TALENT_GROUP_CHANGED" and eventType == "Specialization" then
 			ItemRack.StartTimer("SpecChangeTimer")
 		elseif eventType=="Script" and events[eventName].Trigger==event then
-			local method = loadstring(events[eventName].Script)
-			pcall(method, ...)
+			local a1,a2,a3,a4,a5,a6,a7,a8,a9,a10 = ...
+			-- Compatibility for UNIT_SPELLCAST_* changes in 1.15.0+ / 10.0+
+			-- If arg2 is a castGUID (starts with "Cast-") and arg3 is a spellID, resolve name to arg2
+			if event:match("^UNIT_SPELLCAST_") and type(a2)=="string" and a2:match("^Cast%-") then
+				local spellID = a3
+				if spellID then
+					local name, subtext = GetSpellInfo(spellID)
+					if name then
+						if subtext and subtext ~= "" then
+							a2 = name .. "(" .. subtext .. ")"
+						else
+							a2 = name
+						end
+					end
+				end
+			end
+			-- Compatibility for COMBAT_LOG_EVENT_UNFILTERED changes in 8.0+ / 1.13+
+			if event == "COMBAT_LOG_EVENT_UNFILTERED" then
+				a1,a2,a3,a4,a5,a6,a7,a8,a9,a10 = CombatLogGetCurrentEventInfo()
+			end
+			local method = loadstring("local event,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10 = ...;" .. events[eventName].Script)
+			pcall(method,event,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10)
 		end
 	end
 	if startStance then
@@ -767,6 +798,26 @@ function ItemRack.CheckForMountedEvents()
 	end
 end
 
+-- Debounced OnMovement unequip callback. Fires 0.5s after the player stops moving.
+-- If they started moving again within that window, PendingOnMovementUnequip was cleared
+-- and this function does nothing.
+function ItemRack.ProcessOnMovementUnequip()
+	local eventName = ItemRack.PendingOnMovementUnequip
+	ItemRack.PendingOnMovementUnequip = nil
+	if not eventName then return end
+
+	local events = ItemRackEvents
+	if not events[eventName] then return end
+
+	-- Double-check: only unequip if the player is truly not moving
+	if GetUnitSpeed("player") > 0 then return end
+
+	if events[eventName].Active then
+		ItemRack.PopEvent(eventName)
+		events[eventName].Active = nil
+	end
+end
+
 function ItemRack.ProcessBuffEvent()
 	local enabled = ItemRackUser.Events.Enabled
 	local events = ItemRackEvents
@@ -814,6 +865,12 @@ function ItemRack.ProcessBuffEvent()
 				-- This prevents spamming EquipSet if IsSetEquipped returns false (e.g. due to API bugs or manual swaps)
 				-- And ensures UnequipSet triggers even if the set is only partially equipped
 				if buff then
+					-- Player is moving (or buff active for non-movement events).
+					-- Cancel any pending OnMovement unequip since we're moving again.
+					if events[eventName].OnMovement and ItemRack.PendingOnMovementUnequip == eventName then
+						ItemRack.PendingOnMovementUnequip = nil
+						ItemRack.StopTimer("OnMovementUnequipTimer")
+					end
 					if not events[eventName].Active then
 						if not isSetEquipped then
 							ItemRack.PushEvent(eventName)
@@ -829,6 +886,14 @@ function ItemRack.ProcessBuffEvent()
 							-- or aura flicker — not an intentional stop.
 							if events[eventName].OnMovement and underlyingBuff and inZoneTransition then
 								-- Suppress: still mounted, zone boundary artifact. Do nothing.
+							elseif events[eventName].OnMovement and underlyingBuff then
+								-- OnMovement debounce: delay the unequip by 0.5s.
+								-- If the player starts moving again within that window, the
+								-- timer is cancelled above and no swap occurs.
+								if not ItemRack.PendingOnMovementUnequip then
+									ItemRack.PendingOnMovementUnequip = eventName
+									ItemRack.StartTimer("OnMovementUnequipTimer")
+								end
 							else
 								ItemRack.PopEvent(eventName)
 								events[eventName].Active = nil

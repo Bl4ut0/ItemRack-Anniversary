@@ -158,7 +158,7 @@ function ItemRack.EquipSet(setname, disableSound)
 		ItemRack.Print("Set \""..tostring(setname).."\" doesn't exist.")
 		return
 	end
-	if ItemRack.NowCasting or ItemRack.AnythingLocked() then
+	if ItemRack.AnythingLocked() then
 		-- a swap is in progress, add this set to the wait list and leave
 		ItemRack.AddSetToSetsWaiting(setname,ItemRack.EquipSet, disableSound)
 		return
@@ -204,17 +204,22 @@ function ItemRack.EquipSet(setname, disableSound)
 		set.oldset = ItemRackUser.CurrentSet
 	end
 
-	-- if in combat or dead, combat queue items wanting to equip and only let swappables through
-	if UnitAffectingCombat("player") or ItemRack.IsPlayerReallyDead() then
+	-- if in combat, dead, or casting, combat queue items wanting to equip and only let swappables through
+	if UnitAffectingCombat("player") or ItemRack.IsPlayerReallyDead() or ItemRack.NowCasting then
 		for i in pairs(swap) do
-			ItemRack.AddToCombatQueue(i,swap[i])
-			-- print("Combat queue "..ItemRack.GetInfoByID(swap[i]))
-			swap[i] = nil
-			if set.old then
-				set.old[i] = ItemRack.GetID(i)
-				ItemRack.CombatSet = setname
-			elseif set.oldset then
-				ItemRack.CombatSet = set.oldset
+			local isWeapon = (i >= 16 and i <= 18)
+			-- If casting, NOTHING can be swapped immediately.
+			-- If in combat, only weapons can be swapped immediately.
+			if ItemRack.NowCasting or not isWeapon then
+				ItemRack.AddToCombatQueue(i,swap[i])
+				-- print("Combat queue "..ItemRack.GetInfoByID(swap[i]))
+				swap[i] = nil
+				if set.old then
+					set.old[i] = ItemRack.GetID(i)
+					ItemRack.CombatSet = setname
+				elseif set.oldset then
+					ItemRack.CombatSet = set.oldset
+				end
 			end
 		end
 	end
