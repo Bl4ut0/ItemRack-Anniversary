@@ -170,7 +170,7 @@ function ItemRack.EquipSet(setname, disableSound)
 	end
 	local inv,bag,slot
 	local couldntFind
-	local inCombat = UnitAffectingCombat("player")
+	local inCombat = InCombatLockdown()
 	local isInternalSet = setname and string.sub(setname, 1, 1) == "~" -- Internal sets like ~Unequip, ~CombatQueue, ~DualWieldRetry
 	
 	for i in pairs(set.equip) do
@@ -204,22 +204,17 @@ function ItemRack.EquipSet(setname, disableSound)
 		set.oldset = ItemRackUser.CurrentSet
 	end
 
-	-- if in combat, dead, or casting, combat queue items wanting to equip and only let swappables through
-	if UnitAffectingCombat("player") or ItemRack.IsPlayerReallyDead() or ItemRack.NowCasting then
+	-- if in combat, dead, or casting, queue ALL items for later
+	-- PickupInventoryItem is blocked by the game during InCombatLockdown() for all items including weapons
+	if InCombatLockdown() or ItemRack.IsPlayerReallyDead() or ItemRack.NowCasting then
 		for i in pairs(swap) do
-			local isWeapon = (i >= 16 and i <= 18)
-			-- If casting, NOTHING can be swapped immediately.
-			-- If in combat, only weapons can be swapped immediately.
-			if ItemRack.NowCasting or not isWeapon then
-				ItemRack.AddToCombatQueue(i,swap[i])
-				-- print("Combat queue "..ItemRack.GetInfoByID(swap[i]))
-				swap[i] = nil
-				if set.old then
-					set.old[i] = ItemRack.GetID(i)
-					ItemRack.CombatSet = setname
-				elseif set.oldset then
-					ItemRack.CombatSet = set.oldset
-				end
+			ItemRack.AddToCombatQueue(i,swap[i])
+			swap[i] = nil
+			if set.old then
+				set.old[i] = ItemRack.GetID(i)
+				ItemRack.CombatSet = setname
+			elseif set.oldset then
+				ItemRack.CombatSet = set.oldset
 			end
 		end
 	end
@@ -249,6 +244,21 @@ function ItemRack.EquipSet(setname, disableSound)
 	if not next(swap) then
 		ItemRack.EndSetSwap(setname)
 		return -- leave if swap completed on first pass
+	end
+
+	-- If we're in combat and weapon swaps failed (e.g. cursor issue), move remaining
+	-- items to CombatQueue instead of entering SetSwapping wait state, which can get
+	-- stuck. The CombatQueue will process them cleanly when combat ends.
+	if InCombatLockdown() then
+		for i in pairs(swap) do
+			ItemRack.AddToCombatQueue(i, swap[i])
+			if set.old then
+				set.old[i] = ItemRack.GetID(i)
+				ItemRack.CombatSet = setname
+			end
+			swap[i] = nil
+		end
+		return
 	end
 
 	-- a second pass is needed. ItemRack.SwapList (swap) has the list of remaining items to swap.
@@ -376,7 +386,9 @@ function ItemRack.IterateSwapList(setname, disableSound)
 						set.old[i] = ItemRack.GetID(i)
 					end
 					ItemRack.MoveItem(i,nil,bag,slot) -- empty slot
-					swap[k] = nil
+					if not ItemRack.AbortSwap then
+						swap[k] = nil
+					end
 				else
 					ItemRack.AbortSwap = 1
 					return
@@ -406,16 +418,22 @@ function ItemRack.IterateSwapList(setname, disableSound)
 								ItemRack.AbortSwap=1
 							end
 						end
-						ItemRack.MoveItem(bag,slot,16,nil)
-						swap[k] = nil
-						swap[k+1] = nil -- fix by Romracer
+						if not ItemRack.AbortSwap then
+							ItemRack.MoveItem(bag,slot,16,nil)
+						end
+						if not ItemRack.AbortSwap then
+							swap[k] = nil
+							swap[k+1] = nil -- fix by Romracer
+						end
 						skip = 1
 					else
 						if set.old then
 							set.old[i] = ItemRack.GetID(i)
 						end
 						ItemRack.MoveItem(bag,slot,i,nil)
-						swap[k] = nil
+						if not ItemRack.AbortSwap then
+							swap[k] = nil
+						end
 					end
 				elseif inv==(i+1) and ItemRack.SameID(swap[k+1],ItemRack.GetID(i)) then
 					-- item is in other slot and other slot wants to go to this one
@@ -424,15 +442,22 @@ function ItemRack.IterateSwapList(setname, disableSound)
 						set.old[i+1] = ItemRack.GetID(i+1)
 					end
 					ItemRack.MoveItem(i,nil,i+1,nil)
-					swap[k] = nil
-					swap[k+1] = nil
+					if not ItemRack.AbortSwap then
+						swap[k] = nil
+						swap[k+1] = nil
+					end
 					skip = 1
 				end
 			end
 		end
 	end
-	if ItemRack.AbortSwap then
+	if ItemRack.AbortSwap and not InCombatLockdown() then
 		ItemRack.Print("Swap stopped. "..(ItemRack.AbortReasons[ItemRack.AbortSwap] or ""))
+	end
+	-- Safety: if cursor still has an item from a partial swap, clear it so it doesn't
+	-- block subsequent swaps. ClearCursor() returns the item to its original location.
+	if CursorHasItem() then
+		ClearCursor()
 	end
 	-- CVar fallback restore
 	if overrideSound then
@@ -499,22 +524,29 @@ end
 
 -- moves an item from bag,slot to bag,slot (slot is nil for bag=inv)
 function ItemRack.MoveItem(fromBag,fromSlot,toBag,toSlot)
+	local destSlot = toSlot and "bag" or toBag -- for debug: which inv slot is the target
 	local abort
 	if CursorHasItem() then
 		abort = 2
+		ItemRack.Debug("CombatQueue", "MoveItem ABORT=2 (CursorHasItem) dest="..tostring(destSlot))
 	elseif SpellIsTargeting() then
 		abort = 3
+		ItemRack.Debug("CombatQueue", "MoveItem ABORT=3 (SpellIsTargeting) dest="..tostring(destSlot))
 	elseif not fromSlot and ItemRack.PhantomItem[GetInventoryItemID("player",fromBag) or 1] then
+		ItemRack.Debug("CombatQueue", "MoveItem SKIP (PhantomItem) dest="..tostring(destSlot))
 		return  -- oscarucb: ignore swap requests on slots containing "phantom" artifact items
 	elseif (not fromSlot and IsInventoryItemLocked(fromBag)) or (not toSlot and IsInventoryItemLocked(toBag)) then
 		abort = 4
+		ItemRack.Debug("CombatQueue", "MoveItem ABORT=4 (InventoryItemLocked) dest="..tostring(destSlot).." fromLocked="..tostring(not fromSlot and IsInventoryItemLocked(fromBag)).." toLocked="..tostring(not toSlot and IsInventoryItemLocked(toBag)))
 	elseif (fromSlot and select(3,GetContainerItemInfo(fromBag,fromSlot))) or (toSlot and select(3,GetContainerItemInfo(toBag,toSlot))) then
 		abort = 4
+		ItemRack.Debug("CombatQueue", "MoveItem ABORT=4 (ContainerItemLocked) dest="..tostring(destSlot))
 	end
 	if abort then
 		ItemRack.AbortSwap = abort
 		return
 	else
+		ItemRack.Debug("CombatQueue", "MoveItem ATTEMPT from=("..tostring(fromBag)..","..tostring(fromSlot)..") to=("..tostring(toBag)..","..tostring(toSlot)..") combat="..tostring(InCombatLockdown()))
 		if fromSlot then
 			PickupContainerItem(fromBag,fromSlot)
 		else
@@ -527,6 +559,16 @@ function ItemRack.MoveItem(fromBag,fromSlot,toBag,toSlot)
 				toBag = INVSLOT_RANGED
 			end
 			PickupInventoryItem(toBag)
+		end
+		-- Post-swap safety: if cursor still has an item, the target pickup was
+		-- blocked (e.g. by combat timing, GCD, animation). Return the item to
+		-- its source immediately so nothing gets stuck on the cursor.
+		if CursorHasItem() then
+			ItemRack.Debug("CombatQueue", "MoveItem POST-SWAP FAIL: cursor still has item after swap to dest="..tostring(destSlot)..". ClearCursor called.")
+			ClearCursor()
+			ItemRack.AbortSwap = 4
+		else
+			ItemRack.Debug("CombatQueue", "MoveItem SUCCESS dest="..tostring(destSlot))
 		end
 	end
 end

@@ -533,6 +533,25 @@ end
 function ItemRack.OnUnitInventoryChanged(self,event,unit)
 	if unit=="player" then
 		ItemRack.UpdateButtons()
+		-- Clear any CombatQueue entries that have been fulfilled by the swap
+		if next(ItemRack.CombatQueue) then
+			ItemRack.Debug("CombatQueue", "OnUnitInventoryChanged: checking CombatQueue entries")
+			local dirty = false
+			for slot, queuedID in pairs(ItemRack.CombatQueue) do
+				local equippedID = ItemRack.GetID(slot)
+				local match = equippedID and queuedID and ItemRack.SameID(equippedID, queuedID)
+				ItemRack.Debug("CombatQueue", "  slot="..tostring(slot).." queued="..tostring(queuedID).." equipped="..tostring(equippedID).." match="..tostring(match))
+				if match then
+					ItemRack.CombatQueue[slot] = nil
+					if ItemRack.AutoQueueFlag then ItemRack.AutoQueueFlag[slot] = nil end
+					dirty = true
+				end
+			end
+			if dirty then
+				ItemRack.Debug("CombatQueue", "OnUnitInventoryChanged: cleared fulfilled entries")
+				ItemRack.UpdateCombatQueue()
+			end
+		end
 		if ItemRackMenuFrame:IsVisible() then
 			ItemRack.BuildMenu()
 		end
@@ -571,8 +590,14 @@ function ItemRack.OnLeavingCombatOrDeath()
 end
 
 function ItemRack.ProcessCombatQueue()
+	-- Safety: clear any items stuck on the cursor from previous partial swaps
+	if CursorHasItem() then
+		ClearCursor()
+	end
 	if not ItemRack.IsPlayerReallyDead() and next(ItemRack.CombatQueue) then
 		local inCombat = InCombatLockdown()
+		local unitCombat = UnitAffectingCombat("player")
+		ItemRack.Debug("CombatQueue", "ProcessCombatQueue: InCombatLockdown="..tostring(inCombat).." UnitAffectingCombat="..tostring(unitCombat))
 		local combat = ItemRackUser.Sets["~CombatQueue"].equip
 		local queue = ItemRack.CombatQueue
 		ItemRack.AutoQueueFlag = ItemRack.AutoQueueFlag or {}
@@ -580,7 +605,8 @@ function ItemRack.ProcessCombatQueue()
 			combat[i] = nil
 		end
 		for i in pairs(queue) do
-			local canSwap = not inCombat or (i >= 16 and i <= 18)
+			local canSwap = not inCombat
+			ItemRack.Debug("CombatQueue", "  ProcessCQ slot="..tostring(i).." canSwap="..tostring(canSwap))
 			if canSwap then
 				-- Skip slots whose auto-queue was disabled after this entry was added
 				if not ItemRack.GetQueuesEnabled()[i] and ItemRack.GetQueues()[i] then
@@ -598,6 +624,10 @@ function ItemRack.ProcessCombatQueue()
 			ItemRack.EquipSet("~CombatQueue")
 		end
 	end
+
+	-- Always update overlay indicators, even if queue was empty or already processed
+	-- by a different path (e.g. PopEvent → EquipSet), to clear stale overlays
+	ItemRack.UpdateCombatQueue()
 
 	local inLockdown = InCombatLockdown()
 	if not inLockdown then
@@ -1926,7 +1956,7 @@ end
 
 function ItemRack.EquipItemByID(id,slot,isAutoQueue)
 	if not id then return end
-	if ItemRack.NowCasting or (not ItemRack.SlotInfo[slot].swappable and (UnitAffectingCombat("player") or ItemRack.IsPlayerReallyDead()) ) then
+	if ItemRack.NowCasting or InCombatLockdown() or ItemRack.IsPlayerReallyDead() then
 		-- If it's already queued, don't toggle it off (which can happen during spamming)
 		-- Exception: if id is 0 (empty slot), we allow the toggle to cancel a pending swap.
 		if ItemRack.CombatQueue[slot] ~= id or id == 0 then
@@ -2056,10 +2086,22 @@ function ItemRack.IsPlayerReallyDead()
 end
 
 function ItemRack.AddToCombatQueue(slot,id,isAutoQueue)
+	-- Skip if the item is already equipped (prevents oscillation from ID format mismatches
+	-- where strict ~= in EquipSet sees a difference but SameID correctly matches)
+	if id and id ~= 0 then
+		local equippedID = ItemRack.GetID(slot)
+		if equippedID and ItemRack.SameID(equippedID, id) then
+			return
+		end
+	end
 	if ItemRack.CombatQueue[slot] ~= id then
 		ItemRack.CombatQueue[slot] = id
 		ItemRack.AutoQueueFlag = ItemRack.AutoQueueFlag or {}
 		ItemRack.AutoQueueFlag[slot] = isAutoQueue
+		-- Debug: trace who is adding to CombatQueue
+		local itemName = id and id ~= 0 and (ItemRack.GetInfoByID(id) or tostring(id)) or "empty"
+		ItemRack.Debug("CombatQueue", "AddToCombatQueue slot="..tostring(slot).." item="..tostring(itemName).." auto="..tostring(isAutoQueue))
+		ItemRack.Debug("CombatQueue", "stack: "..debugstack(2,4,0))
 		ItemRack.UpdateCombatQueue()
 	end
 end
@@ -2073,6 +2115,16 @@ function ItemRack.RemoveFromCombatQueue(slot)
 end
 
 function ItemRack.UpdateCombatQueue()
+	-- Clean up stale entries: if the queued item is already equipped, remove it
+	for slot, queuedID in pairs(ItemRack.CombatQueue) do
+		if queuedID and queuedID ~= 0 then
+			local equippedID = ItemRack.GetID(slot)
+			if equippedID and ItemRack.SameID(equippedID, queuedID) then
+				ItemRack.CombatQueue[slot] = nil
+				if ItemRack.AutoQueueFlag then ItemRack.AutoQueueFlag[slot] = nil end
+			end
+		end
+	end
 	local queue,id
 	for i in pairs(ItemRackUser.Buttons) do
 		queue = _G["ItemRackButton"..i.."Queue"]

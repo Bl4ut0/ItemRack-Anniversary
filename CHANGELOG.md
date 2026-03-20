@@ -2,6 +2,21 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.33] - 2026-03-20
+### Bug Fixes
+- **Weapons Stuck on Cursor in Combat**: `MoveItem` now verifies cursor state after each swap attempt. If the game blocks `PickupInventoryItem` (e.g. during combat lockdown), the item is immediately returned via `ClearCursor()` instead of being left stuck on the cursor. Prevents the "Swap stopped. Something is on the cursor." spam.
+- **Failed Swaps Losing Items**: `IterateSwapList` no longer removes items from the swap list when `MoveItem` fails. Failed items now stay in the swap list and properly fall through to the CombatQueue fallback instead of being silently dropped.
+- **Stale Pending Swap Indicator**: Fixed the pending swap overlay icon persisting after gear had already been swapped:
+  - `AddToCombatQueue` now checks `SameID` against the currently equipped item, preventing items that are already equipped from being queued.
+  - `UpdateCombatQueue` sweeps stale entries (where queued item matches equipped) before rendering overlays.
+  - `ProcessCombatQueue` now always refreshes overlay indicators at the end, even when the queue was already processed by a different path.
+  - `OnUnitInventoryChanged` sweeps the CombatQueue after every gear change, clearing entries where the queued item matches what's actually equipped.
+- **Combat API Race Condition**: `EquipSet` and `EquipItemByID` used `UnitAffectingCombat()` to decide whether to queue swaps, but `ProcessCombatQueue` used `InCombatLockdown()` to decide when to process them. Both now consistently use `InCombatLockdown()`.
+- **Partial Swap Cursor Cleanup**: `IterateSwapList` now calls `ClearCursor()` after the swap loop if an item is stuck on the cursor from a partial swap. Additionally, if swaps fail during combat, remaining items are moved to CombatQueue instead of entering the `SetSwapping` wait state.
+
+### Improvements
+- **CombatQueue Debug Tag**: Added `CombatQueue` to the debug tag system for diagnosing swap queue issues. Enable with `/script ItemRack.DebugTags.CombatQueue = true`.
+
 ## [4.32] - 2026-03-16
 ### Bug Fixes
 - **Tooltip Ultrawide Overlap**: Fixed a bug where tooltips would overlap popout menus on ultrawide monitors or at low UI scales. Tooltips for popout menu items now anchor to the entire menu frame (instead of individual buttons) and intelligently deploy to the left or right side based on physical screen space availability rather than naive center-screen heuristics.
