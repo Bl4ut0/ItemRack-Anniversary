@@ -390,6 +390,7 @@ end
 
 function ItemRack.PushEvent(eventName)
 	if ItemRackUser.EnableEvents == "OFF" then return end
+	ItemRack.Debug("Events", "PushEvent: "..(eventName or "nil"))
 	
 	-- Remove event if it's already in the stack
 	for i = #ItemRackUser.EventStack, 1, -1 do
@@ -410,6 +411,7 @@ end
 function ItemRack.PopEvent(eventName)
 	local poppedSet = ItemRackUser.Events.Set[eventName]
 	local disableSound = ItemRackEvents[eventName] and ItemRackEvents[eventName].DisableSound
+	ItemRack.Debug("Events", "PopEvent: "..(eventName or "nil").." (poppedSet: "..(poppedSet or "nil")..")")
 
 	-- Remove the event from the stack
 	for i = #ItemRackUser.EventStack, 1, -1 do
@@ -809,8 +811,11 @@ function ItemRack.ProcessOnMovementUnequip()
 	local events = ItemRackEvents
 	if not events[eventName] then return end
 
+	local speed = GetUnitSpeed("player")
+	ItemRack.Debug("Events", "ProcessOnMovementUnequip ("..eventName.."): speed="..tostring(speed).." active="..tostring(events[eventName].Active))
+
 	-- Double-check: only unequip if the player is truly not moving
-	if GetUnitSpeed("player") > 0 then return end
+	if speed > 0 then return end
 
 	if events[eventName].Active then
 		ItemRack.PopEvent(eventName)
@@ -860,6 +865,10 @@ function ItemRack.ProcessBuffEvent()
 				end
 				setname = ItemRackUser.Events.Set[eventName]
 				isSetEquipped = ItemRack.IsSetEquipped(setname)
+				
+				if events[eventName].OnMovement then
+					ItemRack.Debug("Events", "ProcessBuffEvent checking "..(eventName or "nil")..": moving="..tostring(GetUnitSpeed("player") > 0).." underlyingBuff="..tostring(underlyingBuff).." isSetEquipped="..tostring(isSetEquipped).." active="..tostring(events[eventName].Active))
+				end
 				
 				-- Use .Active to track if we've already handled this event
 				-- This prevents spamming EquipSet if IsSetEquipped returns false (e.g. due to API bugs or manual swaps)

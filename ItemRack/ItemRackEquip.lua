@@ -174,17 +174,19 @@ function ItemRack.EquipSet(setname, disableSound)
 	local isInternalSet = setname and string.sub(setname, 1, 1) == "~" -- Internal sets like ~Unequip, ~CombatQueue, ~DualWieldRetry
 	
 	for i in pairs(set.equip) do
-		if ItemRack.GetID(i)~=set.equip[i] then -- if intended item is not worn (exact match)
-			inv,bag,slot = ItemRack.FindItem(set.equip[i])
-			if not inv and not bag then
-				-- if not found at all, then start/add to list of items not found
-				-- Suppress these messages during combat or for internal sets (they're noise)
-				if not inCombat and not isInternalSet then
-					couldntFind = couldntFind or "Could not find: "
-					couldntFind = couldntFind.."["..tostring(ItemRack.GetInfoByID(set.equip[i])).."] "
+		if type(i) == "number" then
+			if ItemRack.GetID(i)~=set.equip[i] then -- if intended item is not worn (exact match)
+				inv,bag,slot = ItemRack.FindItem(set.equip[i])
+				if not inv and not bag then
+					-- if not found at all, then start/add to list of items not found
+					-- Suppress these messages during combat or for internal sets (they're noise)
+					if not inCombat and not isInternalSet then
+						couldntFind = couldntFind or "Could not find: "
+						couldntFind = couldntFind.."["..tostring(ItemRack.GetInfoByID(set.equip[i])).."] "
+					end
+				elseif inv~=i then -- and finding intended item doesn't point to worn
+					swap[i] = set.equip[i] -- then note this item for a swap
 				end
-			elseif inv~=i then -- and finding intended item doesn't point to worn
-				swap[i] = set.equip[i] -- then note this item for a swap
 			end
 		end
 	end
@@ -585,40 +587,42 @@ function ItemRack.IsSetEquipped(setname,exact)
 		
 		local anyChecked = false
 		for i in pairs(set) do
-			anyChecked = true
-			id = ItemRack.GetID(i)
-			local match = false
-			
-			if (exact and set[i]==id) or (not exact and same(set[i],id)) then
-				match = true
-			elseif not exact then
-				-- Try cross-slot check for Rings (11/12)
-				if (i==11 or i==12) and check11_12 then
-					local otherID = ItemRack.GetID(i==11 and 12 or 11)
-					if same(set[i], otherID) then match = true end
-				-- Try cross-slot check for Trinkets (13/14)
-				elseif (i==13 or i==14) and check13_14 then
-					local otherID = ItemRack.GetID(i==13 and 14 or 13)
-					if same(set[i], otherID) then match = true end
-				end
-			end
-			
-			-- If the slot has a queue, we need to verify that the equipped item is the queue's active item
-			local list = set.Queues
-			if list and #list > 0 then
-				if match then
-					local baseID = ItemRack.GetIRString(GetInventoryItemLink("player",slot),true,true)
-					local start,duration,enable = GetInventoryItemCooldown("player",slot)
-					local ready = ItemRack.ItemNearReady(baseID)
-					local active = ItemRack.AutoQueueItemToEquip(i, baseID, enable, ready)
-					if active and not same(active, id) then
-						match = false   -- Auto Queue would swap to a different item
+			if type(i) == "number" then
+				anyChecked = true
+				id = ItemRack.GetID(i)
+				local match = false
+				
+				if (exact and set[i]==id) or (not exact and same(set[i],id)) then
+					match = true
+				elseif not exact then
+					-- Try cross-slot check for Rings (11/12)
+					if (i==11 or i==12) and check11_12 then
+						local otherID = ItemRack.GetID(i==11 and 12 or 11)
+						if same(set[i], otherID) then match = true end
+					-- Try cross-slot check for Trinkets (13/14)
+					elseif (i==13 or i==14) and check13_14 then
+						local otherID = ItemRack.GetID(i==13 and 14 or 13)
+						if same(set[i], otherID) then match = true end
 					end
-					-- if active is nil, no swap would occur → keep match as is
 				end
+				
+				-- If the slot has a queue, we need to verify that the equipped item is the queue's active item
+				local list = set.Queues
+				if list and #list > 0 then
+					if match then
+						local baseID = ItemRack.GetIRString(GetInventoryItemLink("player",i),true,true)
+						local start,duration,enable = GetInventoryItemCooldown("player",i)
+						local ready = ItemRack.ItemNearReady(baseID)
+						local active = ItemRack.AutoQueueItemToEquip(i, baseID, enable, ready)
+						if active and not same(active, id) then
+							match = false   -- Auto Queue would swap to a different item
+						end
+						-- if active is nil, no swap would occur → keep match as is
+					end
+				end
+				
+				if not match then return false end
 			end
-			
-			if not match then return false end
 		end
 		
 		return anyChecked
@@ -650,7 +654,9 @@ function ItemRack.UnequipSet(setname, disableSound)
 			unequip[i] = nil
 		end
 		for i in pairs(old) do
-			unequip[i] = old[i]
+			if type(i) == "number" then
+				unequip[i] = old[i]
+			end
 		end
 		
 		if parentSet then

@@ -738,16 +738,31 @@ do
 			data[name] = nil
 		end
 		tooltip:Show()
-		-- Re-apply our desired anchor position. tooltip:Show() recalculates layout
-		-- and snaps back to the original Blizzard anchor, undoing any repositioning
-		-- we did in PaperDollItemSlotButton_OnEnter.
-		ItemRack.ApplyTooltipAnchor()
 	end
 end
 
 function ItemRack.InitCore()
 	ItemRackUser.Sets["~Unequip"] = { equip={} }
 	ItemRackUser.Sets["~CombatQueue"] = { equip={} }
+
+	-- Sterilize SavedVariables: Remove non-numeric keys from .equip and .old tables
+	-- This prevents fatal WoW API crashes if string keys like "Queues" were injected by earlier versions
+	for setname, set in pairs(ItemRackUser.Sets) do
+		if set.equip then
+			for k in pairs(set.equip) do
+				if type(k) ~= "number" then
+					set.equip[k] = nil
+				end
+			end
+		end
+		if set.old then
+			for k in pairs(set.old) do
+				if type(k) ~= "number" then
+					set.old[k] = nil
+				end
+			end
+		end
+	end
 
 	ItemRack.UpdateClassSpecificStuff()
 
@@ -2566,25 +2581,28 @@ function PaperDollItemSlotButton_OnEnter(self)
 	if isMenuOpen and slot then
 		local desiredOwner, desiredAnchor
 		
+		local menuOnRight = (ItemRackMenuFrame:GetLeft() or 0) >= (self:GetLeft() or 0)
+		
 		if slot == 0 or (slot >= 16 and slot <= 18) then
 			-- Bottom slots: menu goes down. Tooltip to the right is fine.
 			desiredOwner = self
 			desiredAnchor = "ANCHOR_RIGHT"
-		elseif slot==1 or slot==2 or slot==3 or slot==15 or slot==5 or slot==4 or slot==19 or slot==9 then
-			if ItemRackSettings.LeftSlotsGoRight == "ON" then
-				desiredOwner = ItemRackMenuFrame
-				desiredAnchor = "ANCHOR_RIGHT"
-			else
-				desiredOwner = self
-				desiredAnchor = "ANCHOR_RIGHT"
-			end
 		else
-			if ItemRackSettings.RightSlotsGoLeft == "ON" then
-				desiredOwner = self
-				desiredAnchor = "ANCHOR_BOTTOMLEFT"
+			if menuOnRight then
+				-- Menu rendered to the right. Tooltip should go left (if room) or chain to the right of the menu.
+				if slot==1 or slot==2 or slot==3 or slot==15 or slot==5 or slot==4 or slot==19 or slot==9 then
+					-- Left side slots: No room on the left, chain to the right of the menu
+					desiredOwner = ItemRackMenuFrame
+					desiredAnchor = "ANCHOR_RIGHT"
+				else
+					-- Right side slots: Abundant room on the left (over character model)
+					desiredOwner = self
+					desiredAnchor = "ANCHOR_LEFT"
+				end
 			else
+				-- Menu rendered to the left. Tooltip should go right.
 				desiredOwner = self
-				desiredAnchor = "ANCHOR_LEFT"
+				desiredAnchor = "ANCHOR_RIGHT"
 			end
 		end
 		
@@ -2651,40 +2669,22 @@ function ItemRack.ApplyTooltipAnchor()
 	elseif anchor == "ANCHOR_BOTTOMLEFT" then
 		GameTooltip:SetPoint("TOPLEFT", owner, "BOTTOMLEFT", 0, 0)
 	end
-	
-	-- Check if the positioned tooltip overlaps the menu (e.g. wide tooltip with ANCHOR_LEFT).
-	-- If so, fall back to positioning below or above the menu to keep buttons accessible.
-	if ItemRackMenuFrame:IsVisible() then
-		local ttL = GameTooltip:GetLeft()
-		local ttR = GameTooltip:GetRight()
-		local ttT = GameTooltip:GetTop()
-		local ttB = GameTooltip:GetBottom()
-		local mL = ItemRackMenuFrame:GetLeft()
-		local mR = ItemRackMenuFrame:GetRight()
-		local mT = ItemRackMenuFrame:GetTop()
-		local mB = ItemRackMenuFrame:GetBottom()
-		
-		if ttL and ttR and ttT and ttB and mL and mR and mT and mB then
-			local overlaps = not (ttR < mL or ttL > mR or ttB > mT or ttT < mB)
-			if overlaps then
-				-- Tooltip overlaps the menu. For horizontal menus, dropping below works.
-				-- For vertical menus (like bottom slots), dropping below covers the menu.
-				-- Push to the left/right depending on physical screen space availability.
-				GameTooltip:ClearAllPoints()
-				local spaceRight = GetScreenWidth() - mR
-				local spaceLeft = mL
-				
-				if spaceRight >= spaceLeft then
-					-- More space on the right, push tooltip to the right of the menu
-					GameTooltip:SetPoint("TOPLEFT", ItemRackMenuFrame, "TOPRIGHT", 2, 0)
-				else
-					-- More space on the left, push tooltip to the left of the menu
-					GameTooltip:SetPoint("TOPRIGHT", ItemRackMenuFrame, "TOPLEFT", -2, 0)
-				end
-			end
-		end
-	end
 end
+
+-- Secure hook to prevent asynchronous addons from ripping the tooltip off our custom Anchor.
+-- Every time GameTooltip:Show() natively resets to SetOwner, we instantly snap it back.
+hooksecurefunc(GameTooltip, "Show", function(self)
+	if ItemRack.pendingTooltipAnchor and ItemRack.pendingTooltipOwner and ItemRackMenuFrame:IsVisible() then
+		ItemRack.ApplyTooltipAnchor()
+	end
+end)
+
+-- Clear the pending anchor immediately when the tooltip natively vanishes,
+-- preventing our custom override from randomly hijacking completely unrelated tooltips.
+GameTooltip:HookScript("OnHide", function()
+	ItemRack.pendingTooltipAnchor = nil
+	ItemRack.pendingTooltipOwner = nil
+end)
 
 function ItemRack.DockMenuToCharacterSheet(self)
 	local name = self:GetName()

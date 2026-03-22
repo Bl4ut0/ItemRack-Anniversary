@@ -39,13 +39,28 @@ function ItemRack.GetNextItemInQueue(slot)
 	local baseID = ItemRack.GetIRString(GetInventoryItemLink("player",slot),true,true)
 	if not baseID then return end
 
+	local exactID = ItemRack.GetID(slot)
+	
 	-- simple loop to find current item in list and return next valid one
 	local idx = 0
+	-- First pass: Try to find an exact match (respects enchants, gems for multiple identical items)
 	for i=1,#(list) do
-		local listBaseID = string.match(list[i].id,"(%d+)")
-		if listBaseID == baseID then
+		if list[i].id ~= 0 and ItemRack.SameExactID(list[i].id, exactID) then
 			idx = i
 			break
+		end
+	end
+	
+	-- Second pass: Fallback to base ID match
+	if idx == 0 then
+		for i=1,#(list) do
+			if list[i].id ~= 0 then
+				local listBaseID = string.match(list[i].id,"(%d+)")
+				if listBaseID == baseID then
+					idx = i
+					break
+				end
+			end
 		end
 	end
 
@@ -154,7 +169,8 @@ function ItemRack.ProcessAutoQueue(slot)
 
 	local start,duration,enable = GetInventoryItemCooldown("player",slot)
 	local timeLeft = math.max(start + duration - GetTime(),0)
-	local baseID = ItemRack.GetIRString(GetInventoryItemLink("player",slot),true,true)
+	local exactID = ItemRack.GetID(slot)
+	local baseID = ItemRack.GetIRString(exactID,true)
 	local icon = _G["ItemRackButton"..slot.."Queue"]
 
 	if not baseID then return end
@@ -164,22 +180,37 @@ function ItemRack.ProcessAutoQueue(slot)
 	
 	-- Find the equipped item in the queue to get its priority/keep/delay settings
 	if list then
+		local matchIdx = 0
+		
+		-- First pass: Try to find an exact match (respects enchants, gems for multiple identical items)
 		for i=1, #list do
-			if list[i].id== 0 then
-				-- Stop marker.  If we get here before finding our item, we'll just use defaults 
-				-- since these values probably aren't intentionally set for any item not in our queue.
-				keepValue = false
-				delayValue = 0
-				priorityValue = false
+			if list[i].id == 0 then
+				break -- Stop marker reached before finding our item
+			elseif ItemRack.SameExactID(list[i].id, exactID) then
+				matchIdx = i
 				break
-			else
-				if list[i].id == baseID then
-					keepValue = list[i].keep
-					delayValue = list[i].delay
-					priorityValue = list[i].priority
-					break
+			end
+		end
+		
+		-- Second pass: Fallback to base ID match
+		if matchIdx == 0 then
+			for i=1, #list do
+				if list[i].id == 0 then
+					break -- Stop marker reached
+				else
+					local queueBaseID = string.match(tostring(list[i].id), "^(%d+)")
+					if queueBaseID == baseID then
+						matchIdx = i
+						break
+					end
 				end
 			end
+		end
+		
+		if matchIdx > 0 then
+			keepValue = list[matchIdx].keep
+			delayValue = tonumber(list[matchIdx].delay)
+			priorityValue = list[matchIdx].priority
 		end
 	end
 	
@@ -218,7 +249,7 @@ function ItemRack.ProcessAutoQueue(slot)
 
 	local nextItem, nextItemID = ItemRack.AutoQueueItemToEquip(slot, baseID, enable, ready)
 	if nextItem then
-		if GetItemCount(nextItem)>0 and not IsEquippedItem(nextItem) then
+		if GetItemCount(tonumber(nextItem) or nextItem)>0 and not ItemRack.SameExactID(exactID, nextItemID) then
 			local _,bag = ItemRack.FindItem(nextItemID)
 			if bag and not (ItemRack.CombatQueue[slot]==nextItemID) then
 				ItemRack.EquipItemByID(nextItemID,slot,true)
