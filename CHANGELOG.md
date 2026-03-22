@@ -2,6 +2,13 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.34] - 2026-03-20
+### 🐛 Bug Fixes
+- **Event Set Swapping Broken**: Fixed a fatal Lua error in `IsSetEquipped` arising from PR #10 (Auto-Queue awareness). The queue loop was incorrectly iterating over non-numeric set properties (like the `Queues` table itself), causing the WoW API (`GetInventoryItemLink`) to crash when it received a string instead of a slot number. This silent crash was halting execution of all event scripts (Mount, Zone, etc) and breaking manual set swaps.
+- **Auto-Queue Freezing Swaps**: Fixed an issue where Auto-Queue would infinitely spam `EquipItemByID` if it tried to queue an item ID that the WoW API's `IsEquippedItem` function couldn't parse properly from a string. This spam locked the trinket slot permanently, causing all Event-based set swaps to abort into the `SetsWaiting` queue forever. The queue verify now uses `ItemRack.SameExactID` instead of WoW API.
+- **Character Sheet Tooltips**: Fixed violent visual jumping and menu overlap caused by third-party addons resetting `GameTooltip` anchors during asynchronous data renders (such as fetching server info or modifying lines). ItemRack now securely hooks the native `GameTooltip:Show()` execution, actively clamping its own safe-zone offsets securely over the C-engine's defaults before the graphical layout updates, guaranteeing no frame-1 rendering flickers.
+- **Auto-Queue Pause/Delay Ignored**: Fixed an issue where the "Pause Queue", "Priority", and "Delay" settings were ignored during auto queueing. The auto queue system was checking the saved string IDs against the equipped base item ID using strict equality, which failed if the queued item string contained enchants or gems. It now uses a reliable two-pass lookup: first trying to match the exact item ID (to support identical base items with different enchants/gems having separate queue settings), and then falling back to matching the base item ID if needed.
+
 ## [4.33] - 2026-03-20
 ### Bug Fixes
 - **Weapons Stuck on Cursor in Combat**: `MoveItem` now verifies cursor state after each swap attempt. If the game blocks `PickupInventoryItem` (e.g. during combat lockdown), the item is immediately returned via `ClearCursor()` instead of being left stuck on the cursor. Prevents the "Swap stopped. Something is on the cursor." spam.
