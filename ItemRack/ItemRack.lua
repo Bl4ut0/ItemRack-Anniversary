@@ -1029,7 +1029,8 @@ end
 -- returns the provided ItemRack-style ID string with "item:" prepended, which turns it into a normal itemstring which we can then use for item lookups, itemlink generation and so on.
 -- sure, it's a simple function right now, but if the itemrack ID format above ever needs changing it'll be very easy to update the IRString to ItemString code in this one place.
 function ItemRack.IRStringToItemString(itemRackID)
-	return "item:"..(itemRackID or "")
+	local safeID = string.match(itemRackID or "", ItemRack.iSPatternItemFieldsFromIR) or itemRackID
+	return "item:"..(safeID or "")
 end
 
 -- returns an ItemRack-style ID (62384:0:4041:4041:0:0:0:0:85:146) if an item exists in that slot, or 0 for none

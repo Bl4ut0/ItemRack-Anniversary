@@ -2815,7 +2815,7 @@
 								</Size>
 								<Anchors>
 									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffName" relativePoint="BOTTOMLEFT">
-										<Offset x="-6" y="-8"/>
+										<Offset x="-6" y="-2"/>
 									</Anchor>
 								</Anchors>
 								<Scripts>
@@ -2830,7 +2830,22 @@
 								</Size>
 								<Anchors>
 									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffAnyMount" relativePoint="BOTTOMLEFT">
-										<Offset x="0" y="6"/>
+										<Offset x="0" y="10"/>
+									</Anchor>
+								</Anchors>
+								<Scripts>
+									<OnClick>
+										ItemRackOpt.EventEditUpdateMovementDelay(self)
+									</OnClick>
+								</Scripts>
+							</CheckButton>
+							<CheckButton name="ItemRackOptEventEditBuffOnMovementDelay" inherits="ItemRackOptSimpleCheckButton">
+								<Size>
+									<AbsDimension x="26" y="26"/>
+								</Size>
+								<Anchors>
+									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffOnMovement" relativePoint="BOTTOMLEFT">
+										<Offset x="20" y="12"/>
 									</Anchor>
 								</Anchors>
 							</CheckButton>
@@ -2839,8 +2854,8 @@
 									<AbsDimension x="26" y="26"/>
 								</Size>
 								<Anchors>
-									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffOnMovement" relativePoint="BOTTOMLEFT">
-										<Offset x="0" y="6"/>
+									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffOnMovementDelay" relativePoint="BOTTOMLEFT">
+										<Offset x="-20" y="10"/>
 									</Anchor>
 								</Anchors>
 							</CheckButton>
@@ -2850,7 +2865,7 @@
 								</Size>
 								<Anchors>
 									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffNotInPVP" relativePoint="BOTTOMLEFT">
-										<Offset x="0" y="6"/>
+										<Offset x="0" y="10"/>
 									</Anchor>
 								</Anchors>
 							</CheckButton>
@@ -2860,7 +2875,7 @@
 								</Size>
 								<Anchors>
 									<Anchor point="TOPLEFT" relativeTo="ItemRackOptEventEditBuffNotInPVE" relativePoint="BOTTOMLEFT">
-										<Offset x="0" y="6"/>
+										<Offset x="0" y="10"/>
 									</Anchor>
 								</Anchors>
 							</CheckButton>

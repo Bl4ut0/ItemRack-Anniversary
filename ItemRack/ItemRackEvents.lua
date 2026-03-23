@@ -896,12 +896,18 @@ function ItemRack.ProcessBuffEvent()
 							if events[eventName].OnMovement and underlyingBuff and inZoneTransition then
 								-- Suppress: still mounted, zone boundary artifact. Do nothing.
 							elseif events[eventName].OnMovement and underlyingBuff then
-								-- OnMovement debounce: delay the unequip by 0.5s.
-								-- If the player starts moving again within that window, the
-								-- timer is cancelled above and no swap occurs.
-								if not ItemRack.PendingOnMovementUnequip then
-									ItemRack.PendingOnMovementUnequip = eventName
-									ItemRack.StartTimer("OnMovementUnequipTimer")
+								if events[eventName].OnMovementDelay == false then
+									-- User explicitly disabled the 0.5s stop debounce. Instant unequip.
+									ItemRack.PopEvent(eventName)
+									events[eventName].Active = nil
+								else
+									-- OnMovement debounce: delay the unequip by 0.5s.
+									-- If the player starts moving again within that window, the
+									-- timer is cancelled above and no swap occurs.
+									if not ItemRack.PendingOnMovementUnequip then
+										ItemRack.PendingOnMovementUnequip = eventName
+										ItemRack.StartTimer("OnMovementUnequipTimer")
+									end
 								end
 							else
 								ItemRack.PopEvent(eventName)

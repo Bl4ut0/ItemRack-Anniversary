@@ -70,6 +70,7 @@ ItemRack.CheckButtonLabels = {
 	["ItemRackOptEventEditBuffAnyMountText"] = "Any mount",
 	["ItemRackOptEventEditBuffUnequipText"] = "Unequip when buff fades",
 	["ItemRackOptEventEditBuffOnMovementText"] = "On Movement",
+	["ItemRackOptEventEditBuffOnMovementDelayText"] = "0.5s Stop Delay",
 	["ItemRackOptEventEditBuffNotInPVPText"] = "Except in PVP instances",
 	["ItemRackOptEventEditBuffNotInPVEText"] = "Except in PVE instances",
 	["ItemRackOptEventEditStanceUnequipText"] = "Unequip on leaving stance",
@@ -520,6 +521,26 @@ function ItemRackOpt.SaveSet()
 	for i=0,19 do
 		if ItemRackOpt.Inv[i].selected then
 			set.equip[i] = ItemRackOpt.Inv[i].id
+		end
+	end
+	
+	-- Snapshot currently active queues into the set if per-set queues are enabled
+	if ItemRackUser.EnablePerSetQueues == "ON" then
+		set.QueuesEnabled = {}
+		for i=0,19 do
+			if ItemRack.GetQueuesEnabled()[i] then
+				set.QueuesEnabled[i] = true
+			end
+		end
+		
+		set.Queues = {}
+		for i=0,19 do
+			if ItemRack.GetQueues()[i] then
+				set.Queues[i] = {}
+				for j,v in ipairs(ItemRack.GetQueues()[i]) do
+					table.insert(set.Queues[i], {id=v.id})
+				end
+			end
 		end
 	end
 	
@@ -2168,12 +2189,22 @@ function ItemRackOpt.EventEditOnHide()
 	ItemRackOpt.ShowPrevSubFrame()
 end
 
+function ItemRackOpt.EventEditUpdateMovementDelay()
+	if ItemRackOptEventEditBuffOnMovement:GetChecked() then
+		ItemRackOptEventEditBuffOnMovementDelay:Enable()
+	else
+		ItemRackOptEventEditBuffOnMovementDelay:Disable()
+	end
+end
+
 function ItemRackOpt.EventEditClearFrame()
 	ItemRackOptEventEditNameEdit:SetText("")
 	ItemRackOptEventEditTypeDropText:SetText("Pick one")
 	ItemRackOptEventEditBuffName:SetText("")
 	ItemRackOptEventEditBuffAnyMount:SetChecked(false)
 	ItemRackOptEventEditBuffOnMovement:SetChecked(false)
+	ItemRackOptEventEditBuffOnMovementDelay:SetChecked(false)
+	ItemRackOptEventEditBuffOnMovementDelay:Disable()
 	ItemRackOptEventEditBuffUnequip:SetChecked(false)
 
 	ItemRackOptEventEditBuffNotInPVP:SetChecked(false)
@@ -2209,6 +2240,8 @@ function ItemRackOpt.EventEditPopulateFrame()
 			ItemRackOptEventEditBuffName:SetText(event.Buff or "")
 		end
 		ItemRackOptEventEditBuffOnMovement:SetChecked(event.OnMovement)
+		ItemRackOptEventEditBuffOnMovementDelay:SetChecked(event.OnMovementDelay ~= false)
+		ItemRackOpt.EventEditUpdateMovementDelay()
 		ItemRackOptEventEditBuffUnequip:SetChecked(event.Unequip)
 
 		ItemRackOptEventEditBuffNotInPVP:SetChecked(event.NotInPVP)
@@ -2391,6 +2424,7 @@ function ItemRackOpt.EventEditSave(override)
 		end
 		event.Anymount = ItemRackOptEventEditBuffAnyMount:GetChecked()
 		event.OnMovement = ItemRackOptEventEditBuffOnMovement:GetChecked()
+		event.OnMovementDelay = ItemRackOptEventEditBuffOnMovementDelay:GetChecked()
 		event.Unequip = ItemRackOptEventEditBuffUnequip:GetChecked()
 
 		event.NotInPVP = ItemRackOptEventEditBuffNotInPVP:GetChecked()
