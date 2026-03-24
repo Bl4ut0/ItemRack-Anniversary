@@ -1,5 +1,8 @@
 # Release Notes - ItemRack TBC Anniversary v4.34
 
+### ✨ Improvements
+- **Per-Set Queue Persistence**: Auto-queue settings are now contextually saved and loaded per-set. Creating or updating a gear set will actively capture your current queue state (including toggles and lists) for each slot. Switching between sets will seamlessly restore your configured queue layouts!
+
 ### 🐛 Bug Fixes
 - **Event Set Swapping Broken**: Fixed a fatal Lua error in `IsSetEquipped` arising from PR #10 (Auto-Queue awareness). The queue loop was incorrectly iterating over non-numeric set properties (like the `Queues` table itself), causing the WoW API (`GetInventoryItemLink`) to crash when it received a string instead of a slot number. This silent crash was halting execution of all event scripts (Mount, Zone, etc) and breaking manual set swaps.
 - **Auto-Queue Freezing Swaps**: Fixed an issue where Auto-Queue would infinitely spam `EquipItemByID` if it tried to queue an item ID that the WoW API's `IsEquippedItem` function couldn't parse properly from a string. This spam locked the trinket slot permanently, causing all Event-based set swaps to abort into the `SetsWaiting` queue forever. The queue verify now uses `ItemRack.SameExactID` instead of WoW API.
