@@ -538,7 +538,12 @@ function ItemRackOpt.SaveSet()
 			if ItemRack.GetQueues()[i] then
 				set.Queues[i] = {}
 				for j,v in ipairs(ItemRack.GetQueues()[i]) do
-					table.insert(set.Queues[i], {id=v.id})
+					table.insert(set.Queues[i], {
+						id = v.id,
+						keep = v.keep,
+						priority = v.priority,
+						delay = v.delay
+					})
 				end
 			end
 		end
