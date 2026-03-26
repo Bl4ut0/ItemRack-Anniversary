@@ -2222,7 +2222,11 @@ function ItemRack.IDTooltip(self,itemID) --itemID is an ItemRack-style ID
 	else --cannot find the item in player's inventory or worn equipment!
 		bag,slot = ItemRack.FindInBank(itemID) --try to find the item in the player's bank IF they currently have the bank frame open
 		if bag then -- item found in player's bank
-			GameTooltip:SetBagItem(bag,slot)
+			if bag == BANK_CONTAINER or bag == -1 then
+				GameTooltip:SetInventoryItem("player",BankButtonIDToInvSlotID(slot))
+			else
+				GameTooltip:SetBagItem(bag,slot)
+			end
 		else -- item is completely missing (no such strict OR baseID found anywhere): it's not in inventory, bank or worn items
 			itemID = ItemRack.IRStringToItemString(ItemRack.UpdateIRString(itemID)) -- ensure the stored ID is brought up to date, then generate a regular ItemString from it which can be used to display the required tooltip
 			GameTooltip:SetHyperlink(itemID)
@@ -2328,7 +2332,11 @@ function ItemRack.TooltipUpdate()
 		local cooldown
 		ItemRack.AnchorTooltip(ItemRack.TooltipOwner)
 		if ItemRack.TooltipType=="BAG" then
-			GameTooltip:SetBagItem(ItemRack.TooltipBag,ItemRack.TooltipSlot)
+			if ItemRack.TooltipBag == BANK_CONTAINER or ItemRack.TooltipBag == -1 then
+				GameTooltip:SetInventoryItem("player",BankButtonIDToInvSlotID(ItemRack.TooltipSlot))
+			else
+				GameTooltip:SetBagItem(ItemRack.TooltipBag,ItemRack.TooltipSlot)
+			end
 			cooldown = GetContainerItemCooldown(ItemRack.TooltipBag,ItemRack.TooltipSlot)
 		else
 			GameTooltip:SetInventoryItem("player",ItemRack.TooltipSlot)

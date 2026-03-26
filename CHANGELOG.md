@@ -2,6 +2,15 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.35] - 2026-03-24
+### ✨ Improvements
+- **Per-Set Queue Snapshotting**: When `Enable per-set queues` is active, clicking "Save" on a Set now deeply copies all active AutoQueue metadata (including enabled slot states, item priority orders, explicit delay timers, and pause markers). Previously, saving a new set omitted this metadata, forcing users to manually rebuild their queues for each set.
+- **On Movement Debounce Toggle**: Added a "Stop Delay" check button to the Events option panel for the "On Movement" unequip hook. Users can now bypass the 0.5s debounce timer, initiating instantaneous gear swaps (e.g., unequipping your Riding Crop) the exact millisecond you press your movement key.
+
+### 🐛 Bug Fixes
+- **Bank Item Tooltips**: Sanitized the internal `IRStringToItemString` generator to safely truncate custom trailing attributes. This prevents the WoW client's `GameTooltip:SetHyperlink()` function from crashing and rendering an empty UI when inspecting saved item sets located inside your Bank while the bank frame is closed.
+- **Main Bank Empty Tooltips**: Fixed a core engine bug where inspecting items residing natively in the 28-slot main Bank (`bag == -1`) returned stripped or broken tooltips (making other addons like VendorPrice append to an empty record). ItemRack now bypasses the failing `GameTooltip:SetBagItem` on this specific container, natively translating the slot into a player inventory ID using `BankButtonIDToInvSlotID` directly matching the Blizzard UI implementation.
+
 ## [4.34] - 2026-03-23
 ### ✨ Improvements
 - **Per-Set Queue Persistence**: Auto-queue settings are now contextually saved and loaded per-set. Creating or updating a gear set will actively capture your current queue state (including toggles and lists) for each slot. Switching between sets will seamlessly restore your configured queue layouts!
