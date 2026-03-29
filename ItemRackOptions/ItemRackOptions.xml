@@ -2274,12 +2274,12 @@
 					</CheckButton>
 					<Frame inherits="BackdropTemplate">
 						<Size>
-							<AbsDimension x="228" y="280"/>
+							<AbsDimension x="228" y="268"/>
 						</Size>
 						<Anchors>
 							<Anchor point="BOTTOMRIGHT">
 								<Offset>
-									<AbsDimension x="-8" y="8"/>
+									<AbsDimension x="-8" y="20"/>
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -2371,11 +2371,6 @@
 									<Anchor point="TOPLEFT" relativeTo="ItemRackOptSortList9" relativePoint="BOTTOMLEFT"/>
 								</Anchors>
 							</Button>
-							<Button name="ItemRackOptSortList11" inherits="ItemRackOptSortListTemplate" id="11">
-								<Anchors>
-									<Anchor point="TOPLEFT" relativeTo="ItemRackOptSortList10" relativePoint="BOTTOMLEFT"/>
-								</Anchors>
-							</Button>
 							<ScrollFrame name="ItemRackOptSortListScrollFrame" inherits="FauxScrollFrameTemplate">
 								<Anchors>
 									<Anchor point="TOPLEFT" relativeTo="ItemRackOptSortList2">
@@ -2383,7 +2378,7 @@
 											<AbsDimension x="0" y="4"/>
 										</Offset>
 									</Anchor>
-									<Anchor point="BOTTOMRIGHT" relativeTo="ItemRackOptSortList11">
+									<Anchor point="BOTTOMRIGHT" relativeTo="ItemRackOptSortList10">
 										<Offset>
 											<AbsDimension x="-2" y="1"/>
 										</Offset>
@@ -2639,6 +2634,43 @@
 							<TexCoords left=".25" right=".375" top=".375" bottom=".5"/>
 						</DisabledTexture>
 					</Button>
+
+					<!-- Set info at the bottom of the queue frame -->
+					<Frame name="ItemRackOptQueueSetInfo">
+						<Size>
+							<AbsDimension x="200" y="24"/>
+						</Size>
+						<Anchors>
+							<Anchor point="BOTTOMLEFT">
+								<Offset>
+									<AbsDimension x="48" y="0"/>
+								</Offset>
+							</Anchor>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK">
+								<Texture name="ItemRackOptQueueSetIcon">
+									<Size>
+										<AbsDimension x="18" y="18"/>
+									</Size>
+									<Anchors>
+										<Anchor point="LEFT"/>
+									</Anchors>
+								</Texture>
+								<FontString name="ItemRackOptQueueSetName" font="GameFontHighlightSmall">
+									<Anchors>
+										<Anchor point="LEFT" relativeTo="ItemRackOptQueueSetIcon" relativePoint="RIGHT">
+											<Offset>
+												<AbsDimension x="4" y="0"/>
+											</Offset>
+										</Anchor>
+									</Anchors>
+									<Color r="0.8" g="0.8" b="0.8"/>
+								</FontString>
+							</Layer>
+						</Layers>
+					</Frame>
+
 				</Frames>
 			</Frame>
 

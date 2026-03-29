@@ -671,9 +671,16 @@ function ItemRack.ButtonPreClick(self,button)
 				ItemRackOpt.TabOnClick(self,4)
 				ItemRackOpt.SetupQueue(id)
 			end
+			-- Ensure per-set table exists before writing
+			if ItemRackUser.EnablePerSetQueues == "ON" then
+				local currentSet = ItemRackUser.CurrentSet and ItemRackUser.Sets[ItemRackUser.CurrentSet]
+				if currentSet and not currentSet.QueuesEnabled then
+					currentSet.QueuesEnabled = {}
+				end
+			end
 			ItemRack.GetQueuesEnabled()[id] = not ItemRack.GetQueuesEnabled()[id]
 			if ItemRackOptSubFrame7 and ItemRackOptSubFrame7:IsVisible() and ItemRackOpt.SelectedSlot==id then
-				ItemRackOptQueueEnable:SetChecked(ItemRack.GetQueuesEnabled()[id])
+				ItemRackOpt.UpdateQueueEnable()
 			end
 			ItemRack.UpdateCombatQueue()
 		elseif id==20 then

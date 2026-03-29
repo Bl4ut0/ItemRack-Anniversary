@@ -1393,7 +1393,9 @@ function ItemRackOpt.StopMarquee()
 	ItemRack.StopTimer("SlotMarquee")
 	_G["ItemRackOptInv"..ItemRackOpt.slotOrder[ItemRackOpt.currentMarquee+1]]:UnlockHighlight()
 	ItemRackOpt.RestoreInv()
-	ItemRackOptToggleInvAll:Show()
+	if not ItemRackOptSubFrame7:IsVisible() then
+		ItemRackOptToggleInvAll:Show()
+	end
 end
 
 function ItemRackOpt.SlotMarquee()
@@ -1439,29 +1441,51 @@ function ItemRackOpt.SlotQueueFrameOnHide()
 end
 
 function ItemRackOpt.SetupQueue(id)
+	-- Always ensure the global queue table exists for this slot
 	if not ItemRackUser.Queues[id] then
 		ItemRackUser.Queues[id] = {}
 	end
-	for name, set in pairs(ItemRackUser.Sets) do
-		if not set.Queues then
-			set.Queues = {}
-		end
-	
-		if not set.Queues[id] then
-			set.Queues[id] = {}
+	-- If per-set queues are on, only initialize the CURRENT set's queue (not all sets)
+	if ItemRackUser.EnablePerSetQueues == "ON" then
+		local currentSet = ItemRackUser.CurrentSet and ItemRackUser.Sets[ItemRackUser.CurrentSet]
+		if currentSet then
+			if not currentSet.Queues then
+				currentSet.Queues = {}
+			end
+			if not currentSet.Queues[id] then
+				currentSet.Queues[id] = {}
+			end
 		end
 	end
 	
 	ItemRackOpt.SelectedSlot = id
 	ItemRackOpt.SortSelected = nil
+	ItemRackOpt.QueueEditingSet = ItemRackUser.CurrentSet
 	ItemRackOptSlotQueueName:SetText(ItemRack.SlotInfo[id].real)
 	ItemRackOpt.PopulateSortList(id)
 	ItemRackOpt.ValidateSortButtons()
+	
+	-- Populate set info at the bottom of the queue frame
+	if ItemRackUser.EnablePerSetQueues == "ON" and ItemRackUser.CurrentSet and ItemRackUser.Sets[ItemRackUser.CurrentSet] then
+		local set = ItemRackUser.Sets[ItemRackUser.CurrentSet]
+		ItemRackOptQueueSetIcon:SetTexture(set.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+		ItemRackOptQueueSetName:SetText(ItemRackUser.CurrentSet)
+		ItemRackOptQueueSetInfo:Show()
+	elseif ItemRackUser.EnablePerSetQueues == "ON" then
+		ItemRackOptQueueSetIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+		ItemRackOptQueueSetName:SetText("No Set Active")
+		ItemRackOptQueueSetInfo:Show()
+	else
+		ItemRackOptQueueSetIcon:SetTexture("Interface\\AddOns\\ItemRack\\ItemRackGear")
+		ItemRackOptQueueSetName:SetText("Global Queues")
+		ItemRackOptQueueSetInfo:Show()
+	end
+	
 	ItemRackOptSubFrame7:Show()
 end
 
 function ItemRackOpt.PopulateSortList(slot)
-	local sortList = ItemRack.GetQueues()[slot]
+	local sortList = ItemRack.GetQueues(ItemRackOpt.QueueEditingSet)[slot]
 	
 	-- First, clean up any existing duplicates in the saved queue
 	-- (scan backwards to safely remove while iterating)
@@ -1732,12 +1756,12 @@ function ItemRackOpt.SortListScrollFrameUpdate()
 
 	local item, name, texture, quality, idx
 	local slot = ItemRackOpt.SelectedSlot
-	local sortList = slot and ItemRack.GetQueues()[slot]
+	local sortList = slot and ItemRack.GetQueues(ItemRackOpt.QueueEditingSet)[slot]
 	local offset = FauxScrollFrame_GetOffset(ItemRackOptSortListScrollFrame)
 
-	FauxScrollFrame_Update(ItemRackOptSortListScrollFrame, sortList and #(sortList) or 0, 11, 24)
+	FauxScrollFrame_Update(ItemRackOptSortListScrollFrame, sortList and #(sortList) or 0, 10, 24)
 	
-	for i=1,11 do
+	for i=1,10 do
 		item = _G["ItemRackOptSortList"..i]
 		idx = offset + i
 		if sortList and idx<=#(sortList) then
@@ -1791,7 +1815,7 @@ end
 
 function ItemRackOpt.ValidateSortButtons()
 	local selected = ItemRackOpt.SortSelected
-	local list = ItemRack.GetQueues()[ItemRackOpt.SelectedSlot]
+	local list = ItemRack.GetQueues(ItemRackOpt.QueueEditingSet)[ItemRackOpt.SelectedSlot]
 	ItemRackOptSortMoveTop:Enable()
 	ItemRackOptSortMoveUp:Enable()
 	ItemRackOptSortMoveDown:Enable()
@@ -1833,18 +1857,18 @@ function ItemRackOpt.ValidateSortButtons()
 			offset = (selected==1) and 0 or (parent:GetValue() - (parent:GetHeight() / 2))
 			parent:SetValue(offset)
 			PlaySound(SOUNDKIT.U_CHAT_SCROLL_BUTTON)
-		elseif selected >= (idx+12) then
+		elseif selected >= (idx+10) then
 			offset = (selected==#(list)) and ItemRackOptSortListScrollFrame:GetVerticalScrollRange() or (parent:GetValue() + (parent:GetHeight() / 2))
 			parent:SetValue(offset)
 			PlaySound(SOUNDKIT.U_CHAT_SCROLL_BUTTON);
 		end
 	end
-	ItemRackOptQueueEnable:SetChecked(ItemRack.GetQueuesEnabled()[ItemRackOpt.SelectedSlot])
+	ItemRackOptQueueEnable:SetChecked(ItemRack.GetQueuesEnabled(ItemRackOpt.QueueEditingSet)[ItemRackOpt.SelectedSlot])
 end
 
 function ItemRackOpt.SortMove(self)
 	local dir = ((self==ItemRackOptSortMoveUp) and -1) or ((self==ItemRackOptSortMoveTop) and "top") or ((self==ItemRackOptSortMoveDown) and 1) or ((self==ItemRackOptSortMoveBottom) and "bottom")
-	local list = ItemRack.GetQueues()[ItemRackOpt.SelectedSlot]
+	local list = ItemRack.GetQueues(ItemRackOpt.QueueEditingSet)[ItemRackOpt.SelectedSlot]
 	local idx1 = ItemRackOpt.SortSelected
 	if dir then
 		local idx2 = ((dir=="top") and 1) or ((dir=="bottom") and #(list)) or idx1+dir
@@ -1871,7 +1895,7 @@ end
 function ItemRackOpt.SortListOnEnter(self)
 	_G[self:GetName().."Highlight"]:Show()
 	local idx = FauxScrollFrame_GetOffset(ItemRackOptSortListScrollFrame) + self:GetID()
-	local list = ItemRack.GetQueues()[ItemRackOpt.SelectedSlot]
+	local list = ItemRack.GetQueues(ItemRackOpt.QueueEditingSet)[ItemRackOpt.SelectedSlot]
 	if list[idx] then
 		if list[idx].id==0 then
 			ItemRack.OnTooltip(self,"Stop Queue Here","Move this to mark an explicit end to an order. ie, if you have a clickable trinket with a passive effect, and would like to use the passive effect if no better trinkets are off cooldown.")
@@ -1889,14 +1913,14 @@ function ItemRackOpt.SortListOnLeave(self)
 end
 
 function ItemRackOpt.ItemStatsDelayOnTextChanged(self)
-	local list = ItemRack.GetQueues()[ItemRackOpt.SelectedSlot]
+	local list = ItemRack.GetQueues(ItemRackOpt.QueueEditingSet)[ItemRackOpt.SelectedSlot]
 	local value = tonumber(self:GetText() or "") or 0
 
 	list[ItemRackOpt.SortSelected].delay = value
 end
 
 function ItemRackOpt.ItemStatsCheckOnClick(self)
-	local list = ItemRack.GetQueues()[ItemRackOpt.SelectedSlot]
+	local list = ItemRack.GetQueues(ItemRackOpt.QueueEditingSet)[ItemRackOpt.SelectedSlot]
 	local value = self:GetChecked()
 	local which = self==ItemRackOptItemStatsPriority and "priority" or "keep"
 
@@ -1908,7 +1932,14 @@ function ItemRackOpt.ItemStatsCheckOnClick(self)
 end
 
 function ItemRackOpt.QueueEnableSlotOnClick(self)
-	ItemRack.GetQueuesEnabled()[ItemRackOpt.SelectedSlot] = self:GetChecked()
+	-- Ensure per-set table exists before writing (GetQueuesEnabled no longer creates it lazily)
+	if ItemRackUser.EnablePerSetQueues == "ON" then
+		local currentSet = ItemRackOpt.QueueEditingSet and ItemRackUser.Sets[ItemRackOpt.QueueEditingSet]
+		if currentSet and not currentSet.QueuesEnabled then
+			currentSet.QueuesEnabled = {}
+		end
+	end
+	ItemRack.GetQueuesEnabled(ItemRackOpt.QueueEditingSet)[ItemRackOpt.SelectedSlot] = self:GetChecked()
 	ItemRack.UpdateCombatQueue()
 end
 

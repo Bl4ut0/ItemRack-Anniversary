@@ -2,12 +2,15 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
-## [4.35] - 2026-03-24
+## [4.35] - 2026-03-28
 ### ✨ Improvements
 - **Per-Set Queue Snapshotting**: When `Enable per-set queues` is active, clicking "Save" on a Set now deeply copies all active AutoQueue metadata (including enabled slot states, item priority orders, explicit delay timers, and pause markers). Previously, saving a new set omitted this metadata, forcing users to manually rebuild their queues for each set.
 - **On Movement Debounce Toggle**: Added a "Stop Delay" check button to the Events option panel for the "On Movement" unequip hook. Users can now bypass the 0.5s debounce timer, initiating instantaneous gear swaps (e.g., unequipping your Riding Crop) the exact millisecond you press your movement key.
+- **Queue Context Display**: The Queue Options tab now explicitly displays the name and icon of the exact Set whose auto-queue you are actively editing, preventing confusion about which Set's queue is being modified.
 
 ### 🐛 Bug Fixes
+- **Queue Editor Race Condition**: Fixed a critical isolation bug where editing auto-queues while the Options menu was open could silently corrupt unrelated sets. If an event (like Mounting or entering Combat) caused a gear swap in the background, subsequent edits (moving items, changing delays, toggling auto-queue) would instantly bind to the *newly equipped* set instead of the one you originally selected. The Queue editor now securely snapshots and locks context to the specific set being edited regardless of background gear changes.
+- **Queue Menu Empty Table Pollution**: Fixed an issue where simply opening the Queue UI would rapidly spam the `SavedVariables` table with empty `Queues` objects across every single gear set you owned, bloating file sizes and triggering accidental per-set override defaults. 
 - **Bank Item Tooltips**: Sanitized the internal `IRStringToItemString` generator to safely truncate custom trailing attributes. This prevents the WoW client's `GameTooltip:SetHyperlink()` function from crashing and rendering an empty UI when inspecting saved item sets located inside your Bank while the bank frame is closed.
 - **Main Bank Empty Tooltips**: Fixed a core engine bug where inspecting items residing natively in the 28-slot main Bank (`bag == -1`) returned stripped or broken tooltips (making other addons like VendorPrice append to an empty record). ItemRack now bypasses the failing `GameTooltip:SetBagItem` on this specific container, natively translating the slot into a player inventory ID using `BankButtonIDToInvSlotID` directly matching the Blizzard UI implementation.
 

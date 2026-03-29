@@ -453,7 +453,10 @@ function ItemRack.IterateSwapList(setname, disableSound)
 			end
 		end
 	end
-	if ItemRack.AbortSwap and not InCombatLockdown() then
+	-- Only print abort message if there are no remaining items to retry.
+	-- During multi-pass swaps, AbortSwap=4 (locked items) is expected and will
+	-- be retried via SetSwapping — printing "Another swap is in progress" here is misleading.
+	if ItemRack.AbortSwap and not InCombatLockdown() and not next(swap) then
 		ItemRack.Print("Swap stopped. "..(ItemRack.AbortReasons[ItemRack.AbortSwap] or ""))
 	end
 	-- Safety: if cursor still has an item from a partial swap, clear it so it doesn't

@@ -1809,9 +1809,16 @@ function ItemRack.MenuOnClick(self,button)
 				ItemRackOpt.TabOnClick(self, 4)
 				ItemRackOpt.SetupQueue(slot)
 			end
+			-- Ensure per-set table exists before writing
+			if ItemRackUser.EnablePerSetQueues == "ON" then
+				local currentSet = ItemRackUser.CurrentSet and ItemRackUser.Sets[ItemRackUser.CurrentSet]
+				if currentSet and not currentSet.QueuesEnabled then
+					currentSet.QueuesEnabled = {}
+				end
+			end
 			ItemRack.GetQueuesEnabled()[slot] = not ItemRack.GetQueuesEnabled()[slot]
 			if ItemRackOptSubFrame7 and ItemRackOptSubFrame7:IsVisible() and ItemRackOpt.SelectedSlot == slot then
-				ItemRackOptQueueEnable:SetChecked(ItemRack.GetQueuesEnabled()[slot])
+				ItemRackOpt.UpdateQueueEnable()
 			end
 			ItemRack.UpdateCombatQueue()
 			
@@ -1979,6 +1986,15 @@ function ItemRack.EquipItemByID(id,slot,isAutoQueue)
 			ItemRack.AddToCombatQueue(slot,id,isAutoQueue)
 		end
 	elseif not GetCursorInfo() and not SpellIsTargeting() then
+		-- Guard: if a multi-pass set swap is in progress or items are locked,
+		-- defer this single-item swap to CombatQueue instead of interfering
+		-- with the active swap's lock state (which can cause "Another swap is in progress")
+		if ItemRack.SetSwapping or ItemRack.AnythingLocked() then
+			ItemRack.Debug("CombatQueue", "EquipItemByID: swap in progress, deferring slot="..tostring(slot).." to queue")
+			ItemRack.AddToCombatQueue(slot, id, isAutoQueue)
+			return
+		end
+
 		local disableSound = ItemRackSettings.DisableSwapSound == "ON"
 		local useSound = GetCVar("Sound_EnableSFX")
 		local overrideSound = false
@@ -2004,6 +2020,12 @@ function ItemRack.EquipItemByID(id,slot,isAutoQueue)
 					else
 						local bfree,sfree = ItemRack.FindSpace()
 						if bfree then
+							-- Guard: verify offhand slot isn't locked before the 2H removal sequence
+							if IsInventoryItemLocked(17) then
+								ItemRack.Debug("CombatQueue", "EquipItemByID: offhand locked during 2H swap, deferring slot="..tostring(slot))
+								ItemRack.AddToCombatQueue(slot, id, isAutoQueue)
+								return
+							end
 							PickupInventoryItem(17)
 							PickupContainerItem(bfree,sfree)
 							PickupInventoryItem(slot)
@@ -3141,34 +3163,28 @@ function ItemRack.ProfileFuncs()
 end
 
 -- returns Queues for the current set if EnablePerSetQueues is enabled, otherwise the global Queues
+-- Does NOT lazily create empty tables — that's SetupQueue's job
 function ItemRack.GetQueues()
 	if ItemRackUser.EnablePerSetQueues == "ON" then
-		if not (ItemRackUser.CurrentSet and ItemRackUser.Sets[ItemRackUser.CurrentSet]) then
-			return ItemRackUser.Queues
+		local currentSet = ItemRackUser.CurrentSet and ItemRackUser.Sets[ItemRackUser.CurrentSet]
+		if currentSet and currentSet.Queues then
+			return currentSet.Queues
 		end
-
-		local currentSet = ItemRackUser.Sets[ItemRackUser.CurrentSet]
-		if not currentSet.Queues then
-			currentSet.Queues = {}
-		end
-		return currentSet.Queues
+		return ItemRackUser.Queues -- fallback to global if set has no queues
 	else
 		return ItemRackUser.Queues
 	end
 end
 
 -- returns QueuesEnabled for the current set if EnablePerSetQueues is enabled, otherwise the global QueuesEnabled
+-- Does NOT lazily create empty tables — that's SetupQueue/SaveSet's job
 function ItemRack.GetQueuesEnabled()
 	if ItemRackUser.EnablePerSetQueues == "ON" then
-		if not (ItemRackUser.CurrentSet and ItemRackUser.Sets[ItemRackUser.CurrentSet]) then
-			return ItemRackUser.QueuesEnabled
+		local currentSet = ItemRackUser.CurrentSet and ItemRackUser.Sets[ItemRackUser.CurrentSet]
+		if currentSet and currentSet.QueuesEnabled then
+			return currentSet.QueuesEnabled
 		end
-
-		local currentSet = ItemRackUser.Sets[ItemRackUser.CurrentSet]
-		if not currentSet.QueuesEnabled then
-			currentSet.QueuesEnabled = {}
-		end
-		return currentSet.QueuesEnabled
+		return ItemRackUser.QueuesEnabled -- fallback to global if set has no queuesEnabled
 	else
 		return ItemRackUser.QueuesEnabled
 	end
