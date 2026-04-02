@@ -3164,9 +3164,10 @@ end
 
 -- returns Queues for the current set if EnablePerSetQueues is enabled, otherwise the global Queues
 -- Does NOT lazily create empty tables — that's SetupQueue's job
-function ItemRack.GetQueues()
+function ItemRack.GetQueues(setname)
 	if ItemRackUser.EnablePerSetQueues == "ON" then
-		local currentSet = ItemRackUser.CurrentSet and ItemRackUser.Sets[ItemRackUser.CurrentSet]
+		local targetSet = setname or ItemRackUser.CurrentSet
+		local currentSet = targetSet and ItemRackUser.Sets[targetSet]
 		if currentSet and currentSet.Queues then
 			return currentSet.Queues
 		end
@@ -3178,9 +3179,10 @@ end
 
 -- returns QueuesEnabled for the current set if EnablePerSetQueues is enabled, otherwise the global QueuesEnabled
 -- Does NOT lazily create empty tables — that's SetupQueue/SaveSet's job
-function ItemRack.GetQueuesEnabled()
+function ItemRack.GetQueuesEnabled(setname)
 	if ItemRackUser.EnablePerSetQueues == "ON" then
-		local currentSet = ItemRackUser.CurrentSet and ItemRackUser.Sets[ItemRackUser.CurrentSet]
+		local targetSet = setname or ItemRackUser.CurrentSet
+		local currentSet = targetSet and ItemRackUser.Sets[targetSet]
 		if currentSet and currentSet.QueuesEnabled then
 			return currentSet.QueuesEnabled
 		end

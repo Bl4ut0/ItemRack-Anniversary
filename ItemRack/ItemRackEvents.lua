@@ -569,75 +569,83 @@ function ItemRack.ProcessZoneEvent()
 	for eventName in pairs(enabled) do
 		if events[eventName].Type=="Zone" then
 			setname = ItemRackUser.Events.Set[eventName]
-			local inZone = events[eventName].Zones[currentZone] or 
-						   events[eventName].Zones[currentSubZone] or 
-						   events[eventName].Zones[instanceType] or 
-						   events[eventName].Zones[instanceType:gsub("^%l", string.upper)]
+			local matchedZone = nil
+			if events[eventName].Zones[currentZone] then matchedZone = currentZone
+			elseif events[eventName].Zones[currentSubZone] then matchedZone = currentSubZone
+			elseif events[eventName].Zones[instanceType] then matchedZone = instanceType
+			elseif events[eventName].Zones[instanceType:gsub("^%l", string.upper)] then matchedZone = instanceType:gsub("^%l", string.upper)
+			end
 			
-			if inZone then
+			if matchedZone then
 				-- Issue #5: Always attempt to equip if we enter/change to a matching zone,
 				-- even if we were already in another matching zone previously.
-				if not ItemRack.IsSetEquipped(setname) then
-					local keepMount = true
-					
-					-- If we're currently mounted and in our mount event.
-					if ItemRackUser.Sets["Mounted"] and isMounted and events["Mounted"].Active then
-						-- If we're not actually wearing the mount set, then don't keepMount and let it reset in CheckForMountedEvents, if needed.
-						if not ItemRack.IsSetEquipped(ItemRackUser.Events.Set["Mounted"]) then
-							keepMount = false
-						else
-							-- If the oldset for Mounted is already the set we want to wear, just make sure we're still in a zone where we want to be mounted and then we'll stay mounted.
-							-- The set we'll want to wear for this zone will be reapplied once we dismount.
-							if ItemRackUser.Sets["Mounted"].oldset == setname then
-								if events["Mounted"].NotInPVP then
-									if instanceType=="arena" or instanceType=="pvp" then
-										keepMount = false
-										
-										if events["Mounted"].Unequip then
-											ItemRack.PopEvent("Mounted")
-										end
-									end
-								end
-								if events["Mounted"].NotInPVE then
-									if instanceType=="party" or instanceType=="raid" then
-										keepMount = false
-										
-										if events["Mounted"].Unequip then
-											ItemRack.PopEvent("Mounted")
-										end
-									end
-								end
-							else
-								-- Allow the mount set to be overriden if the old set is no longer what we want for this zone.
+				-- Updated: Only enforce re-equip if the specific matched sub-zone has genuinely changed,
+				-- instead of firing repeatedly on internal sub-zone changes within the same city/BG.
+				if not events[eventName].Active or events[eventName].LastZoneMatched ~= matchedZone then
+					if not ItemRack.IsSetEquipped(setname) then
+						local keepMount = true
+						
+						-- If we're currently mounted and in our mount event.
+						if ItemRackUser.Sets["Mounted"] and isMounted and events["Mounted"].Active then
+							-- If we're not actually wearing the mount set, then don't keepMount and let it reset in CheckForMountedEvents, if needed.
+							if not ItemRack.IsSetEquipped(ItemRackUser.Events.Set["Mounted"]) then
 								keepMount = false
+							else
+								-- If the oldset for Mounted is already the set we want to wear, just make sure we're still in a zone where we want to be mounted and then we'll stay mounted.
+								-- The set we'll want to wear for this zone will be reapplied once we dismount.
+								if ItemRackUser.Sets["Mounted"].oldset == setname then
+									if events["Mounted"].NotInPVP then
+										if instanceType=="arena" or instanceType=="pvp" then
+											keepMount = false
+											
+											if events["Mounted"].Unequip then
+												ItemRack.PopEvent("Mounted")
+											end
+										end
+									end
+									if events["Mounted"].NotInPVE then
+										if instanceType=="party" or instanceType=="raid" then
+											keepMount = false
+											
+											if events["Mounted"].Unequip then
+												ItemRack.PopEvent("Mounted")
+											end
+										end
+									end
+								else
+									-- Allow the mount set to be overriden if the old set is no longer what we want for this zone.
+									keepMount = false
+								end
+							end
+						else
+							keepMount = false
+						end
+						
+						if not keepMount then
+							-- Allow CheckForMountedEvents to update the set after we update it, if needed.
+							events["Mounted"].Active = false
+							-- _refreshMountState will allow CheckForMountedEvents to refresh the mount status after the timer goes off a few times.
+							-- This is to give a bit of a buffer between our new set being equipped and the mount set potentially being equipped.
+							_refreshMountState = 4
+									
+							if events[eventName].Active then
+								-- Already active but gear is missing. Just equip it directly without pushing again.
+								ItemRack.EquipSet(setname, events[eventName].DisableSound)
+							else
+								eventToEquip = eventName
 							end
 						end
-					else
-						keepMount = false
 					end
-					
-					if not keepMount then
-						-- Allow CheckForMountedEvents to update the set after we update it, if needed.
-						events["Mounted"].Active = false
-						-- _refreshMountState will allow CheckForMountedEvents to refresh the mount status after the timer goes off a few times.
-						-- This is to give a bit of a buffer between our new set being equipped and the mount set potentially being equipped.
-						_refreshMountState = 4
-								
-						if events[eventName].Active then
-							-- Already active but gear is missing. Just equip it directly without pushing again.
-							ItemRack.EquipSet(setname, events[eventName].DisableSound)
-						else
-							eventToEquip = eventName
-						end
-					end
+					events[eventName].Active = true
+					events[eventName].LastZoneMatched = matchedZone
 				end
-				events[eventName].Active = true
 			else-- if not inZone
 				if events[eventName].Active then
 					if events[eventName].Unequip then
 						eventToUnequip = eventName
 					end
 					events[eventName].Active = nil
+					events[eventName].LastZoneMatched = nil
 				elseif events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
 					-- Fallback for consistency (e.g. reload UI while in zone then leave)
 					eventToUnequip = eventName

@@ -226,8 +226,8 @@ function ItemRack.ProcessAutoQueue(slot)
 		return
 	end
 	
-	if delayValue then
-		if start>0 and timeLeft>30 and timeLeft <= delayValue then
+	if delayValue and delayValue > 0 then
+		if start>0 and (GetTime() - start) <= delayValue then
 			if icon then icon:SetDesaturated(true) end
 			return
 		end
@@ -239,7 +239,7 @@ function ItemRack.ProcessAutoQueue(slot)
 	end
 
 	-- logic to actually swap
-	local ready = ItemRack.ItemNearReady(baseID)
+	local ready = ItemRack.ItemNearReady(baseID, slot)
 	if ready and ItemRack.CombatQueue[slot] then
 		ItemRack.CombatQueue[slot] = nil
 		ItemRack.UpdateCombatQueue()
@@ -276,7 +276,7 @@ function ItemRack.AutoQueueItemToEquip(slot, baseID, enable, ready)
 		else
 			local canSwap = not ready or enable==0 or list[i].priority
 			if canSwap then
-				if ItemRack.ItemNearReady(candidate) then
+				if ItemRack.ItemNearReady(candidate, slot) then
 					return candidate, list[i].id
 				end
 			end
@@ -286,10 +286,21 @@ function ItemRack.AutoQueueItemToEquip(slot, baseID, enable, ready)
 	return nil
 end
 
-function ItemRack.ItemNearReady(id)
+function ItemRack.ItemNearReady(id, slot)
 	local start,duration = GetItemCooldown(id)
 	if not tonumber(start) then return end -- can return nil shortly after loading screen
-	if start==0 or math.max(start + duration - GetTime(),0)<=30 then
+	if start==0 then return true end
+
+	-- Trinkets (slot 13, 14) and Rings (slot 11, 12) have a 30s equip CD.
+	-- We overlap the last 30s of their ability CD with the 30s equip CD by swapping them in early.
+	-- Other slots (like cloaks, helms) do not have equip CDs, or they have total cooldowns of 30s.
+	-- For non-trinketary slots, we do not want to overlap them, otherwise 30s-CD items get stuck permanently "ready".
+	local overlap = 0
+	if slot == 13 or slot == 14 or slot == 11 or slot == 12 then
+		overlap = 30
+	end
+
+	if math.max(start + duration - GetTime(),0) <= overlap then
 		return true
 	end
 end

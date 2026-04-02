@@ -2,6 +2,12 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.36] - 2026-04-02
+### 🐛 Bug Fixes
+- **Short Cooldown Auto-Queue**: Fixed the auto-swap logic for items with short cooldowns (like the Parachute Cloak) by improving cooldown and delay evaluation.
+- **Redundant Zone Events**: Prevented redundant zone-based event triggers in cities and PvP zones by implementing a state-aware zone transition check.
+- **Queue Initialization Popup**: Suppressed an unintended behavior where Alt+LeftClicking an empty/uninitialized queue slot's quick-access button would abruptly pop open the ItemRack Options menu across the center of your screen. The addon will now silently auto-populate and toggle the new queue in the background, keeping your screen clear (you can still manually open the Queue menu for a slot using Alt+RightClick).
+
 ## [4.35] - 2026-03-28
 ### ✨ Improvements
 - **Per-Set Queue Snapshotting**: When `Enable per-set queues` is active, clicking "Save" on a Set now deeply copies all active AutoQueue metadata (including enabled slot states, item priority orders, explicit delay timers, and pause markers). Previously, saving a new set omitted this metadata, forcing users to manually rebuild their queues for each set.

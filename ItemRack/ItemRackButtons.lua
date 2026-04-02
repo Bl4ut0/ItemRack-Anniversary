@@ -667,9 +667,18 @@ function ItemRack.ButtonPreClick(self,button)
 		if id<20 and ItemRackSettings.DisableAltClick=="OFF" then
 			if not ItemRack.GetQueues()[id] then
 				LoadAddOn("ItemRackOptions")
-				ItemRackOptFrame:Show()
-				ItemRackOpt.TabOnClick(self,4)
-				ItemRackOpt.SetupQueue(id)
+				if ItemRackOpt and ItemRackOpt.SetupQueue then
+					local wasOpen = ItemRackOptFrame and ItemRackOptFrame:IsVisible()
+					if wasOpen then
+						ItemRackOpt.TabOnClick(self,4)
+					end
+					
+					ItemRackOpt.SetupQueue(id)
+					
+					if not wasOpen and ItemRackOptFrame then
+						ItemRackOptFrame:Hide()
+					end
+				end
 			end
 			-- Ensure per-set table exists before writing
 			if ItemRackUser.EnablePerSetQueues == "ON" then

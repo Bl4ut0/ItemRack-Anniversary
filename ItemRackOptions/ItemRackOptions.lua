@@ -526,19 +526,23 @@ function ItemRackOpt.SaveSet()
 	
 	-- Snapshot currently active queues into the set if per-set queues are enabled
 	if ItemRackUser.EnablePerSetQueues == "ON" then
-		set.QueuesEnabled = {}
+		-- Copy current state BEFORE clearing it, in case we are saving the actively equipped set
+		local activeQueuesEnabled = ItemRack.GetQueuesEnabled()
+		local activeQueues = ItemRack.GetQueues()
+		
+		local newQueuesEnabled = {}
 		for i=0,19 do
-			if ItemRack.GetQueuesEnabled()[i] then
-				set.QueuesEnabled[i] = true
+			if activeQueuesEnabled[i] then
+				newQueuesEnabled[i] = true
 			end
 		end
 		
-		set.Queues = {}
+		local newQueues = {}
 		for i=0,19 do
-			if ItemRack.GetQueues()[i] then
-				set.Queues[i] = {}
-				for j,v in ipairs(ItemRack.GetQueues()[i]) do
-					table.insert(set.Queues[i], {
+			if activeQueues[i] then
+				newQueues[i] = {}
+				for j,v in ipairs(activeQueues[i]) do
+					table.insert(newQueues[i], {
 						id = v.id,
 						keep = v.keep,
 						priority = v.priority,
@@ -547,6 +551,9 @@ function ItemRackOpt.SaveSet()
 				end
 			end
 		end
+		
+		set.QueuesEnabled = newQueuesEnabled
+		set.Queues = newQueues
 	end
 	
 	-- Save Associated Spec and Sync with Events
@@ -1438,6 +1445,7 @@ function ItemRackOpt.SlotQueueFrameOnHide()
 		_G["ItemRackOptInv"..i]:Show()
 	end
 	ItemRackOptToggleInvAll:Show()
+	ItemRack.UpdateCombatQueue()
 end
 
 function ItemRackOpt.SetupQueue(id)
@@ -1820,7 +1828,7 @@ function ItemRackOpt.ValidateSortButtons()
 	ItemRackOptSortMoveUp:Enable()
 	ItemRackOptSortMoveDown:Enable()
 	ItemRackOptSortMoveBottom:Enable()
-	if not selected or #(list)<2 then -- none selected, disable all
+	if not selected or not list or #(list)<2 then -- none selected, disable all
 		ItemRackOptSortMoveTop:Disable()
 		ItemRackOptSortMoveUp:Disable()
 		ItemRackOptSortMoveDown:Disable()
@@ -1869,6 +1877,7 @@ end
 function ItemRackOpt.SortMove(self)
 	local dir = ((self==ItemRackOptSortMoveUp) and -1) or ((self==ItemRackOptSortMoveTop) and "top") or ((self==ItemRackOptSortMoveDown) and 1) or ((self==ItemRackOptSortMoveBottom) and "bottom")
 	local list = ItemRack.GetQueues(ItemRackOpt.QueueEditingSet)[ItemRackOpt.SelectedSlot]
+	if not list then return end
 	local idx1 = ItemRackOpt.SortSelected
 	if dir then
 		local idx2 = ((dir=="top") and 1) or ((dir=="bottom") and #(list)) or idx1+dir
@@ -1895,8 +1904,8 @@ end
 function ItemRackOpt.SortListOnEnter(self)
 	_G[self:GetName().."Highlight"]:Show()
 	local idx = FauxScrollFrame_GetOffset(ItemRackOptSortListScrollFrame) + self:GetID()
-	local list = ItemRack.GetQueues(ItemRackOpt.QueueEditingSet)[ItemRackOpt.SelectedSlot]
-	if list[idx] then
+	local list = ItemRackOpt.SelectedSlot and ItemRack.GetQueues(ItemRackOpt.QueueEditingSet)[ItemRackOpt.SelectedSlot]
+	if list and list[idx] then
 		if list[idx].id==0 then
 			ItemRack.OnTooltip(self,"Stop Queue Here","Move this to mark an explicit end to an order. ie, if you have a clickable trinket with a passive effect, and would like to use the passive effect if no better trinkets are off cooldown.")
 		else
@@ -1914,6 +1923,7 @@ end
 
 function ItemRackOpt.ItemStatsDelayOnTextChanged(self)
 	local list = ItemRack.GetQueues(ItemRackOpt.QueueEditingSet)[ItemRackOpt.SelectedSlot]
+	if not list or not ItemRackOpt.SortSelected then return end
 	local value = tonumber(self:GetText() or "") or 0
 
 	list[ItemRackOpt.SortSelected].delay = value
@@ -1921,6 +1931,7 @@ end
 
 function ItemRackOpt.ItemStatsCheckOnClick(self)
 	local list = ItemRack.GetQueues(ItemRackOpt.QueueEditingSet)[ItemRackOpt.SelectedSlot]
+	if not list or not ItemRackOpt.SortSelected then return end
 	local value = self:GetChecked()
 	local which = self==ItemRackOptItemStatsPriority and "priority" or "keep"
 

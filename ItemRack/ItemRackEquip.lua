@@ -615,7 +615,7 @@ function ItemRack.IsSetEquipped(setname,exact)
 					if match then
 						local baseID = ItemRack.GetIRString(GetInventoryItemLink("player",i),true,true)
 						local start,duration,enable = GetInventoryItemCooldown("player",i)
-						local ready = ItemRack.ItemNearReady(baseID)
+						local ready = ItemRack.ItemNearReady(baseID, i)
 						local active = ItemRack.AutoQueueItemToEquip(i, baseID, enable, ready)
 						if active and not same(active, id) then
 							match = false   -- Auto Queue would swap to a different item
