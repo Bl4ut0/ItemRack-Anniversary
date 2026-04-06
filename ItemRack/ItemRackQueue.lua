@@ -316,7 +316,7 @@ function ItemRack.SetQueue(slot,newQueue)
 		for i=1,#(newQueue) do
 			table.insert(ItemRack.GetQueues()[slot],newQueue[i])
 		end
-		if ItemRackOptFrame:IsVisible() then
+		if ItemRackOptFrame and ItemRackOptFrame:IsVisible() then
 			if ItemRackOptSubFrame7:IsVisible() and ItemRackOpt.SelectedSlot==slot then
 				ItemRackOpt.SetupQueue(slot)
 			else

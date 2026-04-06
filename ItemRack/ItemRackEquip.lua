@@ -609,9 +609,10 @@ function ItemRack.IsSetEquipped(setname,exact)
 					end
 				end
 				
-				-- If the slot has a queue, we need to verify that the equipped item is the queue's active item
-				local list = set.Queues
-				if list and #list > 0 then
+				-- If the slot has an active auto-queue, verify that the equipped item is what the queue wants
+				-- (prevents zone/buff events from seeing the set as "equipped" when a queue swap is pending)
+				local slotQueue = ItemRack.GetQueues(setname)[i]
+				if slotQueue and #slotQueue > 0 and ItemRack.GetQueuesEnabled(setname)[i] then
 					if match then
 						local baseID = ItemRack.GetIRString(GetInventoryItemLink("player",i),true,true)
 						local start,duration,enable = GetInventoryItemCooldown("player",i)

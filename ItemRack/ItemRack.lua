@@ -609,7 +609,8 @@ function ItemRack.ProcessCombatQueue()
 			ItemRack.Debug("CombatQueue", "  ProcessCQ slot="..tostring(i).." canSwap="..tostring(canSwap))
 			if canSwap then
 				-- Skip slots whose auto-queue was disabled after this entry was added
-				if not ItemRack.GetQueuesEnabled()[i] and ItemRack.GetQueues()[i] then
+				-- Only discard auto-queued entries; manual queue advances should always be honored
+				if not ItemRack.GetQueuesEnabled()[i] and ItemRack.GetQueues()[i] and ItemRack.AutoQueueFlag[i] then
 					queue[i] = nil
 				else
 					combat[i] = queue[i]
@@ -642,9 +643,7 @@ function ItemRack.ProcessCombatQueue()
 			for i=1,#(ItemRack.RunAfterCombat) do
 				ItemRack[ItemRack.RunAfterCombat[i]]()
 			end
-			for i=1,#(ItemRack.RunAfterCombat) do
-				table.remove(ItemRack.RunAfterCombat,i)
-			end
+			wipe(ItemRack.RunAfterCombat)
 		end
 	end
 

@@ -526,9 +526,9 @@ function ItemRackOpt.SaveSet()
 	
 	-- Snapshot currently active queues into the set if per-set queues are enabled
 	if ItemRackUser.EnablePerSetQueues == "ON" then
-		-- Copy current state BEFORE clearing it, in case we are saving the actively equipped set
-		local activeQueuesEnabled = ItemRack.GetQueuesEnabled()
-		local activeQueues = ItemRack.GetQueues()
+		-- Read from the set being saved (not CurrentSet, which may have changed due to events)
+		local activeQueuesEnabled = ItemRack.GetQueuesEnabled(setname)
+		local activeQueues = ItemRack.GetQueues(setname)
 		
 		local newQueuesEnabled = {}
 		for i=0,19 do
@@ -1939,6 +1939,15 @@ function ItemRackOpt.ItemStatsCheckOnClick(self)
 		list[ItemRackOpt.SortSelected].keep = value
 	else
 		list[ItemRackOpt.SortSelected].priority = value
+	end
+end
+
+-- Refreshes the "Auto Queue This Slot" checkbox to reflect current state.
+-- Called from ButtonPreClick/MenuOnClick when Alt-click toggles auto-queue
+-- while the Queue Options panel is already open for the same slot.
+function ItemRackOpt.UpdateQueueEnable()
+	if ItemRackOpt.SelectedSlot then
+		ItemRackOptQueueEnable:SetChecked(ItemRack.GetQueuesEnabled(ItemRackOpt.QueueEditingSet)[ItemRackOpt.SelectedSlot])
 	end
 end
 
