@@ -19,8 +19,9 @@ function ItemRack.PeriodicQueueCheck()
 	end
 	-- Only process queues if global EnableQueues is ON and at least one slot is enabled
 	if ItemRackUser.EnableQueues=="ON" then
-		for i,v in pairs(ItemRack.GetQueuesEnabled()) do
-			if v then
+		local queuesEnabled = ItemRack.GetQueuesEnabled()
+		for i=0,19 do
+			if queuesEnabled[i] then
 				ItemRack.ProcessAutoQueue(i)
 			end
 		end
@@ -262,6 +263,46 @@ end
 function ItemRack.AutoQueueItemToEquip(slot, baseID, enable, ready)
 	local list = ItemRack.GetQueues()[slot]
 	local candidate
+
+	if not list then return nil end
+
+	-- Respect per-item flags (keep, delay) on the currently-equipped item.
+	-- These checks mirror what ProcessAutoQueue does at lines 224-234, but must also
+	-- live here because IsSetEquipped calls AutoQueueItemToEquip directly.
+	-- Without these checks, IsSetEquipped would falsely report the set as "not equipped"
+	-- whenever a kept/delayed item is worn, causing movement events to re-equip the set
+	-- and the set display to flip to "Custom".
+	local exactID = ItemRack.GetID(slot)
+	for i=1,#(list) do
+		if list[i].id == 0 then
+			break
+		end
+		local matched = false
+		if ItemRack.SameExactID(list[i].id, exactID) then
+			matched = true
+		else
+			local queueBaseID = string.match(tostring(list[i].id), "^(%d+)")
+			if queueBaseID == baseID then
+				matched = true
+			end
+		end
+		if matched then
+			-- Pause Queue: item is flagged to stay equipped indefinitely
+			if list[i].keep then
+				return nil
+			end
+			-- Delay: item should not be swapped until delay seconds after use
+			local delayValue = tonumber(list[i].delay)
+			if delayValue and delayValue > 0 then
+				local start = GetInventoryItemCooldown("player", slot)
+				if start and start > 0 and (GetTime() - start) <= delayValue then
+					return nil
+				end
+			end
+			break
+		end
+	end
+
 	-- reuse the loop structure but optimized for auto-queue logic (priority checks etc)
 	-- This will return nil if no new item should be equipped.  
 	--    - This is either because there is no auto queue or what we have equipped is already what we want.
@@ -309,13 +350,14 @@ function ItemRack.SetQueue(slot,newQueue)
 	if not newQueue then
 		ItemRack.GetQueuesEnabled()[slot] = nil
 	elseif type(newQueue)=="table" then
-		ItemRack.GetQueues()[slot] = ItemRack.GetQueues()[slot] or {}
-		for i in pairs(ItemRack.GetQueues()[slot]) do
-			ItemRack.GetQueues()[slot][i] = nil
-		end
+		-- Always create a fresh table so we never mutate an inherited reference
+		-- from a previous set in the event stack (the proxy's __newindex writes
+		-- this into currentSet.Queues[slot])
+		local fresh = {}
 		for i=1,#(newQueue) do
-			table.insert(ItemRack.GetQueues()[slot],newQueue[i])
+			table.insert(fresh, newQueue[i])
 		end
+		ItemRack.GetQueues()[slot] = fresh
 		if ItemRackOptFrame and ItemRackOptFrame:IsVisible() then
 			if ItemRackOptSubFrame7:IsVisible() and ItemRackOpt.SelectedSlot==slot then
 				ItemRackOpt.SetupQueue(slot)

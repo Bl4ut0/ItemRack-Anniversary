@@ -3161,14 +3161,63 @@ function ItemRack.ProfileFuncs()
 	end
 end
 
+-- Per-slot queue inheritance helper.
+-- Walks the event stack backwards (most recent event first) to find queue data
+-- for a slot that the current set doesn't define.  This ensures that event sets
+-- which only touch a few slots (e.g., a mount set with 1 trinket) don't wipe
+-- out the auto-queue state for every other slot.
+local function resolveSlotFromStack(field, slot)
+	local stack = ItemRackUser.EventStack
+	if stack then
+		for i = #stack, 1, -1 do
+			local evtName = stack[i]
+			local evtSetName = ItemRackUser.Events.Set[evtName]
+			if evtSetName then
+				local evtSet = ItemRackUser.Sets[evtSetName]
+				if evtSet and evtSet[field] and evtSet[field][slot] ~= nil then
+					return evtSet[field][slot]
+				end
+			end
+		end
+	end
+	return nil
+end
+
 -- returns Queues for the current set if EnablePerSetQueues is enabled, otherwise the global Queues
 -- Does NOT lazily create empty tables — that's SetupQueue's job
+--
+-- When called WITHOUT an explicit setname (active context), returns a per-slot
+-- inheritance proxy: current set → event stack sets → global.  This prevents
+-- event sets that only define a few slots from clearing the queue state of
+-- every other slot.
+--
+-- When called WITH an explicit setname (editing, saving, checking a specific
+-- set), returns that set's raw queue data directly — no inheritance.
 function ItemRack.GetQueues(setname)
 	if ItemRackUser.EnablePerSetQueues == "ON" then
 		local targetSet = setname or ItemRackUser.CurrentSet
 		local currentSet = targetSet and ItemRackUser.Sets[targetSet]
 		if currentSet and currentSet.Queues then
-			return currentSet.Queues
+			-- Explicit setname or per-set queues with no event stack: return raw data
+			if setname then
+				return currentSet.Queues
+			end
+			-- Active context: per-slot inheritance via metatable
+			return setmetatable({}, {
+				__index = function(_, slot)
+					if currentSet.Queues[slot] ~= nil then
+						return currentSet.Queues[slot]
+					end
+					local inherited = resolveSlotFromStack("Queues", slot)
+					if inherited ~= nil then
+						return inherited
+					end
+					return ItemRackUser.Queues[slot]
+				end,
+				__newindex = function(_, slot, value)
+					currentSet.Queues[slot] = value
+				end
+			})
 		end
 		return ItemRackUser.Queues -- fallback to global if set has no queues
 	else
@@ -3178,12 +3227,31 @@ end
 
 -- returns QueuesEnabled for the current set if EnablePerSetQueues is enabled, otherwise the global QueuesEnabled
 -- Does NOT lazily create empty tables — that's SetupQueue/SaveSet's job
+--
+-- Same per-slot inheritance logic as GetQueues (see above).
 function ItemRack.GetQueuesEnabled(setname)
 	if ItemRackUser.EnablePerSetQueues == "ON" then
 		local targetSet = setname or ItemRackUser.CurrentSet
 		local currentSet = targetSet and ItemRackUser.Sets[targetSet]
 		if currentSet and currentSet.QueuesEnabled then
-			return currentSet.QueuesEnabled
+			if setname then
+				return currentSet.QueuesEnabled
+			end
+			return setmetatable({}, {
+				__index = function(_, slot)
+					if currentSet.QueuesEnabled[slot] ~= nil then
+						return currentSet.QueuesEnabled[slot]
+					end
+					local inherited = resolveSlotFromStack("QueuesEnabled", slot)
+					if inherited ~= nil then
+						return inherited
+					end
+					return ItemRackUser.QueuesEnabled[slot]
+				end,
+				__newindex = function(_, slot, value)
+					currentSet.QueuesEnabled[slot] = value
+				end
+			})
 		end
 		return ItemRackUser.QueuesEnabled -- fallback to global if set has no queuesEnabled
 	else
