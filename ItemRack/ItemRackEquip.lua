@@ -173,6 +173,14 @@ function ItemRack.EquipSet(setname, disableSound)
 	local inCombat = InCombatLockdown()
 	local isInternalSet = setname and string.sub(setname, 1, 1) == "~" -- Internal sets like ~Unequip, ~CombatQueue, ~DualWieldRetry
 	
+	if ItemRack.BurntQueueItems then
+		for i in pairs(set.equip) do
+			if type(i) == "number" then
+				ItemRack.BurntQueueItems[i] = nil
+			end
+		end
+	end
+	
 	for i in pairs(set.equip) do
 		if type(i) == "number" then
 			if ItemRack.GetID(i)~=set.equip[i] then -- if intended item is not worn (exact match)

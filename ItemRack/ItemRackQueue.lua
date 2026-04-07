@@ -151,13 +151,19 @@ function ItemRack.ManualQueueAdvance(slot)
 	-- Try items after current index
 	for i = currentIdx + 1, #list do
 		if list[i].id == 0 then break end -- Stop marker
-		if tryEquip(list[i].id) then return true end
+		local candidate = string.match(list[i].id,"(%d+)")
+		if not (ItemRack.BurntQueueItems and ItemRack.BurntQueueItems[slot] and ItemRack.BurntQueueItems[slot][candidate]) then
+			if tryEquip(list[i].id) then return true end
+		end
 	end
 	
 	-- Wrap around to start of queue
 	for i = 1, currentIdx - 1 do
 		if list[i].id == 0 then break end
-		if tryEquip(list[i].id) then return true end
+		local candidate = string.match(list[i].id,"(%d+)")
+		if not (ItemRack.BurntQueueItems and ItemRack.BurntQueueItems[slot] and ItemRack.BurntQueueItems[slot][candidate]) then
+			if tryEquip(list[i].id) then return true end
+		end
 	end
 	
 	ItemRack.Debug("Queue", "ManualAdvance: no valid item found in bags")
@@ -240,13 +246,39 @@ function ItemRack.ProcessAutoQueue(slot)
 	end
 
 	-- logic to actually swap
-	local ready = ItemRack.ItemNearReady(baseID, slot)
+	local equippedCustomTime = nil
+	if list then
+		for i=1,#list do
+			if list[i].id == 0 then break end
+			local sqID = string.match(list[i].id,"^(%d+)")
+			if sqID == baseID then
+				equippedCustomTime = list[i].swapInEnabled and list[i].swapIn or nil
+				break
+			end
+		end
+	end
+	local ready = ItemRack.ItemNearReady(baseID, slot, equippedCustomTime)
 	if ready and ItemRack.CombatQueue[slot] then
 		ItemRack.CombatQueue[slot] = nil
 		ItemRack.UpdateCombatQueue()
 	end
 
 	if not list then return end
+
+	ItemRack.BurntQueueItems = ItemRack.BurntQueueItems or {}
+	ItemRack.BurntQueueItems[slot] = ItemRack.BurntQueueItems[slot] or {}
+	local start, duration = GetItemCooldown(tonumber(baseID))
+	if start and start > 0 and duration > 30 then
+		for i=1,#list do
+			if list[i].id == 0 then break end
+			if ItemRack.SameExactID(list[i].id, exactID) or string.match(tostring(list[i].id), "^(%d+)") == baseID then
+				if list[i].swapOnUse then
+					ItemRack.BurntQueueItems[slot][baseID] = true
+				end
+				break
+			end
+		end
+	end
 
 	local nextItem, nextItemID = ItemRack.AutoQueueItemToEquip(slot, baseID, enable, ready)
 	if nextItem then
@@ -311,13 +343,17 @@ function ItemRack.AutoQueueItemToEquip(slot, baseID, enable, ready)
 		-- If there is nothing at the top of our queue, return nil.
 		if list[i].id==0 then
 			return nil
+		-- Skip burnt items
+		elseif ItemRack.BurntQueueItems and ItemRack.BurntQueueItems[slot] and ItemRack.BurntQueueItems[slot][candidate] then
+			-- continue
 		-- If baseID is near ready but our candidate IS baseID, return nil.
 		elseif ready and candidate==baseID then
 			return nil
 		else
 			local canSwap = not ready or enable==0 or list[i].priority
 			if canSwap then
-				if ItemRack.ItemNearReady(candidate, slot) then
+				local candidateCustomTime = list[i].swapInEnabled and list[i].swapIn or nil
+				if ItemRack.ItemNearReady(candidate, slot, candidateCustomTime) then
 					return candidate, list[i].id
 				end
 			end
@@ -327,18 +363,18 @@ function ItemRack.AutoQueueItemToEquip(slot, baseID, enable, ready)
 	return nil
 end
 
-function ItemRack.ItemNearReady(id, slot)
+function ItemRack.ItemNearReady(id, slot, customReadyTime)
 	local start,duration = GetItemCooldown(id)
 	if not tonumber(start) then return end -- can return nil shortly after loading screen
 	if start==0 then return true end
 
-	-- Trinkets (slot 13, 14) and Rings (slot 11, 12) have a 30s equip CD.
-	-- We overlap the last 30s of their ability CD with the 30s equip CD by swapping them in early.
-	-- Other slots (like cloaks, helms) do not have equip CDs, or they have total cooldowns of 30s.
-	-- For non-trinketary slots, we do not want to overlap them, otherwise 30s-CD items get stuck permanently "ready".
-	local overlap = 0
-	if slot == 13 or slot == 14 or slot == 11 or slot == 12 then
-		overlap = 30
+	-- If the total cooldown duration is 30 seconds or less, it's almost certainly an equip cooldown
+	-- (or a very short ability CD), so we consider it "ready" to prevent it from swapping out instantly upon equip.
+	if duration <= 30 then return true end
+
+	local overlap = 30
+	if customReadyTime then
+		overlap = customReadyTime
 	end
 
 	if math.max(start + duration - GetTime(),0) <= overlap then

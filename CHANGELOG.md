@@ -2,6 +2,16 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.37] - 2026-04-06
+### ✨ New Features
+- **Burn on Use**: Added a per-item "Burn on Use" check-box for the queue editor. When enabled, using an item (and putting it on cooldown) flags it as "burnt." The auto-queue system gracefully skips burnt items on subsequent rotations until you naturally re-equip the set or manually jog the queue, allowing true single-use queue logic.
+- **Custom Swap-In Cooldowns**: Added a custom "Swap In" parameter. You can now define exactly how many seconds remaining on an item's cooldown it should be forcibly swapped back into the equipped slot (overwriting the default global 30-second overlap timer). 
+
+### 🐛 Bug Fixes
+- **UI Editing Context Desync**: Fixed a UI issue where the Queue Editing tab failed to bind strictly to the "Equip in options" checkbox configuration, inadvertently forcing the context to only the global equipped state.
+- **Queue Cooldown Crashing**: Fixed a critical `bad argument #1` `GetItemCooldown` Lua failure during queue processing where it erroneously tried to validate ItemRack's pseudo-string format instead of reducing it back to the pure numeric integer ID required by the C engine.
+- **Visual Alignments**: Polished the Options window layout to correctly anchor the new custom Queue Editor settings.
+
 ## [4.36] - 2026-04-02
 ### 🐛 Bug Fixes
 - **Pause Queue Bypassed on Movement**: Fixed a critical bug where marking a trinket as "Pause Queue" (`keep=true`) would only hold while standing still — as soon as you started walking, the auto-queue would swap it away to the next item. The root cause was `AutoQueueItemToEquip()` never checking the `keep` or `delay` flags on the currently-equipped item. While `ProcessAutoQueue` had its own guards, `AutoQueueItemToEquip` was also called from `IsSetEquipped()` in the event system (triggered by `PLAYER_STARTED_MOVING`), which would falsely report the set as "not equipped" and trigger a re-equip that overrode the paused trinket.

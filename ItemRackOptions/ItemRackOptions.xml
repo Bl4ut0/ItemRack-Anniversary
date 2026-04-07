@@ -2541,6 +2541,66 @@
 								</Scripts>
 							</CheckButton>
 
+							<CheckButton name="ItemRackOptItemStatsSwapOnUse" inherits="ItemRackOptSimpleCheckButton">
+								<Size>
+									<AbsDimension x="24" y="24"/>
+								</Size>
+								<Anchors>
+									<Anchor point="BOTTOMRIGHT" relativeTo="ItemRackOptSubFrame7" relativePoint="BOTTOMRIGHT">
+										<Offset>
+											<AbsDimension x="-8" y="0"/>
+										</Offset>
+									</Anchor>
+								</Anchors>
+								<Scripts>
+									<OnClick>
+										ItemRackOpt.ItemStatsCheckOnClick(self)
+									</OnClick>
+								</Scripts>
+							</CheckButton>
+
+							<CheckButton name="ItemRackOptItemStatsSwapInEnable" inherits="ItemRackOptSimpleCheckButton">
+								<Size>
+									<AbsDimension x="24" y="24"/>
+								</Size>
+								<Anchors>
+									<Anchor point="RIGHT" relativeTo="ItemRackOptItemStatsSwapOnUse" relativePoint="LEFT">
+										<Offset>
+											<AbsDimension x="-96" y="0"/>
+										</Offset>
+									</Anchor>
+								</Anchors>
+								<Scripts>
+									<OnClick>
+										ItemRackOpt.ItemStatsCheckOnClick(self)
+									</OnClick>
+								</Scripts>
+							</CheckButton>
+
+							<EditBox name="ItemRackOptItemStatsSwapInDelay" inherits="ItemRackOptSimpleEditBox">
+								<Anchors>
+									<Anchor point="LEFT" relativeTo="ItemRackOptItemStatsSwapInEnableText" relativePoint="RIGHT">
+										<Offset>
+											<AbsDimension x="4" y="-1"/>
+										</Offset>
+									</Anchor>
+								</Anchors>
+								<Scripts>
+									<OnTextChanged>
+										ItemRackOpt.ItemStatsSwapInDelayOnTextChanged(self)
+									</OnTextChanged>
+								</Scripts>
+							</EditBox>
+							<Frame name="ItemRackOptItemStatsSwapInDelayText" inherits="ItemRackOptSimpleLabelGroup">
+								<Anchors>
+									<Anchor point="LEFT" relativeTo="ItemRackOptItemStatsSwapInDelay" relativePoint="RIGHT">
+										<Offset>
+											<AbsDimension x="-2" y="1"/>
+										</Offset>
+									</Anchor>
+								</Anchors>
+							</Frame>
+
 						</Frames>
 					</Frame>
 
@@ -2643,7 +2703,7 @@
 						<Anchors>
 							<Anchor point="BOTTOMLEFT">
 								<Offset>
-									<AbsDimension x="48" y="0"/>
+									<AbsDimension x="12" y="2"/>
 								</Offset>
 							</Anchor>
 						</Anchors>

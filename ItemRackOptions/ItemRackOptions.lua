@@ -63,6 +63,9 @@ end
 ItemRack.CheckButtonLabels = {
 	["ItemRackOptItemStatsPriorityText"] = "Priority",
 	["ItemRackOptItemStatsKeepEquippedText"] = "Pause Queue",
+	["ItemRackOptItemStatsSwapOnUseText"] = "Burn on Use",
+	["ItemRackOptItemStatsSwapInEnableText"] = "Swap in",
+	["ItemRackOptItemStatsSwapInDelayTextText"] = "sec",
 	["ItemRackOptQueueEnableText"] = "Auto Queue This Slot",
 	["ItemRackOptSetsHideCheckButtonText"] = "Hide",
 	["ItemRackOptShowHelmText"] = "Show Helm",
@@ -155,6 +158,7 @@ function ItemRackOpt.OnLoad(self)
 		{type="check",optset=ItemRackUser,variable="EnableEvents",label="Enable events",tooltip="Enable events to automatically swap gear."},
 		{type="check",optset=ItemRackUser,variable="EnableQueues",label="Enable auto queues",tooltip="Enables auto queues to automatically swap gear."},
 		{type="check",optset=ItemRackUser,variable="EnablePerSetQueues",depend="EnableQueues",label="Enable per-set queues",tooltip="Enable individual auto queues per set."},
+		{type="check",optset=ItemRackUser,variable="EnableQueueContextCheck",label="Enable queue context check",tooltip="Inherit auto queues from previously active sets.\nWhen checked, sets that only swap a few slots (like a mount set) will preserve the queue states of the other slots."},
 		{type="number",optset=ItemRackUser,variable="ButtonSpacing",button=ItemRackOptButtonSpacing,label="Button spacing",tooltip="Padding distance between buttons.",combatlock=1},
 		{type="slider",button=ItemRackOptButtonSpacingSlider,variable="ButtonSpacing",label="Button spacing",tooltip="Padding distance between buttons.", min=0, max=24, step=1, form="%d",combatlock=1},
 		{type="number",optset=ItemRackUser,variable="Alpha",button=ItemRackOptAlpha,label="Transparency",tooltip="Transparency (alpha) of the buttons and menu."},
@@ -1121,7 +1125,7 @@ function ItemRackOpt.OptListCheckButtonOnClick(self,override)
 	elseif opt.variable=="ShowMinimap" then
 		opt.optset["minimap"]["hide"] = check ~= "ON" and true or false
 		ItemRack.ShowMinimap()
-	elseif opt.variable=="EnableQueues" or opt.variable=="EnablePerSetQueues" then
+	elseif opt.variable=="EnableQueues" or opt.variable=="EnablePerSetQueues" or opt.variable=="EnableQueueContextCheck" then
 		ItemRack.UpdateCombatQueue()
 	elseif opt.variable=="TinyTooltips" then
 		if check=="ON" then
@@ -1299,8 +1303,10 @@ function ItemRackOpt.BindFrameOnKeyDown(self,key)
 		ItemRackOpt.Binding.keyPressed = keyPressed
 		local oldAction = GetBindingAction(keyPressed)
 		if oldAction~="" and keyPressed~=ItemRackOpt.Binding.currentKey then
+			local bindingName = GetBindingText(oldAction,"BINDING_NAME_")
+			if not bindingName or bindingName == "" then bindingName = oldAction end
 			StaticPopupDialogs["ItemRackCONFIRMBINDING"] = {
-				text = NORMAL_FONT_COLOR_CODE..ItemRackOpt.Binding.keyPressed..FONT_COLOR_CODE_CLOSE.." is currently bound to "..NORMAL_FONT_COLOR_CODE..(GetBindingText(oldAction,"BINDING_NAME_") or "")..FONT_COLOR_CODE_CLOSE.."\n\nDo you want to bind "..NORMAL_FONT_COLOR_CODE..keyPressed..FONT_COLOR_CODE_CLOSE.." to "..NORMAL_FONT_COLOR_CODE..ItemRackOpt.Binding.name..FONT_COLOR_CODE_CLOSE.."?",
+				text = NORMAL_FONT_COLOR_CODE..ItemRackOpt.Binding.keyPressed..FONT_COLOR_CODE_CLOSE.." is currently bound to "..NORMAL_FONT_COLOR_CODE..bindingName..FONT_COLOR_CODE_CLOSE.."\n\nDo you want to bind "..NORMAL_FONT_COLOR_CODE..keyPressed..FONT_COLOR_CODE_CLOSE.." to "..NORMAL_FONT_COLOR_CODE..ItemRackOpt.Binding.name..FONT_COLOR_CODE_CLOSE.."?",
 				button1 = "Yes",
 				button2 = "No",
 				timeout = 0,
@@ -1312,7 +1318,11 @@ function ItemRackOpt.BindFrameOnKeyDown(self,key)
 			ItemRackOptBindFrame:EnableMouse(false) -- and mouse
 			ItemRackOptBindCancel:Disable()
 			ItemRackOptBindUnbind:Disable()
-			StaticPopup_Show("ItemRackCONFIRMBINDING")
+			local popup = StaticPopup_Show("ItemRackCONFIRMBINDING")
+			if not popup then
+				ItemRackOpt.ResetBindFrame()
+				ItemRackOpt.SetKeyBinding()
+			end
 		else
 			ItemRackOpt.SetKeyBinding()
 		end
@@ -1453,9 +1463,19 @@ function ItemRackOpt.SetupQueue(id)
 	if not ItemRackUser.Queues[id] then
 		ItemRackUser.Queues[id] = {}
 	end
-	-- If per-set queues are on, only initialize the CURRENT set's queue (not all sets)
+	
+	-- Determine the set being edited in the options UI
+	local uiSetName = ItemRackOptSetsName and ItemRackOptSetsName:GetText()
+	local editingSet
+	if ItemRackSettings.EquipOnSetPick == "ON" then
+		editingSet = ItemRackUser.CurrentSet
+	else
+		editingSet = (uiSetName and uiSetName ~= "" and ItemRackUser.Sets[uiSetName]) and uiSetName or ItemRackUser.CurrentSet
+	end
+	
+	-- If per-set queues are on, only initialize the currently edited set's queue (not all sets)
 	if ItemRackUser.EnablePerSetQueues == "ON" then
-		local currentSet = ItemRackUser.CurrentSet and ItemRackUser.Sets[ItemRackUser.CurrentSet]
+		local currentSet = editingSet and ItemRackUser.Sets[editingSet]
 		if currentSet then
 			if not currentSet.Queues then
 				currentSet.Queues = {}
@@ -1468,20 +1488,20 @@ function ItemRackOpt.SetupQueue(id)
 	
 	ItemRackOpt.SelectedSlot = id
 	ItemRackOpt.SortSelected = nil
-	ItemRackOpt.QueueEditingSet = ItemRackUser.CurrentSet
+	ItemRackOpt.QueueEditingSet = editingSet
 	ItemRackOptSlotQueueName:SetText(ItemRack.SlotInfo[id].real)
 	ItemRackOpt.PopulateSortList(id)
 	ItemRackOpt.ValidateSortButtons()
 	
 	-- Populate set info at the bottom of the queue frame
-	if ItemRackUser.EnablePerSetQueues == "ON" and ItemRackUser.CurrentSet and ItemRackUser.Sets[ItemRackUser.CurrentSet] then
-		local set = ItemRackUser.Sets[ItemRackUser.CurrentSet]
+	if ItemRackUser.EnablePerSetQueues == "ON" and editingSet and ItemRackUser.Sets[editingSet] then
+		local set = ItemRackUser.Sets[editingSet]
 		ItemRackOptQueueSetIcon:SetTexture(set.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
-		ItemRackOptQueueSetName:SetText(ItemRackUser.CurrentSet)
+		ItemRackOptQueueSetName:SetText(editingSet)
 		ItemRackOptQueueSetInfo:Show()
 	elseif ItemRackUser.EnablePerSetQueues == "ON" then
 		ItemRackOptQueueSetIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
-		ItemRackOptQueueSetName:SetText("No Set Active")
+		ItemRackOptQueueSetName:SetText("No Set Selected")
 		ItemRackOptQueueSetInfo:Show()
 	else
 		ItemRackOptQueueSetIcon:SetTexture("Interface\\AddOns\\ItemRack\\ItemRackGear")
@@ -1851,6 +1871,9 @@ function ItemRackOpt.ValidateSortButtons()
 
 		ItemRackOptItemStatsPriority:SetChecked(list[selected].id ~= "0" and list[selected].priority or false)
 		ItemRackOptItemStatsKeepEquipped:SetChecked(list[selected].id ~= "0" and list[selected].keep or false)
+		ItemRackOptItemStatsSwapOnUse:SetChecked(list[selected].id ~= "0" and list[selected].swapOnUse or false)
+		ItemRackOptItemStatsSwapInEnable:SetChecked(list[selected].id ~= "0" and list[selected].swapInEnabled or false)
+		ItemRackOptItemStatsSwapInDelay:SetText((list[selected].id ~= "0" and list[selected].swapIn) or "30")
 		ItemRackOptItemStatsDelay:SetText((list[selected].id ~= "0" and list[selected].delay) or "0")
 	else
 		ItemRackOptSortMoveDelete:Disable()
@@ -1933,13 +1956,23 @@ function ItemRackOpt.ItemStatsCheckOnClick(self)
 	local list = ItemRack.GetQueues(ItemRackOpt.QueueEditingSet)[ItemRackOpt.SelectedSlot]
 	if not list or not ItemRackOpt.SortSelected then return end
 	local value = self:GetChecked()
-	local which = self==ItemRackOptItemStatsPriority and "priority" or "keep"
-
-	if which == "keep" then
-		list[ItemRackOpt.SortSelected].keep = value
-	else
+	
+	if self == ItemRackOptItemStatsPriority then
 		list[ItemRackOpt.SortSelected].priority = value
+	elseif self == ItemRackOptItemStatsKeepEquipped then
+		list[ItemRackOpt.SortSelected].keep = value
+	elseif self == ItemRackOptItemStatsSwapOnUse then
+		list[ItemRackOpt.SortSelected].swapOnUse = value
+	elseif self == ItemRackOptItemStatsSwapInEnable then
+		list[ItemRackOpt.SortSelected].swapInEnabled = value
 	end
+end
+
+function ItemRackOpt.ItemStatsSwapInDelayOnTextChanged(self)
+	local list = ItemRack.GetQueues(ItemRackOpt.QueueEditingSet)[ItemRackOpt.SelectedSlot]
+	if not list or not ItemRackOpt.SortSelected then return end
+	local value = tonumber(self:GetText() or "") or 0
+	list[ItemRackOpt.SortSelected].swapIn = value
 end
 
 -- Refreshes the "Auto Queue This Slot" checkbox to reflect current state.

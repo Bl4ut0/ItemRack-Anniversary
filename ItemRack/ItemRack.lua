@@ -200,6 +200,7 @@ ItemRackUser = {
 	EnableEvents = "ON", -- whether all events enabled
 	EnableQueues = "ON", -- whether all auto queues enabled
 	EnablePerSetQueues = "OFF",
+	EnableQueueContextCheck = "ON",
 	ButtonSpacing = 4, -- padding between docked buttons
 	Alpha = 1, -- alpha of buttons
 	MainScale = 1, -- scale of the dockable buttons
@@ -312,6 +313,8 @@ ItemRack.TooltipInfo = {
 	{"ItemRackOptSetsHideCheckButton","Hide Set","Check this to make the set hidden in menus."},
 	{"ItemRackOptItemStatsPriority","Priority","Check this to make this item auto equip when it comes off cooldown even if the equipped item is off cooldown and waiting to be used."},
 	{"ItemRackOptItemStatsKeepEquipped","Pause Queue","Check this to suspend the auto queue for this slot until the item is unequipped. (For instance if you have another mod handling the auto equip of a riding crop."},
+	{"ItemRackOptItemStatsSwapOnUse","Burn on Use","Check this to permanently ignore this item in the queue for the rest of the play session once its cooldown is triggered. It will not be equipped again until you manually re-equip the set."},
+	{"ItemRackOptItemStatsSwapInEnable","Custom Swap In","Check this to override the default aggressive swap-in cooldown (30s for trinkets, 0s for others) and specify exactly how many seconds remaining on this item's cooldown it should be aggressively swapped back into the slot."},
 	{"ItemRackOptQueueEnable","Auto Queue This Slot","Check this to allow this slot to auto queue.  When an item goes on cooldown, it will swap for an item higher on the list that's off cooldown."},
 	{"ItemRackOptSetsHideCheckButton","Hide","Hide this set in menus. (Equivalent of Alt+clicking the set in the menu)"},
 	{"ItemRackOptSetsSaveButton","Save Set","Save this set. Some settings like key binding, cloak/helm visibility and whether it's hidden can only be changed to a saved set."},
@@ -3198,8 +3201,8 @@ function ItemRack.GetQueues(setname)
 		local targetSet = setname or ItemRackUser.CurrentSet
 		local currentSet = targetSet and ItemRackUser.Sets[targetSet]
 		if currentSet and currentSet.Queues then
-			-- Explicit setname or per-set queues with no event stack: return raw data
-			if setname then
+			-- Explicit setname, or context check disabled: return raw data
+			if setname or ItemRackUser.EnableQueueContextCheck ~= "ON" then
 				return currentSet.Queues
 			end
 			-- Active context: per-slot inheritance via metatable
@@ -3234,7 +3237,8 @@ function ItemRack.GetQueuesEnabled(setname)
 		local targetSet = setname or ItemRackUser.CurrentSet
 		local currentSet = targetSet and ItemRackUser.Sets[targetSet]
 		if currentSet and currentSet.QueuesEnabled then
-			if setname then
+			-- Explicit setname, or context check disabled: return raw data
+			if setname or ItemRackUser.EnableQueueContextCheck ~= "ON" then
 				return currentSet.QueuesEnabled
 			end
 			return setmetatable({}, {
