@@ -2585,21 +2585,25 @@
 										</Offset>
 									</Anchor>
 								</Anchors>
+								<Layers>
+									<Layer level="OVERLAY">
+										<FontString name="ItemRackOptItemStatsSwapInDelayTextText" font="GameFontHighlightSmall" justifyH="LEFT">
+											<Anchors>
+												<Anchor point="LEFT" relativePoint="RIGHT">
+													<Offset>
+														<AbsDimension x="6" y="0"/>
+													</Offset>
+												</Anchor>
+											</Anchors>
+										</FontString>
+									</Layer>
+								</Layers>
 								<Scripts>
 									<OnTextChanged>
 										ItemRackOpt.ItemStatsSwapInDelayOnTextChanged(self)
 									</OnTextChanged>
 								</Scripts>
 							</EditBox>
-							<Frame name="ItemRackOptItemStatsSwapInDelayText" inherits="ItemRackOptSimpleLabelGroup">
-								<Anchors>
-									<Anchor point="LEFT" relativeTo="ItemRackOptItemStatsSwapInDelay" relativePoint="RIGHT">
-										<Offset>
-											<AbsDimension x="-2" y="1"/>
-										</Offset>
-									</Anchor>
-								</Anchors>
-							</Frame>
 
 						</Frames>
 					</Frame>
