@@ -2548,7 +2548,7 @@
 								<Anchors>
 									<Anchor point="BOTTOMRIGHT" relativeTo="ItemRackOptSubFrame7" relativePoint="BOTTOMRIGHT">
 										<Offset>
-											<AbsDimension x="-8" y="0"/>
+											<AbsDimension x="-40" y="0"/>
 										</Offset>
 									</Anchor>
 								</Anchors>
@@ -2566,7 +2566,7 @@
 								<Anchors>
 									<Anchor point="RIGHT" relativeTo="ItemRackOptItemStatsSwapOnUse" relativePoint="LEFT">
 										<Offset>
-											<AbsDimension x="-96" y="0"/>
+											<AbsDimension x="-115" y="0"/>
 										</Offset>
 									</Anchor>
 								</Anchors>

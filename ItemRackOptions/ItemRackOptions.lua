@@ -63,7 +63,7 @@ end
 ItemRack.CheckButtonLabels = {
 	["ItemRackOptItemStatsPriorityText"] = "Priority",
 	["ItemRackOptItemStatsKeepEquippedText"] = "Pause Queue",
-	["ItemRackOptItemStatsSwapOnUseText"] = "Burn on Use",
+	["ItemRackOptItemStatsSwapOnUseText"] = "Burn",
 	["ItemRackOptItemStatsSwapInEnableText"] = "Swap in",
 	["ItemRackOptItemStatsSwapInDelayTextText"] = "sec",
 	["ItemRackOptQueueEnableText"] = "Auto Queue This Slot",
