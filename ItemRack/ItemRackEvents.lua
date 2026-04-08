@@ -254,7 +254,50 @@ function ItemRack.InitEvents()
 		}
 	end
 
+	-- ======================================================================
+	-- CLEANUP: Clear stale runtime state from SavedVariables
+	-- ItemRackEvents is a SavedVariable, so .Active, .LastZoneMatched,
+	-- .ManualOverride persist across sessions and must be wiped on init.
+	-- ======================================================================
+	for eventName, eventData in pairs(ItemRackEvents) do
+		eventData.Active = nil
+		eventData.LastZoneMatched = nil
+		eventData.ManualOverride = nil
+	end
+
+	-- ======================================================================
+	-- CLEANUP: Purge the EventStack.
+	-- Events with Unequip=false never pop, so the stack accumulates entries
+	-- across sessions. On a fresh login, the stack should always be empty;
+	-- events will push onto it naturally as zone/buff/stance conditions match.
+	-- ======================================================================
+	for i = #ItemRackUser.EventStack, 1, -1 do
+		table.remove(ItemRackUser.EventStack, i)
+	end
+
+	-- ======================================================================
+	-- CLEANUP: Wipe ALL stale old/oldset data on every set.
+	-- The .old table stores which items were displaced when the set was
+	-- equipped, and .oldset stores which set was active before. This data
+	-- is only valid during a single session — on login/reload, no set
+	-- should have restoration data. It will be correctly re-populated
+	-- when PushEvent/EquipSet actually fires during gameplay.
+	-- This prevents ghost set restores, self-referential loops
+	-- (Arena.oldset = "Arena"), and stale circular chains
+	-- (9% -> 6% 1H -> 6% 2H -> 9%).
+	-- ======================================================================
+	for setname, setData in pairs(ItemRackUser.Sets) do
+		if setData.old then
+			for k in pairs(setData.old) do
+				setData.old[k] = nil
+			end
+		end
+		setData.oldset = nil
+	end
+
 	-- Prime all events to prevent redundant swaps on login/reload
+	-- Only check enabled events to avoid false-positives on disabled events
+	local enabled = ItemRackUser.Events.Enabled
 	local getSpec = GetActiveTalentGroup or (C_Talent and C_Talent.GetActiveTalentGroup)
 	local currentSpec = getSpec and getSpec()
 	local currentStance = GetShapeshiftForm()
@@ -265,17 +308,28 @@ function ItemRack.InitEvents()
 
 	ItemRack.LastLastSpec = (currentSpec and currentSpec > 0) and currentSpec or nil
 
-	for eventName, eventData in pairs(ItemRackEvents) do
-		local shouldBeActive = false
-		if eventData.Type == "Specialization" and currentSpec and eventData.Spec == currentSpec then
-			shouldBeActive = true
-		elseif eventData.Type == "Stance" and ItemRack.GetStanceNumber(eventData.Stance) == currentStance then
-			shouldBeActive = true
-		elseif eventData.Type == "Zone" and (eventData.Zones[curZone] or eventData.Zones[curSubZone] or eventData.Zones[instanceType] or eventData.Zones[instanceType:gsub("^%l", string.upper)]) then
-			shouldBeActive = true
-		elseif eventData.Type == "Buff" then
-			if eventData.Anymount then
-				if isMounted then
+	for eventName in pairs(enabled) do
+		local eventData = ItemRackEvents[eventName]
+		if eventData then
+			local shouldBeActive = false
+			if eventData.Type == "Specialization" and currentSpec and eventData.Spec == currentSpec then
+				shouldBeActive = true
+			elseif eventData.Type == "Stance" and ItemRack.GetStanceNumber(eventData.Stance) == currentStance then
+				shouldBeActive = true
+			elseif eventData.Type == "Zone" and eventData.Zones and (eventData.Zones[curZone] or eventData.Zones[curSubZone] or eventData.Zones[instanceType] or eventData.Zones[instanceType:gsub("^%l", string.upper)]) then
+				shouldBeActive = true
+			elseif eventData.Type == "Buff" then
+				if eventData.Anymount then
+					if isMounted then
+						if eventData.OnMovement then
+							if GetUnitSpeed("player") > 0 then
+								shouldBeActive = true
+							end
+						else
+							shouldBeActive = true
+						end
+					end
+				elseif eventData.Buff and AuraUtil.FindAuraByName(eventData.Buff, "player") then
 					if eventData.OnMovement then
 						if GetUnitSpeed("player") > 0 then
 							shouldBeActive = true
@@ -284,21 +338,13 @@ function ItemRack.InitEvents()
 						shouldBeActive = true
 					end
 				end
-			elseif eventData.Buff and AuraUtil.FindAuraByName(eventData.Buff, "player") then
-				if eventData.OnMovement then
-					if GetUnitSpeed("player") > 0 then
-						shouldBeActive = true
-					end
-				else
-					shouldBeActive = true
-				end
 			end
-		end
-		
-		if shouldBeActive then
-			local setname = ItemRackUser.Events.Set[eventName]
-			if setname and ItemRack.IsSetEquipped(setname) then
-				eventData.Active = true
+			
+			if shouldBeActive then
+				local setname = ItemRackUser.Events.Set[eventName]
+				if setname and ItemRack.IsSetEquipped(setname) then
+					eventData.Active = true
+				end
 			end
 		end
 	end
@@ -404,7 +450,9 @@ function ItemRack.PushEvent(eventName)
 	local setname = ItemRackUser.Events.Set[eventName]
 	if setname then
 		local disableSound = ItemRackEvents[eventName] and ItemRackEvents[eventName].DisableSound
+		ItemRack.IsEventEquipment = true
 		ItemRack.EquipSet(setname, disableSound)
+		ItemRack.IsEventEquipment = nil
 	end
 end
 
@@ -420,9 +468,26 @@ function ItemRack.PopEvent(eventName)
 		end
 	end
 	
-	-- Always unequip the set that we pushed, so it restores its exact swaps
-	if poppedSet then
+	-- Check if any active Zone event has ManualOverride.
+	-- If so, and this isn't the zone event itself popping, skip the restore
+	-- to avoid overwriting the user's manual gear choice.
+	local suppressRestore = false
+	if poppedSet and ItemRackEvents[eventName] and ItemRackEvents[eventName].Type ~= "Zone" then
+		local enabled = ItemRackUser.Events.Enabled
+		for en in pairs(enabled) do
+			if ItemRackEvents[en] and ItemRackEvents[en].Type == "Zone" and ItemRackEvents[en].ManualOverride then
+				suppressRestore = true
+				ItemRack.Debug("Events", "PopEvent: suppressing restore for "..(eventName or "nil").." - zone ManualOverride active for "..(en or "nil"))
+				break
+			end
+		end
+	end
+	
+	-- Unequip the set that we pushed, so it restores its exact swaps
+	if poppedSet and not suppressRestore then
+		ItemRack.IsEventEquipment = true
 		ItemRack.UnequipSet(poppedSet, disableSound)
+		ItemRack.IsEventEquipment = nil
 	end
 end
 
@@ -577,64 +642,57 @@ function ItemRack.ProcessZoneEvent()
 			end
 			
 			if matchedZone then
-				-- Issue #5: Always attempt to equip if we enter/change to a matching zone,
-				-- even if we were already in another matching zone previously.
-				-- Updated: Only enforce re-equip if the specific matched sub-zone has genuinely changed,
-				-- instead of firing repeatedly on internal sub-zone changes within the same city/BG.
 				if not events[eventName].Active or events[eventName].LastZoneMatched ~= matchedZone then
 					if not ItemRack.IsSetEquipped(setname) then
-						local keepMount = true
-						
-						-- If we're currently mounted and in our mount event.
-						if ItemRackUser.Sets["Mounted"] and isMounted and events["Mounted"].Active then
-							-- If we're not actually wearing the mount set, then don't keepMount and let it reset in CheckForMountedEvents, if needed.
-							if not ItemRack.IsSetEquipped(ItemRackUser.Events.Set["Mounted"]) then
-								keepMount = false
-							else
-								-- If the oldset for Mounted is already the set we want to wear, just make sure we're still in a zone where we want to be mounted and then we'll stay mounted.
-								-- The set we'll want to wear for this zone will be reapplied once we dismount.
-								if ItemRackUser.Sets["Mounted"].oldset == setname then
-									if events["Mounted"].NotInPVP then
-										if instanceType=="arena" or instanceType=="pvp" then
-											keepMount = false
-											
-											if events["Mounted"].Unequip then
-												ItemRack.PopEvent("Mounted")
-											end
-										end
-									end
-									if events["Mounted"].NotInPVE then
-										if instanceType=="party" or instanceType=="raid" then
-											keepMount = false
-											
-											if events["Mounted"].Unequip then
-												ItemRack.PopEvent("Mounted")
-											end
-										end
-									end
-								else
-									-- Allow the mount set to be overriden if the old set is no longer what we want for this zone.
-									keepMount = false
-								end
-							end
+						-- Manual Override: if the event is already active but the set
+						-- isn't equipped, the user manually swapped gear. Respect it.
+						if events[eventName].Active then
+							events[eventName].ManualOverride = true
+							ItemRack.Debug("Events", "ProcessZoneEvent: ManualOverride set for "..(eventName or "nil").." - user manually changed gear")
 						else
-							keepMount = false
-						end
-						
-						if not keepMount then
-							-- Allow CheckForMountedEvents to update the set after we update it, if needed.
-							events["Mounted"].Active = false
-							-- _refreshMountState will allow CheckForMountedEvents to refresh the mount status after the timer goes off a few times.
-							-- This is to give a bit of a buffer between our new set being equipped and the mount set potentially being equipped.
-							_refreshMountState = 4
-									
-							if events[eventName].Active then
-								-- Already active but gear is missing. Just equip it directly without pushing again.
-								ItemRack.EquipSet(setname, events[eventName].DisableSound)
+							-- First entry into this zone - equip normally
+							local keepMount = true
+							
+							-- If we're currently mounted and in our mount event.
+							if ItemRackUser.Sets["Mounted"] and isMounted and events["Mounted"] and events["Mounted"].Active then
+								if not ItemRack.IsSetEquipped(ItemRackUser.Events.Set["Mounted"]) then
+									keepMount = false
+								else
+									if ItemRackUser.Sets["Mounted"].oldset == setname then
+										if events["Mounted"].NotInPVP then
+											if instanceType=="arena" or instanceType=="pvp" then
+												keepMount = false
+												if events["Mounted"].Unequip then
+													ItemRack.PopEvent("Mounted")
+												end
+											end
+										end
+										if events["Mounted"].NotInPVE then
+											if instanceType=="party" or instanceType=="raid" then
+												keepMount = false
+												if events["Mounted"].Unequip then
+													ItemRack.PopEvent("Mounted")
+												end
+											end
+										end
+									else
+										keepMount = false
+									end
+								end
 							else
-								eventToEquip = eventName
+								keepMount = false
 							end
-						end
+							
+							if not keepMount then
+								events["Mounted"].Active = false
+								_refreshMountState = 4
+							end
+							eventToEquip = eventName
+						end -- close if Active/else (ManualOverride vs first entry)
+					elseif events[eventName].ManualOverride then
+						-- Set IS equipped but ManualOverride was on - user re-equipped the zone set manually.
+						events[eventName].ManualOverride = nil
+						ItemRack.Debug("Events", "ProcessZoneEvent: ManualOverride cleared for "..(eventName or "nil").." - zone set re-equipped")
 					end
 					events[eventName].Active = true
 					events[eventName].LastZoneMatched = matchedZone
@@ -646,8 +704,8 @@ function ItemRack.ProcessZoneEvent()
 					end
 					events[eventName].Active = nil
 					events[eventName].LastZoneMatched = nil
+					events[eventName].ManualOverride = nil
 				elseif events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
-					-- Fallback for consistency (e.g. reload UI while in zone then leave)
 					eventToUnequip = eventName
 				end
 			end

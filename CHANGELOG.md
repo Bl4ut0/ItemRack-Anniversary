@@ -2,6 +2,16 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.38] - 2026-04-08
+### 🐛 Bug Fixes
+- **Options Load Crash**: Added a nil guard to the `CheckButtonLabels` loop in the Options window to prevent "attempt to index" errors if expected UI buttons are missing from the XML context.
+- **Zone Event Overriding Manual Swaps**: Fixed a critical bug where zone-based events (like Warsong Gulch auto-equip) would aggressively force the zone set back onto the player within seconds of manually changing gear. The event system now detects when a user has manually overridden the zone set and respects that choice for the remainder of the zone stay. The override clears automatically when leaving the zone, restoring pre-zone gear as expected.
+- **Stale SavedVariable Cleanup on Init**: Added comprehensive cleanup on every login/reload that wipes all transient runtime state from SavedVariables:
+  - **EventStack**: Purged on init — events with `Unequip=false` never popped, causing the stack to accumulate across sessions with stale restoration data.
+  - **old/oldset on ALL sets**: Wiped on init — these fields only have meaning during a single session. Stale chains (e.g., `Cloud.oldset = "Arena"`, `9% → 6% 1H → 6% 2H → 9%`) caused ghost set restores and infinite loops.
+  - **Runtime event flags**: `.Active`, `.LastZoneMatched`, `.ManualOverride` cleared from the account-wide `ItemRackEvents` SavedVariable to prevent stale zone-exit logic firing on login.
+- **Disabled Events Primed on Init**: Fixed the event priming logic iterating over ALL events (including disabled ones), which could mark disabled events as Active. Priming now only processes enabled events.
+
 ## [4.37] - 2026-04-06
 ### ✨ New Features
 - **Burn on Use**: Added a per-item "Burn on Use" check-box for the queue editor. When enabled, using an item (and putting it on cooldown) flags it as "burnt." The auto-queue system gracefully skips burnt items on subsequent rotations until you naturally re-equip the set or manually jog the queue, allowing true single-use queue logic.

@@ -230,8 +230,10 @@ function ItemRackOpt.OnLoad(self)
 	ItemRack.CreateTimer("SlotMarquee",ItemRackOpt.SlotMarquee,.1,1)
 
 	for i in pairs(ItemRack.CheckButtonLabels) do
-		_G[i]:SetText(ItemRack.CheckButtonLabels[i])
-		_G[i]:SetTextColor(1,1,1,1)
+		if _G[i] then
+			_G[i]:SetText(ItemRack.CheckButtonLabels[i])
+			_G[i]:SetTextColor(1,1,1,1)
+		end
 	end
 
 	ItemRackOpt.TriStateCheckSetState(ItemRackOptShowHelm,nil)
