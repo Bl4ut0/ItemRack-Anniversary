@@ -24,7 +24,7 @@ A comprehensive guide to all mouse, keyboard, and command controls available in 
 | **Hover** | Opens the item selection flyout menu |
 | **Shift+Left-Click** | Links the equipped item to chat (if chat edit box is open) |
 | **Alt+Left-Click** | Toggles Auto-Queue ON/OFF for that slot |
-| **Alt+Right-Click** | Opens the Queue configuration panel for that slot |
+| **Alt+Right-Click** | Opens the Queue Menu (Configuration Panel) for that slot |
 | **Drag (Left or Right)** | Moves the button (if unlocked); Shift+Drag moves just that button, otherwise the entire docked group moves |
 
 ---
@@ -33,11 +33,11 @@ A comprehensive guide to all mouse, keyboard, and command controls available in 
 
 | Action | Effect |
 |--------|--------|
-| **Left-Click** | Equips the current set (or toggles if "Equip Toggle" is ON) |
-| **Right-Click** | Opens the Sets tab in Options |
+| **Left-Click** | Equips the current set (or toggles if "Equip Toggle" is ON). Manually equipping a set suppresses conflicting automated background events. |
+| **Right-Click** | Opens the ItemRack Options window |
 | **Shift+Left-Click** | Unequips the current gear set |
 | **Alt+Left-Click** | Toggles ItemRack Events ON/OFF |
-| **Alt+Right-Click** | Opens the Sets tab in Options |
+| **Alt+Right-Click** | Opens the Events tab in Options |
 
 ---
 
@@ -50,6 +50,7 @@ A comprehensive guide to all mouse, keyboard, and command controls available in 
 | **Shift+Click** item | Links the item to chat (if chat edit box is open) |
 | **Alt+Click** item | Toggles the item as "Hidden" (if AllowHidden is ON) |
 | **Left-Click** while bank is open | Pulls item from bank to bags, or pushes to bank if already owned |
+| **Shift+Left-Click** while bank is open | Equips the item directly from the bank instead of depositing/pulling it |
 | **Right-Click** menu frame | Toggles menu orientation (Vertical ↔ Horizontal) |
 | **Drag** menu frame border | Re-docks the menu to a different corner of the button |
 
@@ -67,7 +68,16 @@ A comprehensive guide to all mouse, keyboard, and command controls available in 
 
 ---
 
-## ⌨️ Slash Commands
+## ⌨️ Keybinds
+
+All 20 ItemRack equipment slots can be bound directly via the native WoW interface without needing slash commands or macros.
+1. Open the game window and press **Escape** -> **Key Bindings**
+2. Scroll to the **AddOns** category and find the **ItemRack** section
+3. Bind keys directly to specific slots (e.g., "Trinket 1", "Main Hand")
+
+---
+
+## 💻 Slash Commands
 
 | Command | Effect |
 |---------|--------|
@@ -97,8 +107,8 @@ A comprehensive guide to all mouse, keyboard, and command controls available in 
 | Option | Effect |
 |--------|--------|
 | **Disable Alt+Click** | Disables Alt+Click toggling Auto-Queue (useful for self-cast macros) |
-| **Menu on Shift** | Requires holding Shift to open flyout menus |
-| **Menu on Right-Click** | Opens menus on right-click instead of hover |
+| **Menu on Shift** | Requires holding Shift to open flyout menus (Mutually exclusive with Menu on Right-Click) |
+| **Menu on Right-Click** | Opens menus on right-click instead of hover (Mutually exclusive with Menu on Shift) |
 | **Allow Hidden** | Enables hiding items from menus via Alt+Click |
 | **Lock** | Prevents all button movement |
 
@@ -112,6 +122,7 @@ The Auto-Queue system automatically swaps items based on cooldown availability:
 2. **Configure Priority**: In the Queue tab, rank items from highest to lowest priority
 3. **How it works**: When an equipped item goes on cooldown, ItemRack swaps to the next ready item
 4. **Pause Queue**: Check "Pause Queue" on items to prevent them from being swapped out during use
+5. **Per-Set Queues**: Gear Sets automatically save and recall which slot queues are currently enabled when you equip them
 
 ---
 

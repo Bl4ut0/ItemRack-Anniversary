@@ -60,6 +60,7 @@ The Auto-Queue system ensures you always have a "ready" item equipped:
 2. Rank your items from top to bottom (Priority).
 3. When an equipped item goes on cooldown, ItemRack will automatically swap it for the highest priority item that is ready.
 4. **Pause Queue:** You can check "Pause Queue" on specific items to prevent them from being swapped out while in use.
+5. **Per-Set Queues:** Gear Sets automatically save and recall which slot queues are currently enabled when you equip them.
 
 ### ⚡ Events & Automation
 Events allow for complex automation based on game state:
@@ -69,7 +70,8 @@ Events allow for complex automation based on game state:
    - **Mounting:** Swap to riding gear.
    - **Zone Changes:** Swap gear when entering a specific raid or city.
    - **Combat State:** Switch weapons or gear sets when entering/leaving combat.
-3. **Event Tracking:** Use the "Events" listener button on the config page to monitor which triggers are firing in real-time for debugging.
+3. **Manual Overrides:** Manually picking a set actively overrides and suppresses background events that attempt to combat your choice. 
+4. **Event Tracking:** Use the "Events" listener button on the config page to monitor which triggers are firing in real-time for debugging.
 
 ## TBC Anniversary Compatibility
 

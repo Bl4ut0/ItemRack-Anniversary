@@ -789,7 +789,15 @@ end
 function ItemRack.UpdateButtonCooldowns()
 	for i in pairs(ItemRackUser.Buttons) do
 		if i<20 then
-			CooldownFrame_Set(_G["ItemRackButton"..i.."Cooldown"],GetInventoryItemCooldown("player",i))
+			local start, duration, enable = GetInventoryItemCooldown("player",i)
+			-- During stuns/loss-of-control, the game sets enable=0 even when items
+			-- have real cooldowns running. This causes CooldownFrame_Set to hide the
+			-- cooldown swirl. Override enable to 1 when there's a genuine cooldown
+			-- in progress so the visual is preserved.
+			if start and start > 0 and duration and duration > 0 then
+				enable = 1
+			end
+			CooldownFrame_Set(_G["ItemRackButton"..i.."Cooldown"], start, duration, enable)
 		end
 	end
 	ItemRack.WriteButtonCooldowns()
