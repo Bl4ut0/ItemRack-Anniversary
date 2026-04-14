@@ -1692,7 +1692,12 @@ function ItemRack.UpdateMenuCooldowns()
 	for i=1,#(ItemRack.Menu) do
 		baseID = tonumber(ItemRack.GetIRString(ItemRack.Menu[i],true)) --get baseID and convert it to number to be able to use it in numerical comparisons below
 		if baseID and baseID>0 and ItemRack.menuOpen<20 then
-			CooldownFrame_Set(_G["ItemRackMenu"..i.."Cooldown"],GetItemCooldown(baseID))
+			local start, duration, enable = GetItemCooldown(baseID)
+			-- Override enable during stuns/loss-of-control (same fix as UpdateButtonCooldowns)
+			if start and start > 0 and duration and duration > 0 then
+				enable = 1
+			end
+			CooldownFrame_Set(_G["ItemRackMenu"..i.."Cooldown"], start, duration, enable)
 		else
 			_G["ItemRackMenu"..i.."Cooldown"]:Hide()
 		end
@@ -2306,12 +2311,15 @@ function ItemRack.AnchorTooltip(owner)
 				
 				if spaceRight >= spaceLeft then
 					GameTooltip:SetOwner(ItemRackMenuFrame, "ANCHOR_RIGHT")
+					ItemRack.pendingTooltipAnchor = "ANCHOR_RIGHT"
 				else
 					GameTooltip:SetOwner(ItemRackMenuFrame, "ANCHOR_LEFT")
+					ItemRack.pendingTooltipAnchor = "ANCHOR_LEFT"
 				end
 
 				-- Store vertical owner so ApplyTooltipAnchor can reposition the tooltip
 				-- to align with the specific button instead of the top of the menu frame.
+				ItemRack.pendingTooltipOwner = ItemRackMenuFrame
 				ItemRack.pendingTooltipVerticalOwner = owner
 			else
 				-- Tooltips for the character sheet slot itself (when hovering the slot while menu is open):
@@ -2358,13 +2366,14 @@ function ItemRack.TooltipUpdate()
 		if ItemRack.TooltipType=="BAG" then
 			if ItemRack.TooltipBag == BANK_CONTAINER or ItemRack.TooltipBag == -1 then
 				GameTooltip:SetInventoryItem("player",BankButtonIDToInvSlotID(ItemRack.TooltipSlot))
+				cooldown = 0
 			else
 				GameTooltip:SetBagItem(ItemRack.TooltipBag,ItemRack.TooltipSlot)
+				cooldown = GetContainerItemCooldown(ItemRack.TooltipBag,ItemRack.TooltipSlot) or 0
 			end
-			cooldown = GetContainerItemCooldown(ItemRack.TooltipBag,ItemRack.TooltipSlot)
 		else
 			GameTooltip:SetInventoryItem("player",ItemRack.TooltipSlot)
-			cooldown = GetInventoryItemCooldown("player",ItemRack.TooltipSlot)
+			cooldown = GetInventoryItemCooldown("player",ItemRack.TooltipSlot) or 0
 		end
 		ItemRack.ShrinkTooltip(ItemRack.TooltipOwner) -- if TinyTooltips on, shrink it
 		if ItemRack.TooltipType=="INVENTORY" and ItemRack.TooltipBag then
@@ -2692,13 +2701,13 @@ function ItemRack.ApplyTooltipAnchor()
 		if verticalOwner and verticalOwner:GetTop() and owner:GetTop() then
 			yOffset = verticalOwner:GetTop() - owner:GetTop()
 		end
-		GameTooltip:SetPoint("TOPLEFT", owner, "TOPRIGHT", 0, yOffset)
+		GameTooltip:SetPoint("TOPLEFT", owner, "TOPRIGHT", 5, yOffset)
 	elseif anchor == "ANCHOR_LEFT" then
 		local yOffset = 0
 		if verticalOwner and verticalOwner:GetTop() and owner:GetTop() then
 			yOffset = verticalOwner:GetTop() - owner:GetTop()
 		end
-		GameTooltip:SetPoint("TOPRIGHT", owner, "TOPLEFT", 0, yOffset)
+		GameTooltip:SetPoint("TOPRIGHT", owner, "TOPLEFT", -5, yOffset)
 	elseif anchor == "ANCHOR_BOTTOMLEFT" then
 		GameTooltip:SetPoint("TOPLEFT", owner, "BOTTOMLEFT", 0, 0)
 	end

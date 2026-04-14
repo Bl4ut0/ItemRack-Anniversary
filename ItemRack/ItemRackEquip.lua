@@ -188,7 +188,9 @@ function ItemRack.EquipSet(setname, disableSound)
 				if not inv and not bag then
 					-- if not found at all, then start/add to list of items not found
 					-- Suppress these messages during combat or for internal sets (they're noise)
-					if not inCombat and not isInternalSet then
+					if set.equip[i] == 0 then
+						swap[i] = 0
+					elseif not inCombat and not isInternalSet then
 						couldntFind = couldntFind or "Could not find: "
 						couldntFind = couldntFind.."["..tostring(ItemRack.GetInfoByID(set.equip[i])).."] "
 					end
@@ -641,7 +643,10 @@ function ItemRack.IsSetEquipped(setname,exact)
 end
 
 function ItemRack.UnequipSet(setname, disableSound)
-	if setname and ItemRackUser.Sets[setname] and ItemRackUser.Sets[setname].old then
+	-- Unequips a set. If 'parentSet' is found, it patches the stack.
+	-- Otherwise, it restores the set's 'old' to 'ItemRackUser.CurrentSet' via '~Unequip'.
+	if setname and ItemRackUser.Sets[setname] then
+		ItemRack.Debug("Equip", "UnequipSet called for:", setname, "- CurrentSet is:", ItemRackUser.CurrentSet)
 		if ItemRack.AnythingLocked() then
 			ItemRack.AddSetToSetsWaiting(setname,ItemRack.UnequipSet, disableSound)
 			return
@@ -672,6 +677,7 @@ function ItemRack.UnequipSet(setname, disableSound)
 		
 		local shouldRestore = false
 		if parentSet then
+			ItemRack.Debug("Equip", "parentSet found:", parentSet, "- Stack splicing.")
 			-- We are buried. Patch the chain.
 			-- Parent ("Zoomies") should now point to Our Previous ("Normal") instead of Us ("Drank")
 			ItemRackUser.Sets[parentSet].oldset = ItemRackUser.Sets[setname].oldset
@@ -686,9 +692,11 @@ function ItemRack.UnequipSet(setname, disableSound)
 					end
 				end
 			end
+			ItemRack.Debug("Equip", "parentSet shouldRestore evaluated to:", shouldRestore)
 			-- Prepare ~Unequip to restore items, but set oldset to nil so EndSetSwap doesn't change CurrentSet
 			ItemRackUser.Sets["~Unequip"].oldset = nil
 		elseif ItemRackUser.CurrentSet == setname then
+			ItemRack.Debug("Equip", "Top of stack normal unequip. shouldRestore = true")
 			-- Normal unequip (Top of stack and matches CurrentSet)
 			shouldRestore = true
 			ItemRackUser.Sets["~Unequip"].oldset = ItemRackUser.Sets[setname].oldset
@@ -696,11 +704,37 @@ function ItemRack.UnequipSet(setname, disableSound)
 				ItemRackUser.Sets["~Unequip"].ShowHelm = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowHelm
 				ItemRackUser.Sets["~Unequip"].ShowCloak = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowCloak
 			end
+		else
+			-- Final check: if the event hasn't finished pushing yet because of WoW API locks (SetsWaiting or SetSwapping)
+			-- CurrentSet mathematically hasn't been assigned yet, but in reality, this set IS the current set intent.
+			local isPendingOrSwapping = false
+			if ItemRack.SetSwapping == setname then
+				isPendingOrSwapping = true
+			elseif ItemRack.SetsWaiting then
+				for _, q in ipairs(ItemRack.SetsWaiting) do
+					if q[1] == setname then
+						isPendingOrSwapping = true
+						break
+					end
+				end
+			end
+			
+			if isPendingOrSwapping then
+				ItemRack.Debug("Equip", "Pending API locks detected for top stack. shouldRestore = true")
+				shouldRestore = true
+				ItemRackUser.Sets["~Unequip"].oldset = ItemRackUser.Sets[setname].oldset
+				if ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset] then
+					ItemRackUser.Sets["~Unequip"].ShowHelm = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowHelm
+					ItemRackUser.Sets["~Unequip"].ShowCloak = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowCloak
+				end
+			end
 		end
 		
 		if shouldRestore then
+			ItemRack.Debug("Equip", "Equipping ~Unequip to restore items.")
 			ItemRack.EquipSet("~Unequip", disableSound)
 		else
+			ItemRack.Debug("Equip", "shouldRestore is FALSE (CurrentSet doesn't match and not buried). Wiping .old data for setname:", setname)
 			-- Restore was suppressed (manual override). Clean up stale old/oldset
 			-- on the popped set so it doesn't linger in SavedVariables.
 			for k in pairs(old) do

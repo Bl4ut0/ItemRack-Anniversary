@@ -473,8 +473,11 @@ function ItemRack.PopEvent(eventName)
 	-- IF AND ONLY IF the event popping is buried beneath the user's manual gear choice.
 	-- If the event is the Active CurrentSet (e.g. Mount), it must be allowed to unequip natively.
 	local suppressRestore = false
+	ItemRack.Debug("Events", "PopEvent evaluating suppressRestore. CurrentSet is:", ItemRackUser.CurrentSet)
 	if poppedSet and ItemRackUser.CurrentSet ~= poppedSet and ItemRackEvents[eventName] and ItemRackEvents[eventName].Type ~= "Zone" then
 		
+		ItemRack.Debug("Events", "PopEvent: CurrentSet ~= poppedSet. Checking if pending...")
+
 		-- Check if the set is still actively swapping or waiting to swap.
 		-- If so, CurrentSet hasn't updated yet, so do NOT suppress the unequip.
 		local isPending = (ItemRack.SetSwapping == poppedSet)
@@ -488,6 +491,7 @@ function ItemRack.PopEvent(eventName)
 		end
 
 		if not isPending then
+			ItemRack.Debug("Events", "PopEvent: Not pending. Checking Zone Overrides for suppressRestore")
 			local enabled = ItemRackUser.Events.Enabled
 			for en in pairs(enabled) do
 				if ItemRackEvents[en] and ItemRackEvents[en].Type == "Zone" and ItemRackEvents[en].ManualOverride then
@@ -496,14 +500,19 @@ function ItemRack.PopEvent(eventName)
 					break
 				end
 			end
+		else
+			ItemRack.Debug("Events", "PopEvent: isPending = true. Skipping suppression.")
 		end
 	end
 	
 	-- Unequip the set that we pushed, so it restores its exact swaps
 	if poppedSet and not suppressRestore then
+		ItemRack.Debug("Events", "PopEvent: Calling UnequipSet for:", poppedSet)
 		ItemRack.IsEventEquipment = true
 		ItemRack.UnequipSet(poppedSet, disableSound)
 		ItemRack.IsEventEquipment = nil
+	elseif suppressRestore then
+		ItemRack.Debug("Events", "PopEvent: UnequipSet SUPPRESSED for:", poppedSet)
 	end
 end
 
@@ -1013,10 +1022,9 @@ function ItemRack.ProcessBuffEvent()
 						end
 					elseif isSetEquipped and events[eventName].Unequip then
 						-- Fallback: If we didn't track it as active but the set IS equipped, unequip it
-						-- This handles cases like reloading UI while mounted.
 						-- Fixed: Skip if the user manually equipped this set right now (CurrentSet check)
-						-- Fixed: Skip if the addon is actively swapping out any set to prevent double-pop wiping .old data
-						if ItemRackUser.CurrentSet ~= setname and not ItemRack.SetSwapping then
+						-- Fixed: Skip if the addon is actively swapping out any set (SetSwapping) or if items are locked (AnythingLocked) to prevent double-pops from server lag
+						if ItemRackUser.CurrentSet ~= setname and not ItemRack.SetSwapping and not ItemRack.AnythingLocked() then
 							ItemRack.PopEvent(eventName)
 						end
 					end
