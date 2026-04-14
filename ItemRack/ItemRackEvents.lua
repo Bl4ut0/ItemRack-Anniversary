@@ -469,16 +469,32 @@ function ItemRack.PopEvent(eventName)
 	end
 	
 	-- Check if any active Zone event has ManualOverride.
-	-- If so, and this isn't the zone event itself popping, skip the restore
-	-- to avoid overwriting the user's manual gear choice.
+	-- If so, and this isn't the zone event itself popping, suppress the restore
+	-- IF AND ONLY IF the event popping is buried beneath the user's manual gear choice.
+	-- If the event is the Active CurrentSet (e.g. Mount), it must be allowed to unequip natively.
 	local suppressRestore = false
-	if poppedSet and ItemRackEvents[eventName] and ItemRackEvents[eventName].Type ~= "Zone" then
-		local enabled = ItemRackUser.Events.Enabled
-		for en in pairs(enabled) do
-			if ItemRackEvents[en] and ItemRackEvents[en].Type == "Zone" and ItemRackEvents[en].ManualOverride then
-				suppressRestore = true
-				ItemRack.Debug("Events", "PopEvent: suppressing restore for "..(eventName or "nil").." - zone ManualOverride active for "..(en or "nil"))
-				break
+	if poppedSet and ItemRackUser.CurrentSet ~= poppedSet and ItemRackEvents[eventName] and ItemRackEvents[eventName].Type ~= "Zone" then
+		
+		-- Check if the set is still actively swapping or waiting to swap.
+		-- If so, CurrentSet hasn't updated yet, so do NOT suppress the unequip.
+		local isPending = (ItemRack.SetSwapping == poppedSet)
+		if not isPending and ItemRack.SetsWaiting then
+			for _, q in ipairs(ItemRack.SetsWaiting) do
+				if q[1] == poppedSet then
+					isPending = true
+					break
+				end
+			end
+		end
+
+		if not isPending then
+			local enabled = ItemRackUser.Events.Enabled
+			for en in pairs(enabled) do
+				if ItemRackEvents[en] and ItemRackEvents[en].Type == "Zone" and ItemRackEvents[en].ManualOverride then
+					suppressRestore = true
+					ItemRack.Debug("Events", "PopEvent: suppressing restore for "..(eventName or "nil").." - zone ManualOverride active for "..(en or "nil").." to protect manual gear context")
+					break
+				end
 			end
 		end
 	end
@@ -597,6 +613,8 @@ function ItemRack.ProcessStanceEvent()
 						if not ItemRack.IsSetEquipped(setname) then
 							eventToEquip = eventName
 							events[eventName].Active = true
+						else
+							events[eventName].Active = true
 						end
 					end
 				elseif stance~=currentStance then
@@ -606,8 +624,10 @@ function ItemRack.ProcessStanceEvent()
 						end
 						events[eventName].Active = nil
 					elseif events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
-						-- Fallback for consistency
-						eventToUnequip = eventName
+						-- Fallback for consistency: only trigger if the user didn't manually equip this set
+						if ItemRackUser.CurrentSet ~= setname then
+							eventToUnequip = eventName
+						end
 					end
 				end
 			end
@@ -706,7 +726,10 @@ function ItemRack.ProcessZoneEvent()
 					events[eventName].LastZoneMatched = nil
 					events[eventName].ManualOverride = nil
 				elseif events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
-					eventToUnequip = eventName
+					-- Fallback for consistency: only trigger if the user didn't manually equip this set
+					if ItemRackUser.CurrentSet ~= setname then
+						eventToUnequip = eventName
+					end
 				end
 			end
 		end
@@ -753,8 +776,10 @@ function ItemRack.ProcessSpecializationEvent()
 					end
 					events[eventName].Active = nil
 				elseif events[eventName].Unequip and ItemRack.IsSetEquipped(setname) then
-					-- Fallback for consistency
-					eventToUnequip = eventName
+					-- Fallback for consistency: only trigger if the user didn't manually equip this set
+					if ItemRackUser.CurrentSet ~= setname then
+						eventToUnequip = eventName
+					end
 				end
 			end
 		end
@@ -950,6 +975,10 @@ function ItemRack.ProcessBuffEvent()
 						if not isSetEquipped then
 							ItemRack.PushEvent(eventName)
 							events[eventName].Active = true
+						else
+							-- Already equipped (e.g. from UI reload or manual preemptive equip),
+							-- simply mark it Active to re-sync the internal event state!
+							events[eventName].Active = true
 						end
 					end
 				elseif not buff then
@@ -984,8 +1013,12 @@ function ItemRack.ProcessBuffEvent()
 						end
 					elseif isSetEquipped and events[eventName].Unequip then
 						-- Fallback: If we didn't track it as active but the set IS equipped, unequip it
-						-- This handles cases like reloading UI while mounted
-						ItemRack.PopEvent(eventName)
+						-- This handles cases like reloading UI while mounted.
+						-- Fixed: Skip if the user manually equipped this set right now (CurrentSet check)
+						-- Fixed: Skip if the addon is actively swapping out any set to prevent double-pop wiping .old data
+						if ItemRackUser.CurrentSet ~= setname and not ItemRack.SetSwapping then
+							ItemRack.PopEvent(eventName)
+						end
 					end
 				end
 			end

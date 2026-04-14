@@ -515,12 +515,11 @@ function ItemRack.EndSetSwap(setname)
 					end
 				end
 			end
-
 		elseif ItemRackUser.Sets[setname].oldset then
-			-- if this is a special set that stored a setname, set current to that setname
+			-- Internal set (e.g. ~Unequip, ~CombatQueue) finished restoring gear.
+			-- Set CurrentSet back to the set name stored in oldset.
 			ItemRackUser.CurrentSet = ItemRackUser.Sets[setname].oldset
 			ItemRackUser.Sets[setname].oldset = nil
-			-- Delay the UI update to allow item locks to clear (same as normal sets on line 371)
 			C_Timer.After(0.5, ItemRack.UpdateCurrentSet)
 		end
 		if ItemRackOptFrame and ItemRackOptFrame:IsVisible() then
@@ -654,7 +653,7 @@ function ItemRack.UnequipSet(setname, disableSound)
 		-- We must splice it out: update parent's oldset, restore items, but DO NOT update CurrentSet.
 		local parentSet = nil
 		for sName, sData in pairs(ItemRackUser.Sets) do
-			if sData.oldset == setname and sData.key ~= setname then -- ensure not self-referential
+			if not string.match(sName, "^~") and sData.oldset == setname and sData.key ~= setname then -- ensure not self-referential
 				parentSet = sName
 				break 
 			end
@@ -671,15 +670,27 @@ function ItemRack.UnequipSet(setname, disableSound)
 			end
 		end
 		
+		local shouldRestore = false
 		if parentSet then
 			-- We are buried. Patch the chain.
 			-- Parent ("Zoomies") should now point to Our Previous ("Normal") instead of Us ("Drank")
 			ItemRackUser.Sets[parentSet].oldset = ItemRackUser.Sets[setname].oldset
 			
+			-- Only restore items if the parent is an active event.
+			-- If it's a manual set, the user's gear choice should be respected.
+			if ItemRackUser.EventStack then
+				for _, eName in ipairs(ItemRackUser.EventStack) do
+					if ItemRackUser.Events.Set[eName] == parentSet then
+						shouldRestore = true
+						break
+					end
+				end
+			end
 			-- Prepare ~Unequip to restore items, but set oldset to nil so EndSetSwap doesn't change CurrentSet
 			ItemRackUser.Sets["~Unequip"].oldset = nil
-		else
-			-- Normal unequip (Top of stack)
+		elseif ItemRackUser.CurrentSet == setname then
+			-- Normal unequip (Top of stack and matches CurrentSet)
+			shouldRestore = true
 			ItemRackUser.Sets["~Unequip"].oldset = ItemRackUser.Sets[setname].oldset
 			if ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset] then
 				ItemRackUser.Sets["~Unequip"].ShowHelm = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowHelm
@@ -687,7 +698,16 @@ function ItemRack.UnequipSet(setname, disableSound)
 			end
 		end
 		
-		ItemRack.EquipSet("~Unequip", disableSound)
+		if shouldRestore then
+			ItemRack.EquipSet("~Unequip", disableSound)
+		else
+			-- Restore was suppressed (manual override). Clean up stale old/oldset
+			-- on the popped set so it doesn't linger in SavedVariables.
+			for k in pairs(old) do
+				old[k] = nil
+			end
+			ItemRackUser.Sets[setname].oldset = nil
+		end
 	end
 end
 
