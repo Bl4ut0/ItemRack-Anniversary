@@ -180,6 +180,7 @@ function ItemRackOpt.OnLoad(self)
 		{type="check",optset=ItemRackSettings,variable="RightClickUse",label="Use on Right-Click",tooltip="Right-clicking an item button uses the item instead of manually advancing its auto queue."},
 		{type="check",optset=ItemRackSettings,variable="HideOOC",label="Hide out of combat",tooltip="Hide the buttons while out of combat.",combatlock=1},
 		{type="check",optset=ItemRackSettings,variable="HidePetBattle",label="Hide during pet battles",tooltip="Hide the buttons during a pet battle."},
+		{type="check",optset=ItemRackSettings,variable="HideArena",label="Hide in arenas",tooltip="Hide the docked quick access buttons and close their menu while inside arena instances.",combatlock=1},
 		{type="check",optset=ItemRackSettings,variable="AllowEmpty",label="Allow empty slots",tooltip="Add an empty slot to menus of equipped items."},
 		{type="check",optset=ItemRackSettings,variable="AllowHidden",label="Allow hidden items",tooltip="Enable Alt+clicking of menu items to hide/show them in the menu.  Hold Alt as you enter a menu to show all."},
 		{type="check",optset=ItemRackSettings,variable="HideTradables",label="Hide tradables",tooltip="Prevent tradable items from showing up in the menu."},
@@ -1111,6 +1112,8 @@ function ItemRackOpt.OptListCheckButtonOnClick(self,override)
 		ItemRack.ReflectHideOOC()
 	elseif opt.variable=="HidePetBattle" then
 		ItemRack.ReflectHidePetBattle()
+	elseif opt.variable=="HideArena" then
+		ItemRack.ReflectHideArena()
 	elseif opt.variable=="CooldownCount" then
 		for i in pairs(ItemRackUser.Buttons) do
 			_G["ItemRackButton"..i.."Time"]:SetText("")

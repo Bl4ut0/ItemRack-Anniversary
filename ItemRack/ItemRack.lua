@@ -215,6 +215,7 @@ ItemRackSettings = {
 	RightClickUse = "OFF", -- use the item on right-click instead of manually advancing the queue
 	HideOOC = "OFF", -- hide dockable buttons when out of combat
 	HidePetBattle = "ON", -- hide dockable buttons during pet battles
+	HideArena = "OFF", -- hide dockable buttons in arena instances
 	Notify = "ON", -- notify when a used item comes off cooldown
 	NotifyThirty = "OFF", -- notify when a used item reaches 30 seconds cooldown
 	NotifyChatAlso = "OFF", -- send cooldown notifications to chat also
@@ -360,6 +361,8 @@ function ItemRack.InitEventHandlers()
 	handler.CHARACTER_POINTS_CHANGED = ItemRack.UpdateClassSpecificStuff
 	handler.PLAYER_TALENT_UPDATE = ItemRack.UpdateClassSpecificStuff
 	handler.PLAYER_ENTERING_WORLD = ItemRack.OnEnterWorld
+	handler.ZONE_CHANGED_NEW_AREA = ItemRack.OnZoneChanged
+	handler.ZONE_CHANGED_INDOORS = ItemRack.OnZoneChanged
 	handler.PLAYER_LOGOUT = ItemRack.OnPlayerLogout
 	handler.ACTIVE_TALENT_GROUP_CHANGED = ItemRack.UpdateClassSpecificStuff
 --	handler.PET_BATTLE_OPENING_START = ItemRack.OnEnteringPetBattle
@@ -439,6 +442,7 @@ end
 
 function ItemRack.OnEnterWorld(self,event,...)
 	local isLogin,isReload = ...
+	ItemRack.UpdateArenaVisibilityState()
 	if isLogin or isReload then
 		-- Force a set update shortly after loading to ensure minimap icon/current set is correct
 		-- This fixes the issue where the set appears as "Custom" until interaction
@@ -451,6 +455,18 @@ function ItemRack.OnEnterWorld(self,event,...)
 			ItemRack.SetSetBindings()
 		end)
 	end
+end
+
+function ItemRack.UpdateArenaVisibilityState()
+	local _, instanceType = IsInInstance()
+	ItemRack.inArena = (instanceType == "arena") and 1 or nil
+	if ItemRack.RefreshButtonVisibility then
+		ItemRack.RefreshButtonVisibility()
+	end
+end
+
+function ItemRack.OnZoneChanged()
+	ItemRack.UpdateArenaVisibilityState()
 end
 
 local loader = CreateFrame("Frame",nil, self, BackdropTemplateMixin and "BackdropTemplate") -- need a new temp frame here, ItemRackFrame is not created yet
@@ -829,6 +845,8 @@ function ItemRack.InitCore()
 	ItemRackFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
 	ItemRackFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_STOP")
 	ItemRackFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	ItemRackFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+	ItemRackFrame:RegisterEvent("ZONE_CHANGED_INDOORS")
 	--end
 	ItemRack.StartTimer("CooldownUpdate")
 	ItemRack.ReflectAlpha()
@@ -850,6 +868,7 @@ function ItemRack.InitCore()
 	ItemRackSettings.CharacterSheetMenus = ItemRackSettings.CharacterSheetMenus or "ON" -- 2.22
 	ItemRackSettings.DisableAltClick = ItemRackSettings.DisableAltClick or "OFF" -- 2.23
 	ItemRackSettings.HidePetBattle = ItemRackSettings.HidePetBattle or "ON" -- 2.87
+	ItemRackSettings.HideArena = ItemRackSettings.HideArena or "OFF"
 	ItemRackSettings.LeftSlotsGoRight = ItemRackSettings.LeftSlotsGoRight or "ON" -- 4.28
 	ItemRackSettings.RightSlotsGoLeft = ItemRackSettings.RightSlotsGoLeft or "OFF" -- 4.27.3
 	ItemRackSettings.TinyTooltipsQuickAccess = ItemRackSettings.TinyTooltipsQuickAccess or "OFF"
@@ -1687,17 +1706,61 @@ function ItemRack.BuildMenu(id,menuInclude,masqueGroup)
 	if overrideSound then SetCVar("Sound_EnableSFX", "1") end
 end
 
+-- Cache for menu item cooldowns (keyed by baseID)
+ItemRack.MenuCooldownCache = ItemRack.MenuCooldownCache or {}
+
 function ItemRack.UpdateMenuCooldowns()
 	local baseID
 	for i=1,#(ItemRack.Menu) do
 		baseID = tonumber(ItemRack.GetIRString(ItemRack.Menu[i],true)) --get baseID and convert it to number to be able to use it in numerical comparisons below
 		if baseID and baseID>0 and ItemRack.menuOpen<20 then
+			local cdFrame = _G["ItemRackMenu"..i.."Cooldown"]
 			local start, duration, enable = GetItemCooldown(baseID)
-			-- Override enable during stuns/loss-of-control (same fix as UpdateButtonCooldowns)
-			if start and start > 0 and duration and duration > 0 then
-				enable = 1
+
+			-- Suppress Blizzard's built-in countdown numbers
+			if cdFrame and cdFrame.SetHideCountdownNumbers then
+				cdFrame:SetHideCountdownNumbers(true)
 			end
-			CooldownFrame_Set(_G["ItemRackMenu"..i.."Cooldown"], start, duration, enable)
+
+			if enable and enable == 1 then
+				-- Normal state: cache real CDs
+				if start and start > 0 and duration and duration > 1.5 then
+					ItemRack.MenuCooldownCache[baseID] = { start = start, duration = duration }
+					CooldownFrame_Set(cdFrame, start, duration, enable)
+				elseif not start or start == 0 or (duration and duration <= 1.5) then
+					-- CC-guard: check cache before clearing
+					local cache = ItemRack.MenuCooldownCache[baseID]
+					if cache then
+						local remaining = cache.duration - (GetTime() - cache.start)
+						if remaining > 0 then
+							CooldownFrame_Set(cdFrame, cache.start, cache.duration, 1)
+						else
+							ItemRack.MenuCooldownCache[baseID] = nil
+							CooldownFrame_Set(cdFrame, start, duration, enable)
+						end
+					else
+						CooldownFrame_Set(cdFrame, start, duration, enable)
+					end
+				else
+					CooldownFrame_Set(cdFrame, start, duration, enable)
+				end
+			elseif enable == 0 then
+				-- Stun/LoC: use cache
+				local cache = ItemRack.MenuCooldownCache[baseID]
+				if cache then
+					local remaining = cache.duration - (GetTime() - cache.start)
+					if remaining > 0 then
+						CooldownFrame_Set(cdFrame, cache.start, cache.duration, 1)
+					else
+						ItemRack.MenuCooldownCache[baseID] = nil
+						CooldownFrame_Clear(cdFrame)
+					end
+				else
+					CooldownFrame_Clear(cdFrame)
+				end
+			else
+				CooldownFrame_Set(cdFrame, start, duration, enable)
+			end
 		else
 			_G["ItemRackMenu"..i.."Cooldown"]:Hide()
 		end
@@ -1711,7 +1774,25 @@ function ItemRack.WriteMenuCooldowns()
 		for i=1,#(ItemRack.Menu) do
 			baseID = ItemRack.GetIRString(ItemRack.Menu[i],true)
 			if baseID then
-				ItemRack.WriteCooldown(_G["ItemRackMenu"..i.."Time"],GetItemCooldown(baseID))
+				local numID = tonumber(baseID)
+				local start, duration, enable = GetItemCooldown(baseID)
+				if enable and enable == 1 then
+					ItemRack.WriteCooldown(_G["ItemRackMenu"..i.."Time"], start, duration)
+				elseif enable == 0 then
+					local cache = numID and ItemRack.MenuCooldownCache[numID]
+					if cache then
+						local remaining = cache.duration - (GetTime() - cache.start)
+						if remaining > 0 then
+							ItemRack.WriteCooldown(_G["ItemRackMenu"..i.."Time"], cache.start, cache.duration)
+						else
+							_G["ItemRackMenu"..i.."Time"]:SetText("")
+						end
+					else
+						_G["ItemRackMenu"..i.."Time"]:SetText("")
+					end
+				else
+					ItemRack.WriteCooldown(_G["ItemRackMenu"..i.."Time"], start, duration)
+				end
 			else
 				_G["ItemRackMenu"..i.."Time"]:SetText("")
 			end

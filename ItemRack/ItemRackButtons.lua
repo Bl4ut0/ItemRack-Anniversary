@@ -20,6 +20,27 @@ ItemRack.LockedButtons = {} -- buttons locked (desaturated)
 
 ItemRack.NewAnchor = nil
 
+local function IRRoundTenths(value)
+	if not value then
+		return 0
+	end
+	return math.floor(value * 10 + 0.5) / 10
+end
+
+-- Cooldown debug can fire extremely often because Blizzard refreshes item cooldowns
+-- for many UI/state changes. Only print when the slot's visible cooldown state changes.
+local function IRDebugCooldownState(slot, stateKey, message)
+	if not (ItemRack.DebugAll or ItemRack.DebugTags.Cooldown) then
+		return
+	end
+	ItemRack.CooldownDebugLast = ItemRack.CooldownDebugLast or {}
+	if ItemRack.CooldownDebugLast[slot] == stateKey then
+		return
+	end
+	ItemRack.CooldownDebugLast[slot] = stateKey
+	ItemRack.Debug("Cooldown", message)
+end
+
 function ItemRack.ButtonOnLoad(self)
 	-- ActionBarButtonTemplate fires ActionBarButtonMixin_OnLoad which calls both
 	-- BaseActionButtonMixin_OnLoad AND ActionBarActionButtonDerivedMixin_OnLoad.
@@ -92,6 +113,82 @@ function ItemRack.ButtonOnLoad(self)
 	if cooldown and cooldown.SetHideCountdownNumbers then
 		cooldown:SetHideCountdownNumbers(true)
 	end
+
+	-- Hook SetCooldown AND Clear on the button's CooldownFrame to intercept
+	-- engine-level cooldown clearing during CC effects. When Blizzard's code calls
+	-- CooldownFrame_Set(cd, 0, 0, 1), it sees start=0 and calls CooldownFrame_Clear
+	-- → cd:Clear() — it does NOT go through SetCooldown. So we must hook Clear()
+	-- to catch the actual clearing path. SetCooldown is also hooked as a safety net.
+	if cooldown then
+		local slotID = self:GetID()
+		if slotID and slotID < 20 then
+			-- Hook SetCooldown() first — the Clear hook needs IROrigSetCooldown to exist
+			local origSetCooldown = cooldown.SetCooldown
+			if origSetCooldown then
+				cooldown.IROrigSetCooldown = origSetCooldown
+				cooldown.SetCooldown = function(cd, start, dur, ...)
+					if ItemRack.InCooldownUpdate then
+						return origSetCooldown(cd, start, dur, ...)
+					end
+					if (not start or start == 0) and (not dur or dur <= 1.5) then
+						local cache = ItemRack.CooldownCache[slotID]
+						local currentItemID = GetInventoryItemID("player", slotID)
+						if cache and cache.itemID == currentItemID then
+							local remaining = cache.duration - (GetTime() - cache.start)
+							if remaining > 0 then
+								IRDebugCooldownState(
+									slotID,
+									string.format("blocked-set:%s:%.1f:%.1f", tostring(currentItemID), IRRoundTenths(cache.start), IRRoundTenths(cache.duration)),
+									string.format("slot %d CC-BLOCKED SetCooldown(0), cache remain=%.1f", slotID, remaining)
+								)
+								return origSetCooldown(cd, cache.start, cache.duration, ...)
+							end
+						elseif cache then
+							ItemRack.CooldownCache[slotID] = nil
+						end
+					end
+					return origSetCooldown(cd, start, dur, ...)
+				end
+			end
+
+			-- Hook Clear(): This is the PRIMARY path — CooldownFrame_Set(cd, 0, 0, 1)
+			-- calls CooldownFrame_Clear → cd:Clear(), bypassing SetCooldown entirely.
+			local origClear = cooldown.Clear
+			if origClear then
+				cooldown.Clear = function(cd, ...)
+					-- If our own UpdateButtonCooldowns is running, let it through
+					if ItemRack.InCooldownUpdate then
+						return origClear(cd, ...)
+					end
+					-- External caller. Check if we have a valid cached cooldown
+					-- for the SAME item (not a swapped-in item).
+					local cache = ItemRack.CooldownCache[slotID]
+					local currentItemID = GetInventoryItemID("player", slotID)
+					if cache and cache.itemID == currentItemID then
+						local remaining = cache.duration - (GetTime() - cache.start)
+						if remaining > 0 then
+							-- Block the clear and re-apply cached cooldown
+							IRDebugCooldownState(
+								slotID,
+								string.format("blocked-clear:%s:%.1f:%.1f", tostring(currentItemID), IRRoundTenths(cache.start), IRRoundTenths(cache.duration)),
+								string.format("slot %d CC-BLOCKED Clear, cache remain=%.1f", slotID, remaining)
+							)
+							if cooldown.IROrigSetCooldown then
+								return cooldown.IROrigSetCooldown(cd, cache.start, cache.duration)
+							end
+							return -- at minimum, don't clear
+						end
+					elseif cache then
+						-- Item changed (gear swap) — invalidate stale cache
+						ItemRack.CooldownCache[slotID] = nil
+					end
+					return origClear(cd, ...)
+				end
+			end
+		end
+	end
+
+
 
 	-- Hide unwanted ActionButton overlays (Yellow/Orange Triangles, Flash, etc.)
 	-- This includes anonymous textures created by ActionButtonTemplate that don't have friendly names.
@@ -229,6 +326,9 @@ function ItemRack.InitButtons()
 	ItemRack.UpdateButtonCooldowns()
 	ItemRack.ReflectHideOOC()
 	ItemRack.ReflectHidePetBattle()
+	if ItemRack.UpdateArenaVisibilityState then
+		ItemRack.UpdateArenaVisibilityState()
+	end
 	ItemRack.ReflectCooldownFont()
 	ItemRack.UpdateCombatQueue()
 	ItemRack.KeyBindingsChanged()
@@ -283,6 +383,9 @@ function ItemRack.AddButton(id)
 	_G["ItemRackButton"..id.."ItemRackIcon"]:SetTexture(ItemRack.GetTextureBySlot(id))
 	button:Show()
 	ItemRack.UpdateButtonCooldowns()
+	if ItemRack.RefreshButtonVisibility then
+		ItemRack.RefreshButtonVisibility()
+	end
 	if id==20 then
 		ItemRack.UpdateCurrentSet()
 		if ItemRack.ReflectEventsRunning then
@@ -511,6 +614,9 @@ function ItemRack.ConstructLayout()
 		end
 	end
 	ItemRack.UpdateButtons()
+	if ItemRack.RefreshButtonVisibility then
+		ItemRack.RefreshButtonVisibility()
+	end
 end
 
 -- updates icons for equipment slots by grabbing the texture directly from the player's worn items
@@ -786,31 +892,185 @@ function ItemRack.ReflectClickedUpdate()
 	end
 end
 
+-- Cache of real item cooldowns. Keyed by slot id.
+-- Each entry: { start = <number>, duration = <number>, itemID = <number> }
+-- itemID is used to invalidate the cache when a gear swap puts a different item in the slot.
+ItemRack.CooldownCache = ItemRack.CooldownCache or {}
+
 function ItemRack.UpdateButtonCooldowns()
+	ItemRack.InCooldownUpdate = true
 	for i in pairs(ItemRackUser.Buttons) do
 		if i<20 then
+			local cdFrame = _G["ItemRackButton"..i.."Cooldown"]
 			local start, duration, enable = GetInventoryItemCooldown("player",i)
-			-- During stuns/loss-of-control, the game sets enable=0 even when items
-			-- have real cooldowns running. This causes CooldownFrame_Set to hide the
-			-- cooldown swirl. Override enable to 1 when there's a genuine cooldown
-			-- in progress so the visual is preserved.
-			if start and start > 0 and duration and duration > 0 then
-				enable = 1
+			local currentItemID = GetInventoryItemID("player", i)
+
+			-- Suppress Blizzard's built-in countdown numbers; ItemRack draws its own
+			if cdFrame.SetHideCountdownNumbers then
+				cdFrame:SetHideCountdownNumbers(true)
 			end
-			CooldownFrame_Set(_G["ItemRackButton"..i.."Cooldown"], start, duration, enable)
+
+			if enable and enable == 1 then
+				if start and start > 0 and duration and duration > 1.5 then
+					-- Real cooldown from API: cache it and display it.
+					ItemRack.CooldownCache[i] = { start = start, duration = duration, itemID = currentItemID }
+					CooldownFrame_Set(cdFrame, start, duration, enable)
+					IRDebugCooldownState(
+						i,
+						string.format("active:%s:%.1f:%.1f", tostring(currentItemID), IRRoundTenths(start), IRRoundTenths(duration)),
+						string.format("slot %d enable=1 start=%.1f dur=%.1f", i, start or 0, duration or 0)
+					)
+				elseif not start or start == 0 or (duration and duration <= 1.5) then
+					-- API says no cooldown (or GCD). But CC/stun/LoC effects (Polymorph,
+					-- Fear, Sap, stuns, etc.) can cause the API to return start=0, dur=0
+					-- with enable=1 even when a real item cooldown is still active.
+					-- Check the cache before clearing.
+					local cache = ItemRack.CooldownCache[i]
+					if cache and cache.itemID == currentItemID then
+						local remaining = cache.duration - (GetTime() - cache.start)
+						if remaining > 0 then
+							-- Cache says cooldown is still running — API is unreliable due to CC.
+							-- Keep displaying the cached cooldown swirl.
+							CooldownFrame_Set(cdFrame, cache.start, cache.duration, 1)
+							IRDebugCooldownState(
+								i,
+								string.format("cc-guard-enable1:%s:%.1f:%.1f", tostring(currentItemID), IRRoundTenths(cache.start), IRRoundTenths(cache.duration)),
+								string.format("slot %d CC-GUARD cache hit remain=%.1f (api start=%.1f dur=%.1f)", i, remaining, start or 0, duration or 0)
+							)
+						else
+							-- Cached cooldown genuinely expired. Clear it.
+							ItemRack.CooldownCache[i] = nil
+							IRDebugCooldownState(
+								i,
+								"cache-expired:"..tostring(currentItemID),
+								string.format("slot %d cache expired (api start=%.1f dur=%.1f)", i, start or 0, duration or 0)
+							)
+						end
+					elseif cache then
+						-- Item changed (gear swap) — old cache is stale
+						ItemRack.CooldownCache[i] = nil
+							CooldownFrame_Set(cdFrame, start, duration, enable)
+							IRDebugCooldownState(
+								i,
+								string.format("cache-reset:%s:%.1f:%.1f", tostring(currentItemID), IRRoundTenths(start), IRRoundTenths(duration)),
+								string.format("slot %d enable=1 start=%.1f dur=%.1f (cache expired)", i, start or 0, duration or 0)
+							)
+					else
+						-- No cache entry or item changed — genuinely no cooldown.
+						CooldownFrame_Set(cdFrame, start, duration, enable)
+						IRDebugCooldownState(
+							i,
+							string.format("no-cache:%s:%.1f:%.1f", tostring(currentItemID), IRRoundTenths(start), IRRoundTenths(duration)),
+							string.format("slot %d enable=1 start=%.1f dur=%.1f", i, start or 0, duration or 0)
+						)
+					end
+				else
+					CooldownFrame_Set(cdFrame, start, duration, enable)
+					IRDebugCooldownState(
+						i,
+						string.format("other-enable1:%s:%.1f:%.1f", tostring(currentItemID), IRRoundTenths(start), IRRoundTenths(duration)),
+						string.format("slot %d enable=1 start=%.1f dur=%.1f", i, start or 0, duration or 0)
+					)
+				end
+			elseif enable == 0 then
+				if start and start > 0 and duration and duration > 0 then
+					-- Stun/LoC with enable=0: API returns the CC duration, not item CD. Use cache.
+					local cache = ItemRack.CooldownCache[i]
+					if cache and cache.itemID == currentItemID then
+						local remaining = cache.duration - (GetTime() - cache.start)
+						if remaining > 0 then
+							CooldownFrame_Set(cdFrame, cache.start, cache.duration, 1)
+							IRDebugCooldownState(
+								i,
+								string.format("stunned-cache:%s:%.1f:%.1f", tostring(currentItemID), IRRoundTenths(cache.start), IRRoundTenths(cache.duration)),
+								string.format("slot %d STUNNED cache hit remain=%.1f (api start=%.1f dur=%.1f)", i, remaining, start or 0, duration or 0)
+							)
+						else
+							ItemRack.CooldownCache[i] = nil
+							CooldownFrame_Clear(cdFrame)
+							IRDebugCooldownState(
+								i,
+								"stunned-expired:"..tostring(currentItemID),
+								string.format("slot %d STUNNED cache expired (api start=%.1f dur=%.1f)", i, start or 0, duration or 0)
+							)
+						end
+					else
+						CooldownFrame_Clear(cdFrame)
+					end
+				else
+					-- enable=0 with start=0: passive item or no "Use" ability.
+					-- Still check cache in case of CC/stun transitions.
+					local cache = ItemRack.CooldownCache[i]
+					if cache and cache.itemID == currentItemID then
+						local remaining = cache.duration - (GetTime() - cache.start)
+						if remaining > 0 then
+							CooldownFrame_Set(cdFrame, cache.start, cache.duration, 1)
+							IRDebugCooldownState(
+								i,
+								string.format("cc-guard-enable0:%s:%.1f:%.1f", tostring(currentItemID), IRRoundTenths(cache.start), IRRoundTenths(cache.duration)),
+								string.format("slot %d CC-GUARD cache hit remain=%.1f (api start=%.1f dur=%.1f)", i, remaining, start or 0, duration or 0)
+							)
+						else
+							ItemRack.CooldownCache[i] = nil
+							CooldownFrame_Clear(cdFrame)
+						end
+					else
+						CooldownFrame_Clear(cdFrame)
+					end
+				end
+			else
+				CooldownFrame_Set(cdFrame, start, duration, enable)
+			end
 		end
 	end
 	ItemRack.WriteButtonCooldowns()
+	ItemRack.InCooldownUpdate = false
 end
 
 function ItemRack.WriteButtonCooldowns()
 	if ItemRackSettings.CooldownCount=="ON" then
 		for i in pairs(ItemRackUser.Buttons) do
-			ItemRack.WriteCooldown(_G["ItemRackButton"..i.."Time"],GetInventoryItemCooldown("player",i))
+			local start, duration, enable = GetInventoryItemCooldown("player", i)
+			if enable and enable == 1 then
+				if start and start > 0 and duration and duration > 1.5 then
+					ItemRack.WriteCooldown(_G["ItemRackButton"..i.."Time"], start, duration)
+				elseif not start or start == 0 or (duration and duration <= 1.5) then
+					-- CC-guard: check cache before showing "no CD" text
+					local cache = ItemRack.CooldownCache[i]
+					local currentItemID = GetInventoryItemID("player", i)
+					if cache and cache.itemID == currentItemID then
+						local remaining = cache.duration - (GetTime() - cache.start)
+						if remaining > 0 then
+							ItemRack.WriteCooldown(_G["ItemRackButton"..i.."Time"], cache.start, cache.duration)
+						else
+							_G["ItemRackButton"..i.."Time"]:SetText("")
+						end
+					else
+						ItemRack.WriteCooldown(_G["ItemRackButton"..i.."Time"], start, duration)
+					end
+				else
+					ItemRack.WriteCooldown(_G["ItemRackButton"..i.."Time"], start, duration)
+				end
+			elseif enable == 0 then
+				-- Stunned/LoC: use cache so real CD text persists
+				local cache = ItemRack.CooldownCache[i]
+				local currentItemID = GetInventoryItemID("player", i)
+				if cache and cache.itemID == currentItemID then
+					local remaining = cache.duration - (GetTime() - cache.start)
+					if remaining > 0 then
+						ItemRack.WriteCooldown(_G["ItemRackButton"..i.."Time"], cache.start, cache.duration)
+					else
+						_G["ItemRackButton"..i.."Time"]:SetText("")
+					end
+				else
+					_G["ItemRackButton"..i.."Time"]:SetText("")
+				end
+			else
+				ItemRack.WriteCooldown(_G["ItemRackButton"..i.."Time"], start, duration)
+			end
 		end
 	end
 end
-
 function ItemRack.UpdateButtonLocks()
 	local isLocked, alreadyLocked
 	for i in pairs(ItemRackUser.Buttons) do
@@ -899,24 +1159,45 @@ function ItemRack.ReflectRightClickUse()
 	end
 end
 
-function ItemRack.ReflectHideOOC()
+function ItemRack.ShouldHideButtons()
+	return (ItemRackSettings.HideOOC=="ON" and not ItemRack.inCombat)
+		or (ItemRackSettings.HidePetBattle=="ON" and ItemRack.inPetBattle)
+		or (ItemRackSettings.HideArena=="ON" and ItemRack.inArena)
+end
+
+function ItemRack.RefreshButtonVisibility()
+	local shouldHide = ItemRack.ShouldHideButtons()
+	if shouldHide then
+		if ItemRackMenuFrame and ItemRackMenuFrame:IsVisible() then
+			ItemRackMenuFrame:Hide()
+		end
+		if GameTooltip then
+			GameTooltip:Hide()
+		end
+		if ItemRack.HideBrackets then
+			ItemRack.HideBrackets()
+		end
+	end
 	for i in pairs(ItemRackUser.Buttons) do
-		if ItemRackSettings.HideOOC=="ON" and not ItemRack.inCombat then
-			_G["ItemRackButton"..i]:Hide()
+		local button = _G["ItemRackButton"..i]
+		if shouldHide then
+			button:Hide()
 		else
-			_G["ItemRackButton"..i]:Show()
+			button:Show()
 		end
 	end
 end
 
+function ItemRack.ReflectHideOOC()
+	ItemRack.RefreshButtonVisibility()
+end
+
 function ItemRack.ReflectHidePetBattle()
-	for i in pairs(ItemRackUser.Buttons) do
-		if ItemRackSettings.HidePetBattle=="ON" and ItemRack.inPetBattle then
-			_G["ItemRackButton"..i]:Hide()
-		else
-			_G["ItemRackButton"..i]:Show()
-		end
-	end
+	ItemRack.RefreshButtonVisibility()
+end
+
+function ItemRack.ReflectHideArena()
+	ItemRack.RefreshButtonVisibility()
 end
 
 --[[ Cooldowns ]]
