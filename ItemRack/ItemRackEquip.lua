@@ -120,6 +120,7 @@ function ItemRack.ProcessSetsWaiting()
 	
 	-- Safety: Skip sets that no longer exist (prevents getting stuck)
 	if not ItemRackUser.Sets[setwaiting] then
+		ItemRack.Debug("API", "ProcessSetsWaiting aborted: set no longer exists ->", setwaiting)
 		-- Set was deleted, skip it and try the next one
 		if #ItemRack.SetsWaiting > 0 then
 			ItemRack.ProcessSetsWaiting()
@@ -127,6 +128,7 @@ function ItemRack.ProcessSetsWaiting()
 		return
 	end
 	
+	ItemRack.Debug("API", "ProcessSetsWaiting executing callback for:", setwaiting)
 	whichequip(setwaiting, disableSound)
 end
 
@@ -134,9 +136,11 @@ function ItemRack.AddSetToSetsWaiting(setwaiting,whichequip,disableSound)
 	local wait = ItemRack.SetsWaiting
 	for i in pairs(wait) do
 		if wait[i][1]==setwaiting and wait[i][2]==whichequip then
+			ItemRack.Debug("API", "AddSetToSetsWaiting ignored duplicate for:", setwaiting)
 			return
 		end
 	end
+	ItemRack.Debug("API", "AddSetToSetsWaiting added set to API lock queue:", setwaiting)
 	table.insert(wait,{setwaiting,whichequip,disableSound})
 end
 
@@ -154,6 +158,7 @@ function ItemRack.OrderSwaps(swap)
 end
 
 function ItemRack.EquipSet(setname, disableSound)
+	ItemRack.Debug("Equip", "EquipSet invoked for set:", setname or "nil")
 	if not setname or not ItemRackUser.Sets[setname] then
 		ItemRack.Print("Set \""..tostring(setname).."\" doesn't exist.")
 		return
@@ -173,7 +178,14 @@ function ItemRack.EquipSet(setname, disableSound)
 	local inCombat = InCombatLockdown()
 	local isInternalSet = setname and string.sub(setname, 1, 1) == "~" -- Internal sets like ~Unequip, ~CombatQueue, ~DualWieldRetry
 	
-	if ItemRack.BurntQueueItems then
+	if ItemRack.ManualQueueChoice then
+		for i in pairs(set.equip) do
+			if type(i) == "number" then
+				ItemRack.ManualQueueChoice[i] = nil
+			end
+		end
+	end
+	if ItemRack.BurntQueueItems and not isInternalSet then
 		for i in pairs(set.equip) do
 			if type(i) == "number" then
 				ItemRack.BurntQueueItems[i] = nil
@@ -202,19 +214,39 @@ function ItemRack.EquipSet(setname, disableSound)
 	end
 	ItemRack.Print(couldntFind) -- if couldntFind is nil then nothing will print
 
+	-- Snapshot current gear BEFORE checking if set is already equipped.
+	-- Even when no swaps are needed (set already worn), we must record what was
+	-- previously equipped so that UnequipSet can restore it later.
+	-- Without this, events like "stop moving" or "leave zone" find an empty
+	-- set.old table and silently fail to restore any gear.
+	if set.old and not isInternalSet then
+		if ItemRackUser.CurrentSet == setname and next(set.old) then
+			-- Set is already actively tracking History. Do not overwrite.
+			ItemRack.Debug("Equip", "Skipping set.old snapshot. Set is already CurrentSet and has history.")
+		else
+			for i in pairs(set.old) do
+				set.old[i] = nil -- wipe old items
+			end
+			set.oldset = ItemRackUser.CurrentSet
+			-- Pre-populate old with current gear for every slot this set defines.
+			for i in pairs(set.equip) do
+				if type(i) == "number" then
+					set.old[i] = ItemRack.GetID(i)
+				end
+			end
+		end
+	end
+
 	-- at this point, ItemRack.SwapList has only what needs to be swapped, indexed by slot
 	if not next(swap) then
---		ItemRack.Print("Set already equipped.")
+		ItemRack.Debug("Equip", "Set", setname, "already perfectly equipped. swap table is empty.")
 		ItemRack.EndSetSwap(setname) -- end swap if set already equipped
 		return
 	end
-
-	if set.old then
-		for i in pairs(set.old) do
-			set.old[i] = nil -- wipe old items
-		end
-		set.oldset = ItemRackUser.CurrentSet
-	end
+	
+	local swapStr = ""
+	for k,v in pairs(swap) do swapStr = swapStr .. k..":"..v.." " end
+	ItemRack.Debug("Equip", "EquipSet swap list generated:", swapStr)
 
 	-- if in combat, dead, or casting, queue ALL items for later
 	-- PickupInventoryItem is blocked by the game during InCombatLockdown() for all items including weapons
@@ -331,6 +363,7 @@ function ItemRack.LockChangedDuringSetSwap()
 	if not ItemRack.AnythingLocked() then
 		local setname = ItemRack.SetSwapping
 		local disableSound = ItemRack.SetSwappingDisableSound
+		ItemRack.Debug("API", "Locks cleared. Resuming interrupted swap list for:", setname)
 		ItemRack.SetSwapping = nil
 		ItemRack.SetSwappingDisableSound = nil
 		ItemRack.IterateSwapList(setname, disableSound)
@@ -338,6 +371,7 @@ function ItemRack.LockChangedDuringSetSwap()
 		-- Re-check: if the second pass locked new items or left work undone,
 		-- re-enter swap-waiting mode instead of immediately starting the next swap.
 		if next(ItemRack.SwapList) or ItemRack.AnythingLocked() then
+			ItemRack.Debug("API", "Secondary locks detected. Pausing swap again for:", setname)
 			ItemRack.SetSwapping = setname
 			ItemRack.SetSwappingDisableSound = disableSound
 			-- Restart the safety timeout for this new waiting period
@@ -360,7 +394,7 @@ function ItemRack.LockChangedDuringSetSwap()
 end
 
 function ItemRack.IterateSwapList(setname, disableSound)
- 
+	ItemRack.Debug("Equip", "IterateSwapList running for set:", setname)
 	local set = ItemRackUser.Sets[setname]
 	local swap = ItemRack.SwapList
 
@@ -397,16 +431,19 @@ function ItemRack.IterateSwapList(setname, disableSound)
 					if set.old then
 						set.old[i] = ItemRack.GetID(i)
 					end
+					ItemRack.Debug("Equip", "IterateSwapList emptying slot", i, "to bag", bag, "slot", slot)
 					ItemRack.MoveItem(i,nil,bag,slot) -- empty slot
 					if not ItemRack.AbortSwap then
 						swap[k] = nil
 					end
 				else
+					ItemRack.Debug("Equip", "IterateSwapList aborted: No space to empty slot", i)
 					ItemRack.AbortSwap = 1
 					return
 				end
 			else
 				inv,bag,slot = ItemRack.FindItem(swap[k],1)
+				ItemRack.Debug("Equip", "IterateSwapList FindItem returned: inv=", inv, "bag=", bag, "slot=", slot, "for intended ID:", swap[k])
 				if bag then
 					if i==16 and ItemRack.HasTitansGrip then
 						local subtype = select(7,GetItemInfo(GetContainerItemLink(bag,slot)))
@@ -417,6 +454,7 @@ function ItemRack.IterateSwapList(setname, disableSound)
 					-- TODO: Polarms, Fishing Poles and Staves (7th GetItemInfo) cannot
 					-- be equipped alongside Two-Handed Axes, Two-Handed Maces and Two-Handed Swords
 					if (not ItemRack.HasTitansGrip or treatAs2H) and select(3,ItemRack.GetInfoByID(swap[k]))=="INVTYPE_2HWEAPON" then
+						ItemRack.Debug("Equip", "IterateSwapList determined 2H Weapon logic for:", swap[k])
 						-- this is a 2H weapon. swap both slots at once if offhand equipped
 						if set.old then
 							set.old[i] = ItemRack.GetID(i)
@@ -425,12 +463,15 @@ function ItemRack.IterateSwapList(setname, disableSound)
 						if GetInventoryItemLink("player",17) then
 							local freeBag,freeSlot = ItemRack.FindSpace()
 							if freeBag then
+								ItemRack.Debug("Equip", "IterateSwapList emptying offhand to bag", freeBag, "slot", freeSlot)
 								ItemRack.MoveItem(17,nil,freeBag,freeSlot)
 							else
+								ItemRack.Debug("Equip", "IterateSwapList aborted: No space for offhand removal.")
 								ItemRack.AbortSwap=1
 							end
 						end
 						if not ItemRack.AbortSwap then
+							ItemRack.Debug("Equip", "IterateSwapList swapping 2H weapon from bag", bag, "slot", slot, "to slot 16")
 							ItemRack.MoveItem(bag,slot,16,nil)
 						end
 						if not ItemRack.AbortSwap then
@@ -442,6 +483,7 @@ function ItemRack.IterateSwapList(setname, disableSound)
 						if set.old then
 							set.old[i] = ItemRack.GetID(i)
 						end
+						ItemRack.Debug("Equip", "IterateSwapList executing normal move from bag", bag, "slot", slot, "--> slot", i)
 						ItemRack.MoveItem(bag,slot,i,nil)
 						if not ItemRack.AbortSwap then
 							swap[k] = nil
@@ -449,6 +491,7 @@ function ItemRack.IterateSwapList(setname, disableSound)
 					end
 				elseif inv==(i+1) and ItemRack.SameID(swap[k+1],ItemRack.GetID(i)) then
 					-- item is in other slot and other slot wants to go to this one
+					ItemRack.Debug("Equip", "IterateSwapList executing localized inner-slot shuffle from slot", i, "to", i+1)
 					if set.old then
 						set.old[i] = ItemRack.GetID(i)
 						set.old[i+1] = ItemRack.GetID(i+1)
@@ -487,6 +530,7 @@ function ItemRack.IterateSwapList(setname, disableSound)
 end
 
 function ItemRack.EndSetSwap(setname)
+	ItemRack.Debug("Equip", "EndSetSwap called for set:", setname or "nil")
 	ItemRack.SetSwapping = nil
 	-- Cancel safety timeout since swap completed normally
 	if ItemRack.SetSwapTimeout then
@@ -618,19 +662,36 @@ function ItemRack.IsSetEquipped(setname,exact)
 					end
 				end
 				
-				-- If the slot has an active auto-queue, verify that the equipped item is what the queue wants
-				-- (prevents zone/buff events from seeing the set as "equipped" when a queue swap is pending)
+				-- If the slot has an active auto-queue, accept whichever queued item
+				-- is intentionally active for this set context, and reject only when
+				-- the queue would still swap to something else.
 				local slotQueue = ItemRack.GetQueues(setname)[i]
 				if slotQueue and #slotQueue > 0 and ItemRack.GetQueuesEnabled(setname)[i] then
-					if match then
-						local baseID = ItemRack.GetIRString(GetInventoryItemLink("player",i),true,true)
-						local start,duration,enable = GetInventoryItemCooldown("player",i)
-						local ready = ItemRack.ItemNearReady(baseID, i)
-						local active = ItemRack.AutoQueueItemToEquip(i, baseID, enable, ready)
-						if active and not same(active, id) then
-							match = false   -- Auto Queue would swap to a different item
+					local currentBaseID = ItemRack.GetIRString(id,true)
+					local currentCustomTime
+					local currentInQueue = false
+					if currentBaseID and currentBaseID ~= 0 then
+						for q=1,#slotQueue do
+							if slotQueue[q].id == 0 then
+								break
+							end
+							local queueBaseID = ItemRack.GetIRString(slotQueue[q].id,true)
+							if ItemRack.SameExactID(slotQueue[q].id, id) or queueBaseID == currentBaseID then
+								currentInQueue = true
+								currentCustomTime = slotQueue[q].swapInEnabled and slotQueue[q].swapIn or nil
+								break
+							end
 						end
-						-- if active is nil, no swap would occur → keep match as is
+						local start,duration,enable = GetInventoryItemCooldown("player",i)
+						local ready = ItemRack.ItemNearReady(currentBaseID, i, currentCustomTime)
+						local active = ItemRack.AutoQueueItemToEquip(i, currentBaseID, enable, ready, setname)
+						if currentInQueue then
+							match = not active or same(active, id)
+						elseif match and active and not same(active, id) then
+							match = false
+						end
+					elseif match then
+						match = false
 					end
 				end
 				
@@ -658,7 +719,7 @@ function ItemRack.UnequipSet(setname, disableSound)
 		-- We must splice it out: update parent's oldset, restore items, but DO NOT update CurrentSet.
 		local parentSet = nil
 		for sName, sData in pairs(ItemRackUser.Sets) do
-			if not string.match(sName, "^~") and sData.oldset == setname and sData.key ~= setname then -- ensure not self-referential
+			if not string.match(sName, "^~") and sData.oldset == setname and sName ~= setname then -- ensure not self-referential
 				parentSet = sName
 				break 
 			end
@@ -676,61 +737,72 @@ function ItemRack.UnequipSet(setname, disableSound)
 		end
 		
 		local shouldRestore = false
-		if parentSet then
+		local isPendingOrSwapping = false
+		if ItemRack.SetSwapping == setname then
+			isPendingOrSwapping = true
+		elseif ItemRack.SetsWaiting then
+			for _, q in ipairs(ItemRack.SetsWaiting) do
+				if q[1] == setname then
+					isPendingOrSwapping = true
+					break
+				end
+			end
+		end
+
+		if ItemRackUser.CurrentSet == setname then
+			ItemRack.Debug("Equip", "Top of stack normal unequip. shouldRestore = true")
+			shouldRestore = true
+			ItemRackUser.Sets["~Unequip"].oldset = ItemRackUser.Sets[setname].oldset
+			ItemRackUser.Sets["~Unequip"].ShowHelm = nil
+			ItemRackUser.Sets["~Unequip"].ShowCloak = nil
+			if ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset] then
+				ItemRackUser.Sets["~Unequip"].ShowHelm = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowHelm
+				ItemRackUser.Sets["~Unequip"].ShowCloak = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowCloak
+			end
+		elseif isPendingOrSwapping then
+			ItemRack.Debug("Equip", "Pending API locks detected for top stack. shouldRestore = true")
+			shouldRestore = true
+			ItemRackUser.Sets["~Unequip"].oldset = ItemRackUser.Sets[setname].oldset
+			ItemRackUser.Sets["~Unequip"].ShowHelm = nil
+			ItemRackUser.Sets["~Unequip"].ShowCloak = nil
+			if ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset] then
+				ItemRackUser.Sets["~Unequip"].ShowHelm = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowHelm
+				ItemRackUser.Sets["~Unequip"].ShowCloak = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowCloak
+			end
+		elseif ItemRack.IsSetEquipped(setname) and (not ItemRackUser.CurrentSet or not ItemRackUser.Sets[ItemRackUser.CurrentSet] or not ItemRack.IsSetEquipped(ItemRackUser.CurrentSet)) then
+			ItemRack.Debug("Equip", "Physical gear still matches set and CurrentSet drifted stale. shouldRestore = true")
+			shouldRestore = true
+			ItemRackUser.Sets["~Unequip"].oldset = ItemRackUser.Sets[setname].oldset
+			ItemRackUser.Sets["~Unequip"].ShowHelm = nil
+			ItemRackUser.Sets["~Unequip"].ShowCloak = nil
+			if ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset] then
+				ItemRackUser.Sets["~Unequip"].ShowHelm = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowHelm
+				ItemRackUser.Sets["~Unequip"].ShowCloak = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowCloak
+			end
+		elseif parentSet then
 			ItemRack.Debug("Equip", "parentSet found:", parentSet, "- Stack splicing.")
-			-- We are buried. Patch the chain.
-			-- Parent ("Zoomies") should now point to Our Previous ("Normal") instead of Us ("Drank")
 			ItemRackUser.Sets[parentSet].oldset = ItemRackUser.Sets[setname].oldset
 			
-			-- Only restore items if the parent is an active event.
-			-- If it's a manual set, the user's gear choice should be respected.
 			if ItemRackUser.EventStack then
 				for _, eName in ipairs(ItemRackUser.EventStack) do
-					if ItemRackUser.Events.Set[eName] == parentSet then
+					if ItemRack.GetEventSet and ItemRack.GetEventSet(eName) == parentSet then
 						shouldRestore = true
 						break
 					end
 				end
 			end
 			ItemRack.Debug("Equip", "parentSet shouldRestore evaluated to:", shouldRestore)
-			-- Prepare ~Unequip to restore items, but set oldset to nil so EndSetSwap doesn't change CurrentSet
 			ItemRackUser.Sets["~Unequip"].oldset = nil
-		elseif ItemRackUser.CurrentSet == setname then
-			ItemRack.Debug("Equip", "Top of stack normal unequip. shouldRestore = true")
-			-- Normal unequip (Top of stack and matches CurrentSet)
-			shouldRestore = true
-			ItemRackUser.Sets["~Unequip"].oldset = ItemRackUser.Sets[setname].oldset
-			if ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset] then
-				ItemRackUser.Sets["~Unequip"].ShowHelm = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowHelm
-				ItemRackUser.Sets["~Unequip"].ShowCloak = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowCloak
-			end
-		else
-			-- Final check: if the event hasn't finished pushing yet because of WoW API locks (SetsWaiting or SetSwapping)
-			-- CurrentSet mathematically hasn't been assigned yet, but in reality, this set IS the current set intent.
-			local isPendingOrSwapping = false
-			if ItemRack.SetSwapping == setname then
-				isPendingOrSwapping = true
-			elseif ItemRack.SetsWaiting then
-				for _, q in ipairs(ItemRack.SetsWaiting) do
-					if q[1] == setname then
-						isPendingOrSwapping = true
-						break
-					end
-				end
-			end
-			
-			if isPendingOrSwapping then
-				ItemRack.Debug("Equip", "Pending API locks detected for top stack. shouldRestore = true")
-				shouldRestore = true
-				ItemRackUser.Sets["~Unequip"].oldset = ItemRackUser.Sets[setname].oldset
-				if ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset] then
-					ItemRackUser.Sets["~Unequip"].ShowHelm = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowHelm
-					ItemRackUser.Sets["~Unequip"].ShowCloak = ItemRackUser.Sets[ItemRackUser.Sets["~Unequip"].oldset].ShowCloak
-				end
-			end
+			ItemRackUser.Sets["~Unequip"].ShowHelm = nil
+			ItemRackUser.Sets["~Unequip"].ShowCloak = nil
 		end
 		
 		if shouldRestore then
+			local dbgStr = ""
+			for k,v in pairs(ItemRackUser.Sets["~Unequip"].equip) do
+				dbgStr = dbgStr .. tostring(k)..":"..tostring(v).." "
+			end
+			ItemRack.Debug("Equip", "DIAGNOSTIC - ~Unequip contains:", (dbgStr == "" and "EMPTY" or dbgStr))
 			ItemRack.Debug("Equip", "Equipping ~Unequip to restore items.")
 			ItemRack.EquipSet("~Unequip", disableSound)
 		else

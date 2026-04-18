@@ -13,6 +13,8 @@ Dockable buttons:
 * Alt+click slots on the character sheet to create/remove buttons
 * Alt+click yourself in the character sheet to create/remove a set button
 * Alt+click the created buttons to toggle their auto-queue status
+* Right-click a created slot button to advance to the next valid item in that slot's queue
+* Burn-on-use queue tracking is exact-item aware, so duplicate same-base items with different enchants or gems won't burn each other
 * Shift+drag buttons to break them apart if they're docked to each other
 * Drag the menu's border around to dock it to a different side of buttons
 * Right-click the menu's border to rotate the menu
@@ -81,7 +83,15 @@ When dealing with events, it's good to keep some things in mind:
 * You'll get the most predictable behavior by having sets that don't overlap.  If you're a warrior with a Tanking, DPS and PVP set, consider not including weapons in those sets.  If you decide to make an event to swap in a 2H when you go into Berserker Stance and a 1h+shield when you go into Defensive Stance, you won't step on the toes of events that swap in PVP gear in a BG/arena or a tuxedo in a city.
 * A gold gear icon on the minimap button (and on the sets button if you've created one) means that events are enabled.  If you decide you want to temporarily shut down all events, Alt+click the minimap button or the sets button. (You can disable events in options also)
 * For non-English users, you might want to edit the events that have English text within them.  I try to keep it locale-independant when possible (ie, warrior and most druid stances use the numbers instead of names), but you'll never enter "Stormwind City" on a deDE client for the city event.
-* Script Events do not have a "set" defined to them like other events do.  They need to EquipSet("setname") explicitly.  Its set button will always be the macro keys icon.
+* Script Events do not have a "set" defined to them like other events do.  Inside script events, use EquipEventSet("setname") and UnequipEventSet() so the event stack can restore prior gear correctly.  For backward compatibility, bare EquipSet()/UnequipSet() calls inside script events are shimmed onto this stack-aware path too.  Its set button will always be the macro keys icon.
+* Updating old scripts is recommended but not required for simple cases.
+  Old:
+    EquipSet("setname")
+    UnequipSet("setname")
+  New:
+    EquipEventSet("setname")
+    UnequipEventSet()
+  If a script intentionally uses ItemRack.EquipSet()/ItemRack.UnequipSet(), that remains the low-level behavior and is not automatically event-stack managed.
 * Advanced users of 1.9x may notice the lack of a delay option in scripted events.  I've decided to pull this down into the scripting system to streamline the event process.  For now, you can use ItemRack.CreateTimer and ItemRack.StartTimer defined in ItemRack.lua.
 
 __ Future plans __

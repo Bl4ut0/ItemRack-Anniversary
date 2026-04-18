@@ -1166,6 +1166,15 @@ function ItemRack.ShouldHideButtons()
 end
 
 function ItemRack.RefreshButtonVisibility()
+	if InCombatLockdown() then
+		for i=1,#(ItemRack.RunAfterCombat) do
+			if ItemRack.RunAfterCombat[i] == "RefreshButtonVisibility" then
+				return
+			end
+		end
+		table.insert(ItemRack.RunAfterCombat,"RefreshButtonVisibility")
+		return
+	end
 	local shouldHide = ItemRack.ShouldHideButtons()
 	if shouldHide then
 		if ItemRackMenuFrame and ItemRackMenuFrame:IsVisible() then

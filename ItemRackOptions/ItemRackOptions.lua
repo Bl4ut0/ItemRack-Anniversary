@@ -553,7 +553,10 @@ function ItemRackOpt.SaveSet()
 						id = v.id,
 						keep = v.keep,
 						priority = v.priority,
-						delay = v.delay
+						delay = v.delay,
+						swapOnUse = v.swapOnUse,
+						swapInEnabled = v.swapInEnabled,
+						swapIn = v.swapIn
 					})
 				end
 			end
@@ -2060,8 +2063,6 @@ function ItemRackOpt.PopulateEventList()
 	local oldevent = ItemRackOpt.EventSelected and list[ItemRackOpt.EventSelected][1] or nil
 	ItemRackOpt.EventSelected = nil
 
-	local safeToRegister = 1 -- assume it's safe to register events
-
 	for i in pairs(list) do
 		list[i] = nil
 	end
@@ -2073,9 +2074,6 @@ function ItemRackOpt.PopulateEventList()
 			setname = "zzz" -- give it a fake set name for sorting purposes
 		else
 			setname = nil
-		end
-		if user.Enabled[i] and not setname then
-			safeToRegister = nil
 		end
 		table.insert(list,{i,events[i].Type,user.Enabled[i],setname})
 	end
@@ -2105,9 +2103,9 @@ function ItemRackOpt.PopulateEventList()
 	ItemRackOpt.EventListScrollFrameUpdate()
 	ItemRackOpt.ValidateEventListButtons()
 
-	if safeToRegister then
-		ItemRack.RegisterEvents()
-	end
+	-- Always re-register after event list changes. Individual event processors
+	-- safely ignore enabled events that do not yet have a valid assigned set.
+	ItemRack.RegisterEvents()
 end
 
 function ItemRackOpt.EventListScrollFrameUpdate()

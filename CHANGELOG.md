@@ -2,6 +2,26 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.39.2] - 2026-04-15
+### Bug Fixes
+- **Arena Cooldown Reset**: Quick Access and popup-menu cooldown displays now clear their cached item cooldown state when entering a fresh arena, with a delayed second pass on arena entry to match Blizzard's full item-reset timing for fresh matches.
+- **Stale Combat Queue Context**: Auto-queued combat swaps now remember which set/queue context created them and are discarded if that context changes before combat ends. This fixes cases where leaving combat after mount or event transitions could still apply a trinket or queued item chosen for an older set context.
+- **Parachute Burn-on-Use**: Burn-on-use queue items are now marked from the actual item-use event, fixing short post-buff cooldown cases like parachute cloaks where the item became "ready enough" before the queue ever rotated it out.
+- **Detailed Burn State Matching**: Burn-on-use queue state is now tracked by the exact queued item fields instead of just the base item ID, so duplicate same-base items no longer burn each other and per-item swap-in timing resolves against the precise equipped variant.
+- **Per-Set Queue Save Completeness**: Saving a set now preserves all queue metadata, including Burn on Use and Custom Swap In settings. Previously, re-saving a set could silently drop those newer per-item queue options and cause later queue behavior to drift from what the user configured.
+- **Event Event History Corruption**: `EquipSet` is now guarded from cannibalizing valid historical data (`set.old`) into itself during successive mounts/event triggers while already equipped.
+- **Event Restoration Stack Splicing**: Corrected a severe regression in `UnequipSet` where historical ghost pointers on previously equipped sets would trick the unequip engine into thinking the currently active set was buried in the stack, aborting the gear restoration entirely. Top-of-stack manual set evaluations now rightfully take absolute precedence over event stack tracking.
+- **Queued Item Set Detection**: `IsSetEquipped` now treats the currently active queued item as valid for the owning set and evaluates queue intent in the correct set context, fixing minimap/current-set display drift and reducing false event desyncs when queues swap items.
+
+### Improvements
+- **Diagnostic Debugging Framework**: Introduced a fully native, copyable diagnostic UI that captures server API locks and ItemRack physics swapping engine states `(/itemrack dump)`. Users can export 500-line activity logs alongside active `SavedVariables` arrays instantly.
+- **Script Event Stack Helpers**: Script events now support `EquipEventSet("setname")` and `UnequipEventSet()` so custom scripted swaps participate in the same event stack, nested restore, and manual-override logic as built-in events.
+- **Script Event Backward Compatibility**: Existing simple script events that use bare `EquipSet(...)` and `UnequipSet(...)` inside the script editor continue to work without user edits. These names are now shimmed onto the new stack-aware helper path at runtime.
+- **Swimming Script Migration**: The default Swimming script now uses the stack-aware helper API, and legacy saved copies are migrated automatically on load.
+
+### Documentation
+- **Script Event Migration Guide**: Added documentation for updating older script events from `EquipSet("setname")` / `UnequipSet("setname")` to `EquipEventSet("setname")` / `UnequipEventSet()`. Existing simple scripts do not need to be changed immediately, but the helper names are now the recommended pattern going forward.
+
 ## [4.39.1] - 2026-04-14
 ### Bug Fixes
 - **Robust Loss-of-Control Cooldown Guard**: Quick Access buttons now preserve real item cooldown swirls when Blizzard reports false `start=0` / `dur=0` states or clears the cooldown frame during stuns and other loss-of-control effects. Popup menu cooldowns now use the same cached-cooldown guard.

@@ -61,6 +61,7 @@ The Auto-Queue system ensures you always have a "ready" item equipped:
 3. When an equipped item goes on cooldown, ItemRack will automatically swap it for the highest priority item that is ready.
 4. **Pause Queue:** You can check "Pause Queue" on specific items to prevent them from being swapped out while in use.
 5. **Per-Set Queues:** Gear Sets automatically save and recall which slot queues are currently enabled when you equip them.
+6. **Burn on Use:** Burned queue items are now tracked by the exact queued item variant, so duplicate same-base items with different enchants, gems, or suffixes no longer burn each other.
 
 ### ⚡ Events & Automation
 Events allow for complex automation based on game state:
@@ -71,7 +72,41 @@ Events allow for complex automation based on game state:
    - **Zone Changes:** Swap gear when entering a specific raid or city.
    - **Combat State:** Switch weapons or gear sets when entering/leaving combat.
 3. **Manual Overrides:** Manually picking a set actively overrides and suppresses background events that attempt to combat your choice. 
-4. **Event Tracking:** Use the "Events" listener button on the config page to monitor which triggers are firing in real-time for debugging.
+4. **Event Tracking:** Use the **`/itemrack debug`** command to monitor which triggers are firing in real-time. This prints all background event logic and gear restorations directly to your chat window. (See the Diagnostic Debugging section below for more details).
+
+#### Script Event Compatibility
+Script events now have a stack-aware helper API:
+- `EquipEventSet("Set Name")`
+- `UnequipEventSet()`
+
+Existing simple script events do **not** need to be rewritten if they use bare `EquipSet(...)` and `UnequipSet(...)` inside the script event editor. Those names are now shimmed onto the stack-aware event path automatically.
+
+Recommended migration for older scripts:
+
+Before:
+```lua
+EquipSet("My Set")
+UnequipSet("My Set")
+```
+
+After:
+```lua
+EquipEventSet("My Set")
+UnequipEventSet()
+```
+
+Use the new helper names when editing or creating script events going forward. If a script intentionally calls `ItemRack.EquipSet(...)` or `ItemRack.UnequipSet(...)`, that remains the low-level escape hatch and is not automatically stack-managed.
+
+### 🛠️ Diagnostic Debugging Tools (New!)
+ItemRack now includes an incredibly powerful, native diagnostic system built directly into the UI. No more trying to find or zip `WTF` folders—if you experience a bug, you can instantly export exactly what is wrong.
+
+1. Turn on debugging: `/itemrack debug`
+2. Perform the action that breaks (e.g., mounting, entering combat).
+3. Type `/itemrack dump` to summon a native pop-up window containing the last 500 actions, queue states, and any stuck API locks.
+4. Hit `CTRL+C` in the text box to instantly copy the exact, anonymized diagnostic code and active `SavedVariables` state for easy sharing when reporting a bug.
+
+> [!IMPORTANT]
+> **Data Privacy Notice:** The `/itemrack dump` command retrieves technical data for debugging, which includes your gear set names, queue configurations, and recently equipped items. It does **not** collect passwords or sensitive account information. Please review the output before sharing if you wish to keep specific set names private.
 
 ## TBC Anniversary Compatibility
 

@@ -1,14 +1,21 @@
-# Release Notes - ItemRack TBC Anniversary v4.39.1
+# Release Notes - ItemRack TBC Anniversary v4.39.2
 
-This hotfix hardens cooldown display during loss-of-control effects, reduces cooldown debug spam, and adds an arena-only quick access hide toggle.
+This update fixes several queue and event edge cases, makes script events participate in the event stack, and resets Quick Access cooldown displays correctly when entering fresh arena matches.
 
 ---
 
 ## Bug Fixes
 
-- **Robust Loss-of-Control Cooldown Guard**: Quick Access buttons now preserve real item cooldown swirls when Blizzard reports false `start=0` / `dur=0` states or clears the cooldown frame during stuns and other loss-of-control effects. Popup menu cooldowns now use the same cached-cooldown guard.
-- **Cooldown Debug Spam**: `IR-Cooldown` now logs only when a slot's cooldown state actually changes, preventing heavy chat spam from repeated cooldown refresh events.
+- **Arena Cooldown Reset**: Quick Access and popup-menu cooldown displays now clear their cached cooldown state when entering a fresh arena, with a delayed second pass on arena entry so fresh matches correctly show reset trinkets and other items.
+- **Stale Combat Queue Context**: Auto-queued combat swaps now remember which set/queue context created them and are discarded if that context changes before combat ends. This fixes cases where leaving combat after mount or event transitions could still apply a trinket or queued item chosen for an older set context.
+- **Parachute Burn-on-Use**: Burn-on-use queue items are now marked from the real item-use event, fixing short post-buff cooldown cases like parachute cloaks that were staying in place after the buff faded.
+- **Detailed Burn State Matching**: Burn-on-use queue state now tracks the exact queued item variant instead of only the base item ID, so duplicate same-base items no longer burn each other and per-item swap-in timing stays tied to the precise item variant.
+- **Per-Set Queue Save Completeness**: Saving a set now preserves all queue metadata, including Burn on Use and Custom Swap In settings. Previously, re-saving a set could silently drop those newer per-item queue options and cause later queue behavior to drift from what the user configured.
+- **Queue/Event Slot Ownership**: Per-set queue inheritance no longer bleeds into slots that the active set explicitly defines, preventing inherited queues from fighting event gear on the same slot.
+- **Queued Item Set Detection**: The current set display now correctly treats the active queued item as valid for that set, fixing minimap/current-set display drift when auto queues swap items.
 
 ## Improvements
 
-- **Arena Quick Access Hiding**: Added a `Hide in arenas` option for the docked Quick Access buttons. When enabled, the on-screen quick access bar and its menu automatically hide inside arena instances and restore when you leave.
+- **Script Event Stack Helpers**: Script events now support `EquipEventSet("setname")` and `UnequipEventSet()` so custom scripted swaps participate in the same event stack, nested restore, and manual-override logic as built-in events.
+- **Script Event Backward Compatibility**: Existing simple script events that use bare `EquipSet(...)` and `UnequipSet(...)` inside the script editor continue to work without user edits.
+- **Swimming Script Migration**: The default Swimming script now uses the stack-aware helper API, and legacy saved copies are migrated automatically on load.

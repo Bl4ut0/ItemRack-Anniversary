@@ -16,6 +16,19 @@ Steps to reproduce the behavior in-game:
 3. Click on '...'
 4. See error
 
+**Diagnostic Dump (Highly Recommended)**
+To help us diagnose exactly what is happening in the addon engine, please:
+1. Type `/itemrack debug` to enable diagnostic logging.
+2. Reproduce the bug in-game.
+3. Type `/itemrack dump` to open the log window.
+4. `CTRL+C` to copy the output and paste it into the code block below:
+
+*(Note: The dump includes your gear set names and configurations. Feel free to review or anonymize specific names before pasting).*
+
+```lua
+-- Paste Diagnostic Dump here
+```
+
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 

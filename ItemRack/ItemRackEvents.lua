@@ -40,12 +40,16 @@ end
 		  Script : Actual script run through RunScript
 
 	The set to equip is defined in ItemRackUser.Events.Set, indexed by event name
-	The set to equip is nil if it's a Script event.  Sets equip/unequip explicitly
+	The set to equip is nil if it's a Script event. Script events should use
+	EquipEventSet()/UnequipEventSet() so they participate in the event stack.
 	Whether an event is enabled is in ItemRackuser.Events.Enabled, indexed by event name
 ]]
 
 -- increment this value when default events are changed to deploy them to existing events
 ItemRack.EventsVersion = 20
+
+ItemRack.LegacySwimmingScript = "local set = \"Name of set\"\nif IsSwimming() and not IsSetEquipped(set) then\n  EquipSet(set)\n  if not SwimmingEvent then\n    function SwimmingEvent()\n      if not IsSwimming() then\n        ItemRack.StopTimer(\"SwimmingEvent\")\n        UnequipSet(set)\n      end\n    end\n    ItemRack.CreateTimer(\"SwimmingEvent\",SwimmingEvent,.5,1)\n  end\n  ItemRack.StartTimer(\"SwimmingEvent\")\nend\n--[[Equips a set when swimming and breath gauge appears and unequips soon after you stop swimming.]]"
+ItemRack.StackedSwimmingScript = "local set = \"Name of set\"\nif IsSwimming() and not IsSetEquipped(set) then\n  EquipEventSet(set)\n  if not SwimmingEvent then\n    function SwimmingEvent()\n      if not IsSwimming() then\n        ItemRack.StopTimer(\"SwimmingEvent\")\n        UnequipEventSet()\n      end\n    end\n    ItemRack.CreateTimer(\"SwimmingEvent\",SwimmingEvent,.5,1)\n  end\n  ItemRack.StartTimer(\"SwimmingEvent\")\nend\n--[[Equips a set when swimming and breath gauge appears and unequips soon after you stop swimming.]]"
 
 -- default events, loaded when no events exist or ItemRack.EventsVersion is increased
 ItemRack.DefaultEvents = {
@@ -106,7 +110,7 @@ ItemRack.DefaultEvents = {
 	["Swimming"] = {
 		["Trigger"] = "MIRROR_TIMER_START",
 		["Type"] = "Script",
-		["Script"] = "local set = \"Name of set\"\nif IsSwimming() and not IsSetEquipped(set) then\n  EquipSet(set)\n  if not SwimmingEvent then\n    function SwimmingEvent()\n      if not IsSwimming() then\n        ItemRack.StopTimer(\"SwimmingEvent\")\n        UnequipSet(set)\n      end\n    end\n    ItemRack.CreateTimer(\"SwimmingEvent\",SwimmingEvent,.5,1)\n  end\n  ItemRack.StartTimer(\"SwimmingEvent\")\nend\n--[[Equips a set when swimming and breath gauge appears and unequips soon after you stop swimming.]]",
+		["Script"] = ItemRack.StackedSwimmingScript,
 	},
 
 	["Buffs Gained"] = {
@@ -219,6 +223,22 @@ function ItemRack.CleanupEvents()
 	end
 end
 
+function ItemRack.MigrateDefaultScriptEvents()
+	local swimming = ItemRackEvents and ItemRackEvents["Swimming"]
+	if swimming and swimming.Trigger == "MIRROR_TIMER_START" and swimming.Script then
+		if swimming.Script == ItemRack.LegacySwimmingScript then
+			swimming.Script = ItemRack.StackedSwimmingScript
+			return
+		end
+		local updated = swimming.Script
+		updated = string.gsub(updated, "\n  EquipSet%(set%)\n", "\n  EquipEventSet(set)\n", 1)
+		updated = string.gsub(updated, "\n        UnequipSet%(set%)\n", "\n        UnequipEventSet()\n", 1)
+		if updated ~= swimming.Script then
+			swimming.Script = updated
+		end
+	end
+end
+
 function ItemRack.ResetEvents(resetDefault,resetAll)
 	if not resetDefault and not resetAll then
 		StaticPopupDialogs["ItemRackConfirmResetEvents"] = {
@@ -235,6 +255,7 @@ end
 
 function ItemRack.InitEvents()
 	ItemRack.LoadEvents()
+	ItemRack.MigrateDefaultScriptEvents()
 
 	ItemRack.CreateTimer("EventsBuffTimer",ItemRack.ProcessBuffEvent,.15)
 	ItemRack.CreateTimer("EventsZoneTimer",ItemRack.ProcessZoneEvent,.16)
@@ -247,6 +268,8 @@ function ItemRack.InitEvents()
 	if not ItemRackUser.EventStack then
 		ItemRackUser.EventStack = {}
 	end
+	ItemRack.ScriptEventSets = {}
+	ItemRack.ScriptEventDisableSound = {}
 	if not ItemRackUser.Sets["~BaseGear"] then
 		ItemRackUser.Sets["~BaseGear"] = {
 			equip = {},
@@ -434,6 +457,68 @@ end
 
 --[[ Event Stack Architecture ]]
 
+function ItemRack.GetEventSet(eventName)
+	if ItemRack.ScriptEventSets and ItemRack.ScriptEventSets[eventName] then
+		return ItemRack.ScriptEventSets[eventName]
+	end
+	return ItemRackUser.Events.Set[eventName]
+end
+
+function ItemRack.GetEventDisableSound(eventName)
+	if ItemRack.ScriptEventDisableSound and ItemRack.ScriptEventDisableSound[eventName] ~= nil then
+		return ItemRack.ScriptEventDisableSound[eventName]
+	end
+	return ItemRackEvents[eventName] and ItemRackEvents[eventName].DisableSound
+end
+
+function ItemRack.ClearScriptEventState(eventName)
+	if ItemRack.ScriptEventSets then
+		ItemRack.ScriptEventSets[eventName] = nil
+	end
+	if ItemRack.ScriptEventDisableSound then
+		ItemRack.ScriptEventDisableSound[eventName] = nil
+	end
+end
+
+function ItemRack.ScriptEventEquip(eventName, setname, disableSound)
+	if not eventName then
+		return
+	end
+	if not setname or not ItemRackUser.Sets[setname] then
+		ItemRack.Print("Set \""..tostring(setname).."\" doesn't exist.")
+		return
+	end
+	ItemRack.ScriptEventSets = ItemRack.ScriptEventSets or {}
+	ItemRack.ScriptEventDisableSound = ItemRack.ScriptEventDisableSound or {}
+	local priorSet = ItemRack.ScriptEventSets[eventName]
+	local wasActive = false
+	if ItemRackUser.EventStack then
+		for _, activeEvent in ipairs(ItemRackUser.EventStack) do
+			if activeEvent == eventName then
+				wasActive = true
+				break
+			end
+		end
+	end
+	if priorSet and priorSet ~= setname and wasActive then
+		ItemRack.PopEvent(eventName)
+	end
+	ItemRack.ScriptEventSets[eventName] = setname
+	ItemRack.ScriptEventDisableSound[eventName] = disableSound
+	ItemRack.PushEvent(eventName)
+end
+
+function ItemRack.ScriptEventUnequip(eventName, disableSound)
+	if not eventName then
+		return
+	end
+	ItemRack.ScriptEventDisableSound = ItemRack.ScriptEventDisableSound or {}
+	if disableSound ~= nil then
+		ItemRack.ScriptEventDisableSound[eventName] = disableSound
+	end
+	ItemRack.PopEvent(eventName)
+end
+
 function ItemRack.PushEvent(eventName)
 	if ItemRackUser.EnableEvents == "OFF" then return end
 	ItemRack.Debug("Events", "PushEvent: "..(eventName or "nil"))
@@ -447,9 +532,9 @@ function ItemRack.PushEvent(eventName)
 	
 	table.insert(ItemRackUser.EventStack, eventName)
 	
-	local setname = ItemRackUser.Events.Set[eventName]
+	local setname = ItemRack.GetEventSet(eventName)
 	if setname then
-		local disableSound = ItemRackEvents[eventName] and ItemRackEvents[eventName].DisableSound
+		local disableSound = ItemRack.GetEventDisableSound(eventName)
 		ItemRack.IsEventEquipment = true
 		ItemRack.EquipSet(setname, disableSound)
 		ItemRack.IsEventEquipment = nil
@@ -457,8 +542,8 @@ function ItemRack.PushEvent(eventName)
 end
 
 function ItemRack.PopEvent(eventName)
-	local poppedSet = ItemRackUser.Events.Set[eventName]
-	local disableSound = ItemRackEvents[eventName] and ItemRackEvents[eventName].DisableSound
+	local poppedSet = ItemRack.GetEventSet(eventName)
+	local disableSound = ItemRack.GetEventDisableSound(eventName)
 	ItemRack.Debug("Events", "PopEvent: "..(eventName or "nil").." (poppedSet: "..(poppedSet or "nil")..")")
 
 	-- Remove the event from the stack
@@ -514,6 +599,7 @@ function ItemRack.PopEvent(eventName)
 	elseif suppressRestore then
 		ItemRack.Debug("Events", "PopEvent: UnequipSet SUPPRESSED for:", poppedSet)
 	end
+	ItemRack.ClearScriptEventState(eventName)
 end
 
 --[[ Event processing ]]
@@ -568,7 +654,7 @@ function ItemRack.ProcessingFrameOnEvent(self,event,...)
 			if event == "COMBAT_LOG_EVENT_UNFILTERED" then
 				a1,a2,a3,a4,a5,a6,a7,a8,a9,a10 = CombatLogGetCurrentEventInfo()
 			end
-			local method = loadstring("local event,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10 = ...;" .. events[eventName].Script)
+			local method = loadstring("local event,arg1,arg2,arg3,arg4,arg5,arg6,arg7,arg8,arg9,arg10 = ...;local EquipEventSet = function(setname, disableSound) return ItemRack.ScriptEventEquip(event, setname, disableSound) end;local UnequipEventSet = function(disableSound) return ItemRack.ScriptEventUnequip(event, disableSound) end;local EquipSet = function(setname, disableSound) return EquipEventSet(setname, disableSound) end;local UnequipSet = function(setname, disableSound) local activeSet = ItemRack.GetEventSet(event) if setname and (not activeSet or setname ~= activeSet) then return ItemRack.UnequipSet(setname, disableSound) end return UnequipEventSet(disableSound) end;" .. events[eventName].Script)
 			pcall(method,event,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10)
 		end
 	end
@@ -975,20 +1061,13 @@ function ItemRack.ProcessBuffEvent()
 				-- And ensures UnequipSet triggers even if the set is only partially equipped
 				if buff then
 					-- Player is moving (or buff active for non-movement events).
-					-- Cancel any pending OnMovement unequip since we're moving again.
 					if events[eventName].OnMovement and ItemRack.PendingOnMovementUnequip == eventName then
 						ItemRack.PendingOnMovementUnequip = nil
 						ItemRack.StopTimer("OnMovementUnequipTimer")
 					end
 					if not events[eventName].Active then
-						if not isSetEquipped then
-							ItemRack.PushEvent(eventName)
-							events[eventName].Active = true
-						else
-							-- Already equipped (e.g. from UI reload or manual preemptive equip),
-							-- simply mark it Active to re-sync the internal event state!
-							events[eventName].Active = true
-						end
+						ItemRack.PushEvent(eventName)
+						events[eventName].Active = true
 					end
 				elseif not buff then
 					if events[eventName].Active then

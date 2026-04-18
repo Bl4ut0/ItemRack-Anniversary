@@ -52,6 +52,16 @@ function ItemRack.Debug(tag, ...)
 	if not ItemRack.DebugAll and not ItemRack.DebugTags[tag] then return end
 	local prefix = "|cff00ff00[IR-" .. tag .. "]|r"
 	print(prefix, ...)
+	if ItemRack.DebugAll or ItemRack.DebugTags[tag] then
+		if not ItemRack.LogBuffer then ItemRack.LogBuffer = {} end
+		local text = "[IR-" .. tag .. "]"
+		for i=1, select("#", ...) do
+			local val = select(i, ...)
+			text = text .. " " .. tostring(val)
+		end
+		table.insert(ItemRack.LogBuffer, date("[%H:%M:%S] ") .. text)
+		if #ItemRack.LogBuffer > 500 then table.remove(ItemRack.LogBuffer, 1) end
+	end
 end
 
 -- by Mikinho - Fix for latest update for Classic Era/SoD v11504
@@ -343,6 +353,7 @@ function ItemRack.InitEventHandlers()
 	local handler = ItemRack.EventHandlers
 	handler.ITEM_LOCK_CHANGED = ItemRack.OnItemLockChanged
 	handler.ACTIONBAR_UPDATE_COOLDOWN = ItemRack.UpdateButtonCooldowns
+	handler.UNIT_AURA = ItemRack.OnUnitAura
 	handler.UNIT_INVENTORY_CHANGED = ItemRack.OnUnitInventoryChanged
 	handler.UPDATE_BINDINGS = ItemRack.KeyBindingsChanged
 	handler.PLAYER_REGEN_ENABLED = ItemRack.OnLeavingCombatOrDeath
@@ -457,9 +468,37 @@ function ItemRack.OnEnterWorld(self,event,...)
 	end
 end
 
+function ItemRack.ResetCooldownCaches()
+	ItemRack.CooldownCache = {}
+	ItemRack.MenuCooldownCache = {}
+	ItemRack.CooldownDebugLast = {}
+	if ItemRackUser and ItemRackUser.ItemsUsed then
+		for itemID in pairs(ItemRackUser.ItemsUsed) do
+			ItemRackUser.ItemsUsed[itemID] = nil
+		end
+	end
+	if ItemRack.UpdateButtonCooldowns then
+		ItemRack.UpdateButtonCooldowns()
+	end
+	if ItemRack.UpdateMenuCooldowns then
+		ItemRack.UpdateMenuCooldowns()
+	end
+end
+
 function ItemRack.UpdateArenaVisibilityState()
+	local wasInArena = ItemRack.inArena
 	local _, instanceType = IsInInstance()
 	ItemRack.inArena = (instanceType == "arena") and 1 or nil
+	if not wasInArena and ItemRack.inArena then
+		ItemRack.ResetCooldownCaches()
+		-- Arena joins can briefly report stale cooldown data during the zone load.
+		-- Re-clear one second later so quick access buttons match Blizzard's reset state.
+		C_Timer.After(1, function()
+			if ItemRack.inArena then
+				ItemRack.ResetCooldownCaches()
+			end
+		end)
+	end
 	if ItemRack.RefreshButtonVisibility then
 		ItemRack.RefreshButtonVisibility()
 	end
@@ -562,7 +601,7 @@ function ItemRack.OnUnitInventoryChanged(self,event,unit)
 				ItemRack.Debug("CombatQueue", "  slot="..tostring(slot).." queued="..tostring(queuedID).." equipped="..tostring(equippedID).." match="..tostring(match))
 				if match then
 					ItemRack.CombatQueue[slot] = nil
-					if ItemRack.AutoQueueFlag then ItemRack.AutoQueueFlag[slot] = nil end
+					ItemRack.ClearCombatQueueMetadata(slot)
 					dirty = true
 				end
 			end
@@ -582,6 +621,12 @@ function ItemRack.OnUnitInventoryChanged(self,event,unit)
 			end
 			ItemRackOpt.UpdateInv()
 		end
+	end
+end
+
+function ItemRack.OnUnitAura(self,event,unit)
+	if unit=="player" and ItemRack.PeriodicQueueCheck then
+		ItemRack.PeriodicQueueCheck()
 	end
 end
 
@@ -619,7 +664,8 @@ function ItemRack.ProcessCombatQueue()
 		ItemRack.Debug("CombatQueue", "ProcessCombatQueue: InCombatLockdown="..tostring(inCombat).." UnitAffectingCombat="..tostring(unitCombat))
 		local combat = ItemRackUser.Sets["~CombatQueue"].equip
 		local queue = ItemRack.CombatQueue
-		ItemRack.AutoQueueFlag = ItemRack.AutoQueueFlag or {}
+		local queuesEnabled = ItemRack.GetQueuesEnabled()
+		local queues = ItemRack.GetQueues()
 		for i in pairs(combat) do
 			combat[i] = nil
 		end
@@ -627,15 +673,28 @@ function ItemRack.ProcessCombatQueue()
 			local canSwap = not inCombat
 			ItemRack.Debug("CombatQueue", "  ProcessCQ slot="..tostring(i).." canSwap="..tostring(canSwap))
 			if canSwap then
-				-- Skip slots whose auto-queue was disabled after this entry was added
-				-- Only discard auto-queued entries; manual queue advances should always be honored
-				if not ItemRack.GetQueuesEnabled()[i] and ItemRack.GetQueues()[i] and ItemRack.AutoQueueFlag[i] then
+				local discard = false
+				if ItemRack.AutoQueueFlag and ItemRack.AutoQueueFlag[i] then
+					local sourceOwner = ItemRack.AutoQueueOwner and ItemRack.AutoQueueOwner[i]
+					local currentOwner = ItemRack.GetActiveQueueOwner and ItemRack.GetActiveQueueOwner(i) or false
+					local queueEnabled = queuesEnabled[i]
+					local queueList = queues[i]
+					-- Only auto-queued entries are context-sensitive. If the queue owner changed
+					-- (for example: mount/flying event dropped, manual set changed, or per-set
+					-- queues were reconfigured), discard the stale request instead of applying a
+					-- trinket chosen for an older set context after combat ends.
+					if not queueEnabled or not queueList or #queueList == 0 or sourceOwner ~= currentOwner then
+						discard = true
+						ItemRack.Debug("CombatQueue", "  dropping stale auto-queue slot="..tostring(i).." source="..tostring(sourceOwner or "global").." current="..tostring(currentOwner or "global"))
+					end
+				end
+				if discard then
 					queue[i] = nil
 				else
 					combat[i] = queue[i]
 					queue[i] = nil
 				end
-				ItemRack.AutoQueueFlag[i] = nil
+				ItemRack.ClearCombatQueueMetadata(i)
 			end
 		end
 		if next(combat) then
@@ -844,6 +903,7 @@ function ItemRack.InitCore()
 	ItemRackFrame:RegisterEvent("UNIT_SPELLCAST_FAILED")
 	ItemRackFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
 	ItemRackFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_STOP")
+	ItemRackFrame:RegisterEvent("UNIT_AURA")
 	ItemRackFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 	ItemRackFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 	ItemRackFrame:RegisterEvent("ZONE_CHANGED_INDOORS")
@@ -2067,6 +2127,13 @@ end
 
 function ItemRack.EquipItemByID(id,slot,isAutoQueue)
 	if not id then return end
+	if isAutoQueue then
+		if ItemRack.ClearManualQueueChoice then
+			ItemRack.ClearManualQueueChoice(slot)
+		end
+	elseif ItemRack.SetManualQueueChoice then
+		ItemRack.SetManualQueueChoice(slot, id)
+	end
 	if ItemRack.NowCasting or InCombatLockdown() or ItemRack.IsPlayerReallyDead() then
 		-- If it's already queued, don't toggle it off (which can happen during spamming)
 		-- Exception: if id is 0 (empty slot), we allow the toggle to cancel a pending swap.
@@ -2167,6 +2234,9 @@ function ItemRack.ReflectItemUse(id)
 	local baseID = ItemRack.GetIRString(GetInventoryItemLink("player",id),true,true)
 	if baseID then
 		ItemRackUser.ItemsUsed[baseID] = 1
+		if ItemRack.MarkEquippedQueueItemBurnt and ItemRack.GetQueuesEnabled()[id] then
+			ItemRack.MarkEquippedQueueItemBurnt(id, ItemRack.GetID(id), baseID, ItemRack.GetQueues()[id])
+		end
 	end
 end
 
@@ -2211,6 +2281,15 @@ function ItemRack.IsPlayerReallyDead()
 	return dead
 end
 
+function ItemRack.ClearCombatQueueMetadata(slot)
+	if ItemRack.AutoQueueFlag then
+		ItemRack.AutoQueueFlag[slot] = nil
+	end
+	if ItemRack.AutoQueueOwner then
+		ItemRack.AutoQueueOwner[slot] = nil
+	end
+end
+
 function ItemRack.AddToCombatQueue(slot,id,isAutoQueue)
 	-- Skip if the item is already equipped (prevents oscillation from ID format mismatches
 	-- where strict ~= in EquipSet sees a difference but SameID correctly matches)
@@ -2220,13 +2299,19 @@ function ItemRack.AddToCombatQueue(slot,id,isAutoQueue)
 			return
 		end
 	end
-	if ItemRack.CombatQueue[slot] ~= id then
+	local queueOwner = nil
+	if isAutoQueue and ItemRack.GetActiveQueueOwner then
+		queueOwner = ItemRack.GetActiveQueueOwner(slot)
+	end
+	ItemRack.AutoQueueFlag = ItemRack.AutoQueueFlag or {}
+	ItemRack.AutoQueueOwner = ItemRack.AutoQueueOwner or {}
+	if ItemRack.CombatQueue[slot] ~= id or ItemRack.AutoQueueFlag[slot] ~= isAutoQueue or ItemRack.AutoQueueOwner[slot] ~= queueOwner then
 		ItemRack.CombatQueue[slot] = id
-		ItemRack.AutoQueueFlag = ItemRack.AutoQueueFlag or {}
 		ItemRack.AutoQueueFlag[slot] = isAutoQueue
+		ItemRack.AutoQueueOwner[slot] = queueOwner
 		-- Debug: trace who is adding to CombatQueue
 		local itemName = id and id ~= 0 and (ItemRack.GetInfoByID(id) or tostring(id)) or "empty"
-		ItemRack.Debug("CombatQueue", "AddToCombatQueue slot="..tostring(slot).." item="..tostring(itemName).." auto="..tostring(isAutoQueue))
+		ItemRack.Debug("CombatQueue", "AddToCombatQueue slot="..tostring(slot).." item="..tostring(itemName).." auto="..tostring(isAutoQueue).." owner="..tostring(queueOwner or "global"))
 		ItemRack.Debug("CombatQueue", "stack: "..debugstack(2,4,0))
 		ItemRack.UpdateCombatQueue()
 	end
@@ -2235,7 +2320,7 @@ end
 function ItemRack.RemoveFromCombatQueue(slot)
 	if ItemRack.CombatQueue[slot] ~= nil then
 		ItemRack.CombatQueue[slot] = nil
-		if ItemRack.AutoQueueFlag then ItemRack.AutoQueueFlag[slot] = nil end
+		ItemRack.ClearCombatQueueMetadata(slot)
 		ItemRack.UpdateCombatQueue()
 	end
 end
@@ -2247,7 +2332,7 @@ function ItemRack.UpdateCombatQueue()
 			local equippedID = ItemRack.GetID(slot)
 			if equippedID and ItemRack.SameID(equippedID, queuedID) then
 				ItemRack.CombatQueue[slot] = nil
-				if ItemRack.AutoQueueFlag then ItemRack.AutoQueueFlag[slot] = nil end
+				ItemRack.ClearCombatQueueMetadata(slot)
 			end
 		end
 	end
@@ -3145,6 +3230,103 @@ function ItemRack.SlashHandler(arg1)
 	elseif arg1=="unlock" then
 		ItemRackUser.Locked="OFF"
 		ItemRack.ReflectLock()
+	elseif arg1=="debug" then
+		ItemRack.DebugAll = not ItemRack.DebugAll
+		if ItemRack.DebugAll then
+			ItemRack.DebugTags.Events = true
+			ItemRack.DebugTags.Equip = true
+			ItemRack.DebugTags.Queue = true
+			ItemRack.DebugTags.CombatQueue = true
+			ItemRack.DebugTags.API = true
+			ItemRack.Print("Diagnostic debugging ENABLED for all layers.")
+		else
+			ItemRack.DebugTags.Events = false
+			ItemRack.DebugTags.Equip = false
+			ItemRack.DebugTags.Queue = false
+			ItemRack.DebugTags.CombatQueue = false
+			ItemRack.DebugTags.API = false
+			ItemRack.Print("Diagnostic debugging DISABLED.")
+		end
+	elseif arg1=="dump" then
+		if not ItemRack.LogBuffer then ItemRack.LogBuffer = {} end
+		if not ItemRackLogFrame then
+			local f = CreateFrame("Frame", "ItemRackLogFrame", UIParent, "BackdropTemplate")
+			f:SetSize(750, 500)
+			f:SetPoint("CENTER")
+			f:SetFrameStrata("DIALOG")
+			f:EnableMouse(true)
+			f:SetMovable(true)
+			f:RegisterForDrag("LeftButton")
+			f:SetScript("OnDragStart", f.StartMoving)
+			f:SetScript("OnDragStop", f.StopMovingOrSizing)
+			f:SetBackdrop({bgFile="Interface\\ChatFrame\\ChatFrameBackground", edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", edgeSize=16, insets={left=4,right=4,top=4,bottom=4}})
+			f:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
+			
+			local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+			closeBtn:SetPoint("TOPRIGHT", -5, -5)
+			
+			local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+			title:SetPoint("TOP", 0, -10)
+			title:SetText("ItemRack Diagnostic Log & SavedVariables Dump (CTRL+C to Copy)")
+			
+			local sf = CreateFrame("ScrollFrame", "ItemRackLogScrollFrame", f, "UIPanelScrollFrameTemplate")
+			sf:SetPoint("TOPLEFT", 15, -35)
+			sf:SetPoint("BOTTOMRIGHT", -35, 15)
+			
+			local eb = CreateFrame("EditBox", "ItemRackLogEditBox", sf)
+			eb:SetMultiLine(true)
+			eb:SetFontObject("ChatFontNormal")
+			eb:SetWidth(680)
+			eb:SetAutoFocus(true)
+			eb:SetScript("OnEscapePressed", function(self) ItemRackLogFrame:Hide() end)
+			sf:SetScrollChild(eb)
+			
+			-- Helper function to serialize WoW tables to string
+			function f.Serialize(val, indent)
+				indent = indent or ""
+				if type(val) == "string" then
+					return string.format("%q", val)
+				elseif type(val) == "number" or type(val) == "boolean" then
+					return tostring(val)
+				elseif type(val) == "table" then
+					local res = "{\n"
+					local nextIndent = indent .. "  "
+					for k, v in pairs(val) do
+						local keyStr
+						if type(k) == "number" then
+							keyStr = "[" .. k .. "]"
+						elseif type(k) == "string" then
+							keyStr = "[\"" .. k .. "\"]"
+						else
+							keyStr = "[" .. tostring(k) .. "]"
+						end
+						res = res .. nextIndent .. keyStr .. " = " .. f.Serialize(v, nextIndent) .. ",\n"
+					end
+					res = res .. indent .. "}"
+					return res
+				else
+					return '"' .. tostring(val) .. '"'
+				end
+			end
+		end
+		
+		local dumpText = "=== ITEMRACK LOG BUFFER ===\n" .. table.concat(ItemRack.LogBuffer, "\n")
+		dumpText = dumpText .. "\n\n=== SAVED VARIABLES DUMP ===\n"
+		dumpText = dumpText .. "ItemRackUser.CurrentSet = " .. tostring(ItemRackUser.CurrentSet) .. "\n"
+		dumpText = dumpText .. "ItemRackUser.SetSwapping = " .. tostring(ItemRack.SetSwapping) .. "\n"
+		dumpText = dumpText .. "ItemRackUser.EventStack = " .. ItemRackLogFrame.Serialize(ItemRackUser.EventStack) .. "\n"
+		
+		-- Only dump internal/corrupted ghosts or ~Unequip specifically since full SV is massive, 
+		-- or optionally dump active sets they were interacting with.
+		dumpText = dumpText .. "ItemRackUser.Sets['~Unequip'] = " .. ItemRackLogFrame.Serialize(ItemRackUser.Sets["~Unequip"]) .. "\n"
+		if ItemRackUser.CurrentSet and ItemRackUser.Sets[ItemRackUser.CurrentSet] then
+			dumpText = dumpText .. "ItemRackUser.Sets['" .. ItemRackUser.CurrentSet .. "'] = " .. ItemRackLogFrame.Serialize(ItemRackUser.Sets[ItemRackUser.CurrentSet]) .. "\n"
+		end
+		
+		ItemRackLogFrame:Show()
+		ItemRackLogEditBox:SetText(dumpText)
+		ItemRackLogEditBox:HighlightText()
+		ItemRackLogEditBox:SetFocus()
 	elseif arg1=="opt" or arg1=="options" or arg1=="config" then
 		ItemRack.ToggleOptions()
 	else
@@ -3264,7 +3446,7 @@ local function resolveSlotFromStack(field, slot)
 	if stack then
 		for i = #stack, 1, -1 do
 			local evtName = stack[i]
-			local evtSetName = ItemRackUser.Events.Set[evtName]
+			local evtSetName = (ItemRack.GetEventSet and ItemRack.GetEventSet(evtName)) or ItemRackUser.Events.Set[evtName]
 			if evtSetName then
 				local evtSet = ItemRackUser.Sets[evtSetName]
 				if evtSet and evtSet[field] and evtSet[field][slot] ~= nil then
@@ -3274,6 +3456,48 @@ local function resolveSlotFromStack(field, slot)
 		end
 	end
 	return nil
+end
+
+local function setOwnsQueueSlot(setData, slot)
+	return setData and (
+		(setData.QueuesEnabled and setData.QueuesEnabled[slot] ~= nil) or
+		(setData.Queues and setData.Queues[slot] ~= nil) or
+		(setData.equip and setData.equip[slot] ~= nil)
+	)
+end
+
+-- Returns the set currently providing queue context for a slot.
+-- `false` means the slot is currently using the global queue tables.
+function ItemRack.GetActiveQueueOwner(slot, setname)
+	if ItemRackUser.EnablePerSetQueues ~= "ON" then
+		return false
+	end
+
+	local targetSet = setname or ItemRackUser.CurrentSet
+	local currentSet = targetSet and ItemRackUser.Sets[targetSet]
+	if currentSet and setOwnsQueueSlot(currentSet, slot) then
+		return targetSet
+	end
+
+	if setname or ItemRackUser.EnableQueueContextCheck ~= "ON" then
+		return false
+	end
+
+	local stack = ItemRackUser.EventStack
+	if stack then
+		for i = #stack, 1, -1 do
+			local evtName = stack[i]
+			local evtSetName = (ItemRack.GetEventSet and ItemRack.GetEventSet(evtName)) or ItemRackUser.Events.Set[evtName]
+			if evtSetName and evtSetName ~= targetSet then
+				local evtSet = ItemRackUser.Sets[evtSetName]
+				if setOwnsQueueSlot(evtSet, slot) then
+					return evtSetName
+				end
+			end
+		end
+	end
+
+	return false
 end
 
 -- returns Queues for the current set if EnablePerSetQueues is enabled, otherwise the global Queues
@@ -3300,6 +3524,9 @@ function ItemRack.GetQueues(setname)
 				__index = function(_, slot)
 					if currentSet.Queues[slot] ~= nil then
 						return currentSet.Queues[slot]
+					end
+					if currentSet.equip and currentSet.equip[slot] ~= nil then
+						return nil
 					end
 					local inherited = resolveSlotFromStack("Queues", slot)
 					if inherited ~= nil then
@@ -3335,6 +3562,9 @@ function ItemRack.GetQueuesEnabled(setname)
 				__index = function(_, slot)
 					if currentSet.QueuesEnabled[slot] ~= nil then
 						return currentSet.QueuesEnabled[slot]
+					end
+					if currentSet.equip and currentSet.equip[slot] ~= nil then
+						return nil
 					end
 					local inherited = resolveSlotFromStack("QueuesEnabled", slot)
 					if inherited ~= nil then
