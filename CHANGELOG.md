@@ -2,8 +2,11 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
-## [4.39.2] - 2026-04-15
+## [4.39.2] - 2026-04-20
 ### Bug Fixes
+- **OmniCC Compatibility**: Fixed an issue where the native cooldown overlay provided by OmniCC would fail to display on ItemRack buttons. The addon now dynamically routes its CC-guard bypasses through the engine's metatable so that OmniCC can securely receive `OnSetCooldown` events.
+- **Trinket Cooldown Desync**: Enhanced the precision of the CC-guard cache evaluation (using a 0.1s epsilon) to prevent a brief jarring flash-to-ready state when an item ends its cooldown.
+- **Popout Menu Alt+Click Hiding**: Fixed a regression where using Alt+Click on items within a popout menu would try to toggle the Quick Access Queue instead of letting you hide the item (e.g. mining picks or fishing poles).
 - **Arena Cooldown Reset**: Quick Access and popup-menu cooldown displays now clear their cached item cooldown state when entering a fresh arena, with a delayed second pass on arena entry to match Blizzard's full item-reset timing for fresh matches.
 - **Stale Combat Queue Context**: Auto-queued combat swaps now remember which set/queue context created them and are discarded if that context changes before combat ends. This fixes cases where leaving combat after mount or event transitions could still apply a trinket or queued item chosen for an older set context.
 - **Parachute Burn-on-Use**: Burn-on-use queue items are now marked from the actual item-use event, fixing short post-buff cooldown cases like parachute cloaks where the item became "ready enough" before the queue ever rotated it out.

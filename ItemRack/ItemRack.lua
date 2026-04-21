@@ -1778,7 +1778,7 @@ function ItemRack.UpdateMenuCooldowns()
 			local start, duration, enable = GetItemCooldown(baseID)
 
 			-- Suppress Blizzard's built-in countdown numbers
-			if cdFrame and cdFrame.SetHideCountdownNumbers then
+			if cdFrame and cdFrame.SetHideCountdownNumbers and not _G["OmniCC"] then
 				cdFrame:SetHideCountdownNumbers(true)
 			end
 
@@ -1792,7 +1792,7 @@ function ItemRack.UpdateMenuCooldowns()
 					local cache = ItemRack.MenuCooldownCache[baseID]
 					if cache then
 						local remaining = cache.duration - (GetTime() - cache.start)
-						if remaining > 0 then
+						if remaining > 0.1 then
 							CooldownFrame_Set(cdFrame, cache.start, cache.duration, 1)
 						else
 							ItemRack.MenuCooldownCache[baseID] = nil
@@ -1809,7 +1809,7 @@ function ItemRack.UpdateMenuCooldowns()
 				local cache = ItemRack.MenuCooldownCache[baseID]
 				if cache then
 					local remaining = cache.duration - (GetTime() - cache.start)
-					if remaining > 0 then
+					if remaining > 0.1 then
 						CooldownFrame_Set(cdFrame, cache.start, cache.duration, 1)
 					else
 						ItemRack.MenuCooldownCache[baseID] = nil
@@ -1947,7 +1947,10 @@ function ItemRack.MenuOnClick(self,button)
 	self:SetChecked(false)
 	local item = ItemRack.Menu[self:GetID()]
 	ItemRack.ClearLockList()
-	if IsAltKeyDown() and ItemRackSettings.DisableAltClick == "OFF" then
+	if IsAltKeyDown() and ItemRackSettings.AllowHidden == "ON" and item ~= "MENU" then
+		ItemRack.ToggleHidden(item)
+		ItemRack.BuildMenu()
+	elseif IsAltKeyDown() and ItemRackSettings.DisableAltClick == "OFF" then
 		-- In the Quick Access Menu, Alt-Click toggles the queue for the slot this menu belongs to
 		local slot = ItemRack.menuOpen
 		if slot and slot < 20 then
@@ -1979,9 +1982,6 @@ function ItemRack.MenuOnClick(self,button)
 			end
 		end
 		-- Re-build the menu to reflect the new gear icon on the main button
-		ItemRack.BuildMenu()
-	elseif IsAltKeyDown() and ItemRackSettings.AllowHidden=="ON" then
-		ItemRack.ToggleHidden(item)
 		ItemRack.BuildMenu()
 	elseif IsShiftKeyDown() and ChatFrame1EditBox:IsVisible() then
 		ItemRack.ChatLinkID(item)

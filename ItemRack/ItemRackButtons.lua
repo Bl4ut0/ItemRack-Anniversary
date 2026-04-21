@@ -110,7 +110,7 @@ function ItemRack.ButtonOnLoad(self)
 	-- WoW settings only allow disabling this for spells, not items, so we do it here.
 	-- ItemRack's own CooldownCount system (the Time element) is unaffected.
 	local cooldown = _G[self:GetName().."Cooldown"]
-	if cooldown and cooldown.SetHideCountdownNumbers then
+	if cooldown and cooldown.SetHideCountdownNumbers and not _G["OmniCC"] then
 		cooldown:SetHideCountdownNumbers(true)
 	end
 
@@ -122,32 +122,45 @@ function ItemRack.ButtonOnLoad(self)
 	if cooldown then
 		local slotID = self:GetID()
 		if slotID and slotID < 20 then
-			-- Hook SetCooldown() first — the Clear hook needs IROrigSetCooldown to exist
+			-- Hook SetCooldown() first — the Clear hook needs IROrigSetCooldown to exist.
+			-- OmniCC and similar addons hook cooldown.SetCooldown AFTER us (they load after XML),
+			-- so at runtime the chain is: OmniCC wrapper → our wrapper → origSetCooldown (raw C).
+			-- origSetCooldown is ONLY safe to call directly from INSIDE our SetCooldown wrapper
+			-- (to avoid infinite recursion). Everywhere else, use cooldown.SetCooldown so the
+			-- full chain including OmniCC is honoured.
 			local origSetCooldown = cooldown.SetCooldown
 			if origSetCooldown then
 				cooldown.IROrigSetCooldown = origSetCooldown
 				cooldown.SetCooldown = function(cd, start, dur, ...)
+					local function callSetCooldown(c, s, d, ...)
+						local mt = getmetatable(c)
+						if mt and mt.__index and type(mt.__index.SetCooldown) == "function" then
+							return mt.__index.SetCooldown(c, s, d, ...)
+						end
+						return origSetCooldown(c, s, d, ...)
+					end
+
 					if ItemRack.InCooldownUpdate then
-						return origSetCooldown(cd, start, dur, ...)
+						return callSetCooldown(cd, start, dur, ...)
 					end
 					if (not start or start == 0) and (not dur or dur <= 1.5) then
 						local cache = ItemRack.CooldownCache[slotID]
 						local currentItemID = GetInventoryItemID("player", slotID)
 						if cache and cache.itemID == currentItemID then
 							local remaining = cache.duration - (GetTime() - cache.start)
-							if remaining > 0 then
+							if remaining > 0.1 then
 								IRDebugCooldownState(
 									slotID,
 									string.format("blocked-set:%s:%.1f:%.1f", tostring(currentItemID), IRRoundTenths(cache.start), IRRoundTenths(cache.duration)),
 									string.format("slot %d CC-BLOCKED SetCooldown(0), cache remain=%.1f", slotID, remaining)
 								)
-								return origSetCooldown(cd, cache.start, cache.duration, ...)
+								return callSetCooldown(cd, cache.start, cache.duration, ...)
 							end
 						elseif cache then
 							ItemRack.CooldownCache[slotID] = nil
 						end
 					end
-					return origSetCooldown(cd, start, dur, ...)
+					return callSetCooldown(cd, start, dur, ...)
 				end
 			end
 
@@ -156,9 +169,17 @@ function ItemRack.ButtonOnLoad(self)
 			local origClear = cooldown.Clear
 			if origClear then
 				cooldown.Clear = function(cd, ...)
+					local function callClear(c, ...)
+						local mt = getmetatable(c)
+						if mt and mt.__index and type(mt.__index.Clear) == "function" then
+							return mt.__index.Clear(c, ...)
+						end
+						return origClear(c, ...)
+					end
+
 					-- If our own UpdateButtonCooldowns is running, let it through
 					if ItemRack.InCooldownUpdate then
-						return origClear(cd, ...)
+						return callClear(cd, ...)
 					end
 					-- External caller. Check if we have a valid cached cooldown
 					-- for the SAME item (not a swapped-in item).
@@ -166,15 +187,17 @@ function ItemRack.ButtonOnLoad(self)
 					local currentItemID = GetInventoryItemID("player", slotID)
 					if cache and cache.itemID == currentItemID then
 						local remaining = cache.duration - (GetTime() - cache.start)
-						if remaining > 0 then
+						if remaining > 0.1 then
 							-- Block the clear and re-apply cached cooldown
 							IRDebugCooldownState(
 								slotID,
 								string.format("blocked-clear:%s:%.1f:%.1f", tostring(currentItemID), IRRoundTenths(cache.start), IRRoundTenths(cache.duration)),
 								string.format("slot %d CC-BLOCKED Clear, cache remain=%.1f", slotID, remaining)
 							)
-							if cooldown.IROrigSetCooldown then
-								return cooldown.IROrigSetCooldown(cd, cache.start, cache.duration)
+							if cooldown.SetCooldown then
+								-- Route through cooldown.SetCooldown (not IROrigSetCooldown) so OmniCC
+								-- and other addons that hooked SetCooldown after us are notified.
+								return cooldown.SetCooldown(cd, cache.start, cache.duration)
 							end
 							return -- at minimum, don't clear
 						end
@@ -182,7 +205,7 @@ function ItemRack.ButtonOnLoad(self)
 						-- Item changed (gear swap) — invalidate stale cache
 						ItemRack.CooldownCache[slotID] = nil
 					end
-					return origClear(cd, ...)
+					return callClear(cd, ...)
 				end
 			end
 		end
@@ -906,7 +929,7 @@ function ItemRack.UpdateButtonCooldowns()
 			local currentItemID = GetInventoryItemID("player", i)
 
 			-- Suppress Blizzard's built-in countdown numbers; ItemRack draws its own
-			if cdFrame.SetHideCountdownNumbers then
+			if cdFrame.SetHideCountdownNumbers and not _G["OmniCC"] then
 				cdFrame:SetHideCountdownNumbers(true)
 			end
 
@@ -928,7 +951,7 @@ function ItemRack.UpdateButtonCooldowns()
 					local cache = ItemRack.CooldownCache[i]
 					if cache and cache.itemID == currentItemID then
 						local remaining = cache.duration - (GetTime() - cache.start)
-						if remaining > 0 then
+						if remaining > 0.1 then
 							-- Cache says cooldown is still running — API is unreliable due to CC.
 							-- Keep displaying the cached cooldown swirl.
 							CooldownFrame_Set(cdFrame, cache.start, cache.duration, 1)
