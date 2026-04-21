@@ -2,6 +2,10 @@
 
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
+## [4.39.3] - 2026-04-21
+### Bug Fixes
+- **Ghost Overrides for Events**: Fixed an edge case in `ItemRackEvents.lua` where transient or disabled Zone events could leave their `ManualOverride` flag stuck on. This "ghost override" previously suppressed gear restorations (like dismounting or dropping a stance) permanently, even when the player was not actively using a zone set. (PR #14)
+
 ## [4.39.2] - 2026-04-20
 ### Bug Fixes
 - **OmniCC Compatibility**: Fixed an issue where the native cooldown overlay provided by OmniCC would fail to display on ItemRack buttons. The addon now dynamically routes its CC-guard bypasses through the engine's metatable so that OmniCC can securely receive `OnSetCooldown` events.

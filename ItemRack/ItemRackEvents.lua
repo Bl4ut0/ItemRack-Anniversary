@@ -579,7 +579,7 @@ function ItemRack.PopEvent(eventName)
 			ItemRack.Debug("Events", "PopEvent: Not pending. Checking Zone Overrides for suppressRestore")
 			local enabled = ItemRackUser.Events.Enabled
 			for en in pairs(enabled) do
-				if ItemRackEvents[en] and ItemRackEvents[en].Type == "Zone" and ItemRackEvents[en].ManualOverride then
+				if ItemRackEvents[en] and ItemRackEvents[en].Type == "Zone" and ItemRackEvents[en].ManualOverride and ItemRackEvents[en].Active then
 					suppressRestore = true
 					ItemRack.Debug("Events", "PopEvent: suppressing restore for "..(eventName or "nil").." - zone ManualOverride active for "..(en or "nil").." to protect manual gear context")
 					break
