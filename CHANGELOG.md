@@ -4,6 +4,7 @@ All notable changes to the TBC Anniversary port of ItemRack will be documented i
 
 ## [4.39.3] - 2026-04-21
 ### Bug Fixes
+- **Action Blocked (Taint Protection)**: Fixed `[ADDON_ACTION_BLOCKED]` errors caused by ItemRack buttons remaining registered in Blizzard's shared action bar event dispatch tables (`ActionBarButtonEventsFrame`, `ActionBarActionEventsFrame`, etc.). When ItemRack's addon code touched these buttons, taint propagated to all real Blizzard action buttons, causing `ActionButtonX:SetShown()`, `SetAttribute()`, `MainActionBar:SetShownBase()`, `SetPointBase()`, and `ClearAllPointsBase()` to be blocked in combat. The fix unregisters all ItemRack buttons from these dispatch tables immediately on creation — applied to the docked slot buttons via `ButtonOnLoad` and to dynamically-created popup menu buttons (`ItemRackMenu1..N`) in `CreateMenuButton`.
 - **Ghost Overrides for Events**: Fixed an edge case in `ItemRackEvents.lua` where transient or disabled Zone events could leave their `ManualOverride` flag stuck on. This "ghost override" previously suppressed gear restorations (like dismounting or dropping a stance) permanently, even when the player was not actively using a zone set. (PR #14)
 
 ## [4.39.2] - 2026-04-20
