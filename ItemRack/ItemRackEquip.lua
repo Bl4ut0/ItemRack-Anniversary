@@ -151,7 +151,21 @@ function ItemRack.OrderSwaps(swap)
 			if (ItemRack.UniqueGems[gem1] or ItemRack.UniqueGems[gem2] or ItemRack.UniqueGems[gem3])
 			and k < ItemRack.eqBackOfTheBusOffset then
 				swap[k+ItemRack.eqBackOfTheBusOffset] = v
-				swap[k] = nil
+				
+				local wornID = ItemRack.GetID(k)
+				local wornHasUniqueGem = false
+				if wornID and wornID ~= 0 then
+					local _, _, wGem1, wGem2, wGem3 = ItemRack.GetEnhancements(wornID)
+					if ItemRack.UniqueGems[wGem1] or ItemRack.UniqueGems[wGem2] or ItemRack.UniqueGems[wGem3] then
+						wornHasUniqueGem = true
+					end
+				end
+				
+				if wornHasUniqueGem then
+					swap[k] = 0 -- unequip worn item with unique gem early
+				else
+					swap[k] = nil
+				end
 			end
 		end
 	end
@@ -429,7 +443,7 @@ function ItemRack.IterateSwapList(setname, disableSound)
 				bag,slot = ItemRack.FindSpace()
 				if bag then
 					if set.old then
-						set.old[i] = ItemRack.GetID(i)
+						if set.old[i] == nil then set.old[i] = ItemRack.GetID(i) end
 					end
 					ItemRack.Debug("Equip", "IterateSwapList emptying slot", i, "to bag", bag, "slot", slot)
 					ItemRack.MoveItem(i,nil,bag,slot) -- empty slot
@@ -457,8 +471,8 @@ function ItemRack.IterateSwapList(setname, disableSound)
 						ItemRack.Debug("Equip", "IterateSwapList determined 2H Weapon logic for:", swap[k])
 						-- this is a 2H weapon. swap both slots at once if offhand equipped
 						if set.old then
-							set.old[i] = ItemRack.GetID(i)
-							set.old[i+1] = ItemRack.GetID(i+1)
+							if set.old[i] == nil then set.old[i] = ItemRack.GetID(i) end
+							if set.old[i+1] == nil then set.old[i+1] = ItemRack.GetID(i+1) end
 						end
 						if GetInventoryItemLink("player",17) then
 							local freeBag,freeSlot = ItemRack.FindSpace()
@@ -481,7 +495,7 @@ function ItemRack.IterateSwapList(setname, disableSound)
 						skip = 1
 					else
 						if set.old then
-							set.old[i] = ItemRack.GetID(i)
+							if set.old[i] == nil then set.old[i] = ItemRack.GetID(i) end
 						end
 						ItemRack.Debug("Equip", "IterateSwapList executing normal move from bag", bag, "slot", slot, "--> slot", i)
 						ItemRack.MoveItem(bag,slot,i,nil)
@@ -493,8 +507,8 @@ function ItemRack.IterateSwapList(setname, disableSound)
 					-- item is in other slot and other slot wants to go to this one
 					ItemRack.Debug("Equip", "IterateSwapList executing localized inner-slot shuffle from slot", i, "to", i+1)
 					if set.old then
-						set.old[i] = ItemRack.GetID(i)
-						set.old[i+1] = ItemRack.GetID(i+1)
+						if set.old[i] == nil then set.old[i] = ItemRack.GetID(i) end
+						if set.old[i+1] == nil then set.old[i+1] = ItemRack.GetID(i+1) end
 					end
 					ItemRack.MoveItem(i,nil,i+1,nil)
 					if not ItemRack.AbortSwap then

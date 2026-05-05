@@ -2515,8 +2515,8 @@ function ItemRackOpt.EventEditSave(override)
 			event.Buff = ItemRackOptEventEditBuffName:GetText()
 		end
 		event.Anymount = ItemRackOptEventEditBuffAnyMount:GetChecked()
-		event.OnMovement = ItemRackOptEventEditBuffOnMovement:GetChecked()
-		event.OnMovementDelay = ItemRackOptEventEditBuffOnMovementDelay:GetChecked()
+		event.OnMovement = ItemRackOptEventEditBuffOnMovement:GetChecked() and true or false
+		event.OnMovementDelay = ItemRackOptEventEditBuffOnMovementDelay:GetChecked() and true or false
 		event.Unequip = ItemRackOptEventEditBuffUnequip:GetChecked()
 
 		event.NotInPVP = ItemRackOptEventEditBuffNotInPVP:GetChecked()
