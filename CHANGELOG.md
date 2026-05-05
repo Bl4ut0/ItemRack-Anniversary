@@ -9,6 +9,7 @@ All notable changes to the TBC Anniversary port of ItemRack will be documented i
 
 ### Improvements
 - **Masque Compatibility**: ItemRack buttons now correctly expose their icon texture under the `button.icon` key that Masque expects. Previously Masque could register ItemRack buttons but could not identify the icon layer, leaving Blizzard's grey `NormalTexture` border visible underneath the user's chosen skin. Users with Masque installed will now have their selected skin apply fully to all ItemRack slot buttons and popup menu buttons without any additional configuration.
+- **Missing Ornate Gem IDs**: Added six missing TBC PvP Honor gems to the unique-gem tracking list: Bold Ornate Ruby (28362), Runed Ornate Ruby (28118), Inscribed Ornate Topaz (28363), Potent Ornate Topaz (28123), Smooth Ornate Dawnstone (28119), and Gleaming Ornate Dawnstone (28120). These gems are now correctly detected when ordering set swaps, ensuring items socketed with them are unequipped first to avoid unique-gem conflicts.
 
 ## [4.39.2] - 2026-04-20
 ### Bug Fixes

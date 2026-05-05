@@ -108,6 +108,13 @@ ItemRack.UniqueGems = {
 	[42701] = 1, --enchanted-pearl
 	[42702] = 1, --enchanted-tear
 	[44066] = 1, --kharmaas-grace
+	-- TBC PvP Ornate gems (unique-equipped, purchased with Honor points)
+	[28362] = 1, --bold-ornate-ruby
+	[28118] = 1, --runed-ornate-ruby
+	[28363] = 1, --inscribed-ornate-topaz
+	[28123] = 1, --potent-ornate-topaz
+	[28119] = 1, --smooth-ornate-dawnstone
+	[28120] = 1, --gleaming-ornate-dawnstone
 	--[41492] = 1, --perfect-inscribed-citrine DEBUG
 }
 ItemRack.eqBackOfTheBusOffset = 100
