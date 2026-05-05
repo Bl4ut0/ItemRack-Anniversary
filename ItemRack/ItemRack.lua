@@ -1933,6 +1933,11 @@ function ItemRack.CreateMenuButton(idx,itemID)
 		CreateFrame("Frame",nil,button,"ItemRackTimeTemplate")
 
 		ItemRack.SetFont("ItemRackMenu"..idx)
+		-- Expose icon texture for Masque (same as ButtonOnLoad does for docked slot buttons)
+		local iconTex = _G["ItemRackMenu"..idx.."Icon"]
+		if iconTex then
+			button.icon = iconTex
+		end
 --		local font = button:CreateFontString("ItemRackMenu"..idx.."Time","OVERLAY","NumberFontNormal")
 --		font:SetJustifyH("CENTER")
 --		font:SetWidth(36)
