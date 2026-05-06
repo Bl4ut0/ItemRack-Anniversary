@@ -263,14 +263,6 @@ function ItemRack.ButtonOnLoad(self)
 	if ActionButton_HideOverlayGlow then
 		self.HideOverlayGlow = function() end
 	end
-
-	-- Expose the icon texture under the key Masque expects ("button.icon").
-	-- Without this, Masque registers the button but cannot find the icon,
-	-- leaving the Blizzard grey NormalTexture border visible underneath the skin.
-	local iconTex = _G[self:GetName().."ItemRackIcon"]
-	if iconTex then
-		self.icon = iconTex
-	end
 end
 
 function ItemRack.InitButtons()

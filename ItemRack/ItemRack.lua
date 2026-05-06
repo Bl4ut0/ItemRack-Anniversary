@@ -1898,31 +1898,6 @@ function ItemRack.CreateMenuButton(idx,itemID)
 	local button
 	if not _G["ItemRackMenu"..idx] then
 		button = CreateFrame("CheckButton","ItemRackMenu"..idx,ItemRackMenuFrame,"ActionButtonTemplate")
-		-- ActionButtonTemplate fires ActionBarButtonMixin_OnLoad which registers this button
-		-- into Blizzard's shared action bar dispatcher tables. Addon code touching these
-		-- dynamic menu buttons taints those tables, propagating to ALL real action buttons
-		-- (ActionButtonX:SetShown, SetAttribute, MainActionBar:SetShownBase, etc).
-		-- Unregister immediately — mirrors what ButtonOnLoad does for the docked slot buttons.
-		if ActionBarButtonEventsFrame and ActionBarButtonEventsFrame.frames then
-			for k, frame in pairs(ActionBarButtonEventsFrame.frames) do
-				if frame == button then ActionBarButtonEventsFrame.frames[k] = nil; break end
-			end
-		end
-		if ActionBarActionEventsFrame and ActionBarActionEventsFrame.frames then
-			ActionBarActionEventsFrame.frames[button] = nil
-		end
-		if ActionBarButtonUpdateFrame and ActionBarButtonUpdateFrame.frames then
-			ActionBarButtonUpdateFrame.frames[button] = nil
-		end
-		if ActionBarButtonRangeCheckFrame and ActionBarButtonRangeCheckFrame.actions then
-			for _, frames in pairs(ActionBarButtonRangeCheckFrame.actions) do
-				frames[button] = nil
-			end
-		end
-		button:SetAttribute("action", nil)
-		button.action = nil
-		button.eventsRegistered = nil
-		button:UnregisterAllEvents()
 		button:SetID(idx)
 		button:SetFrameStrata("HIGH")
 --		button:SetFrameLevel(ItemRackMenuFrame:GetFrameLevel()+1)
@@ -1933,11 +1908,6 @@ function ItemRack.CreateMenuButton(idx,itemID)
 		CreateFrame("Frame",nil,button,"ItemRackTimeTemplate")
 
 		ItemRack.SetFont("ItemRackMenu"..idx)
-		-- Expose icon texture for Masque (same as ButtonOnLoad does for docked slot buttons)
-		local iconTex = _G["ItemRackMenu"..idx.."Icon"]
-		if iconTex then
-			button.icon = iconTex
-		end
 --		local font = button:CreateFontString("ItemRackMenu"..idx.."Time","OVERLAY","NumberFontNormal")
 --		font:SetJustifyH("CENTER")
 --		font:SetWidth(36)

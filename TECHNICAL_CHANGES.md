@@ -53,23 +53,9 @@ ItemRack.ApplyTooltipAnchor()  -- ClearAllPoints + SetPoint to desired position
 GameTooltip:SetAlpha(1)
 ```
 
-### Solution — Button Template & Taint Isolation
-**File:** `ItemRackButtons.xml`, `ItemRackButtons.lua` — `ButtonOnLoad`
-
-ItemRack buttons inherit `ActionBarButtonTemplate` (which includes `SecureActionButtonTemplate` + the click-handling mixins needed for item use). However, this template also registers each button with Blizzard's shared event dispatchers (`ActionBarButtonEventsFrame`, `ActionBarActionEventsFrame`, etc.). When addon code later touches these buttons, the taint propagates through the shared dispatch tables to ALL real action buttons.
-
-`ButtonOnLoad` now immediately unregisters ItemRack buttons from these dispatchers:
-```lua
--- Remove from shared event dispatch tables to prevent taint propagation
-ActionBarButtonEventsFrame.frames[k] = nil   -- global button events
-ActionBarActionEventsFrame.frames[self] = nil -- action-specific events
-ActionBarButtonUpdateFrame.frames[self] = nil -- update ticks
-```
-
 ### Key Takeaways
 1. **Never directly assign to secure table keys** (e.g. `GameTooltip.SetOwner = ...`), even temporarily. WoW's taint tracking flags the key permanently.
-2. **Buttons inheriting `ActionBarButtonTemplate` must unregister from shared dispatchers** if they are managed by addon code, otherwise taint propagates to all real action buttons.
-3. Use `hooksecurefunc()` for pre/post hooks, or reposition frames after the secure handler completes.
+2. Use `hooksecurefunc()` for pre/post hooks, or reposition frames after the secure handler completes.
 
 ---
 

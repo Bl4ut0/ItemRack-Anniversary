@@ -4,11 +4,9 @@ All notable changes to the TBC Anniversary port of ItemRack will be documented i
 
 ## [4.39.3] - 2026-05-05
 ### Bug Fixes
-- **Action Blocked (Taint Protection)**: Fixed `[ADDON_ACTION_BLOCKED]` errors caused by ItemRack buttons remaining registered in Blizzard's shared action bar event dispatch tables (`ActionBarButtonEventsFrame`, `ActionBarActionEventsFrame`, etc.). When ItemRack's addon code touched these buttons, taint propagated to all real Blizzard action buttons, causing `ActionButtonX:SetShown()`, `SetAttribute()`, `MainActionBar:SetShownBase()`, `SetPointBase()`, and `ClearAllPointsBase()` to be blocked in combat. The fix unregisters all ItemRack buttons from these dispatch tables immediately on creation — applied to the docked slot buttons via `ButtonOnLoad` and to dynamically-created popup menu buttons (`ItemRackMenu1..N`) in `CreateMenuButton`.
 - **Ghost Overrides for Events**: Fixed an edge case in `ItemRackEvents.lua` where transient or disabled Zone events could leave their `ManualOverride` flag stuck on. This "ghost override" previously suppressed gear restorations (like dismounting or dropping a stance) permanently, even when the player was not actively using a zone set. (PR #14)
 
 ### Improvements
-- **Masque Compatibility**: ItemRack buttons now correctly expose their icon texture under the `button.icon` key that Masque expects. Previously Masque could register ItemRack buttons but could not identify the icon layer, leaving Blizzard's grey `NormalTexture` border visible underneath the user's chosen skin. Users with Masque installed will now have their selected skin apply fully to all ItemRack slot buttons and popup menu buttons without any additional configuration.
 - **Missing Ornate Gem IDs**: Added six missing TBC PvP Honor gems to the unique-gem tracking list: Bold Ornate Ruby (28362), Runed Ornate Ruby (28118), Inscribed Ornate Topaz (28363), Potent Ornate Topaz (28123), Smooth Ornate Dawnstone (28119), and Gleaming Ornate Dawnstone (28120). These gems are now correctly detected when ordering set swaps, ensuring items socketed with them are unequipped first to avoid unique-gem conflicts.
 
 ## [4.39.2] - 2026-04-20
