@@ -1,4 +1,4 @@
-[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
+[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Low')]
 param(
     [string]$SourceRoot = (Join-Path $PSScriptRoot '..'),
     [string]$WowRoot = 'C:\Program Files (x86)\World of Warcraft'
