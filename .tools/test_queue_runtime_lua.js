@@ -35,6 +35,7 @@ ItemRack = {
   IsQueueItemBurnt=function() return false end,
   GetID=function() return "999" end,
   GetIRString=function(value) return tostring(value) end,
+  GetProxyBuff=function() return nil end,
   ShouldHoldEquippedItem=function() return false end,
   ItemNearReady=function() return false end,
   IsCandidateReady=function() return false end,

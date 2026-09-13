@@ -1,4 +1,5 @@
 __ Development __
+- Trinkets gated by another item's cooldown are no longer treated as permanently ready by AutoQueue. ItemRack.CooldownProxies maps such an item to the item that gates it, readiness and the existing buff hold resolve through the proxy, and the slot buttons and flyout menu show the gating item's cooldown. Ships with Serpent-Coil Braid keyed to mana gems.
 
 __ New in 4.45 - By Bl4ut0 __
 - Linking a gear set to a talent specialization (Primary/Secondary Spec) no longer automatically enables the associated Event by default, preventing unexpected double set swaps when equipping a spec-changing set.

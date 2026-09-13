@@ -58,6 +58,10 @@ ItemRack.DebugTags = { -- per-tag toggles; explicit defaults allow /itemrack deb
 	Combat = false
 }
 ItemRack.DebugAll = false -- master override to enable all tags
+
+ItemRack.CooldownProxies = {
+	[30720] = { id = 22044, buff = 37445 }, -- Serpent-Coil Braid <- mana gems (Mana Surge)
+}
 ItemRack.DebugChat = false -- whether to print debug messages to the chat frame
 
 function ItemRack.Debug(tag, ...)
@@ -375,6 +379,17 @@ ItemRack.NoTitansGrip = {
 	["Polearms"] = 1, -- reverted in 3.4.1 to block Polearms from Titan's Grip again
 	["Fishing Poles"] = 1,
 	["Staves"] = 1
+}
+
+-- Items whose usefulness is gated by another item's cooldown (e.g. Serpent-Coil
+-- Braid keys off mana gems). id = the gating item. buff = the aura the pairing
+-- grants. The queue's existing "hold while this item's buff runs" check keys on
+-- GetItemSpell, which cannot see an equip effect, so the aura has to be named
+-- here. Give buff as a spell ID so the name resolves in the client's own locale.
+-- Mana gem ranks share one cooldown category tracked independent of possession,
+-- so any single rank ID is a valid probe.
+ItemRack.CooldownProxies = {
+	[30720] = { id = 22044, buff = 37445 }, -- Serpent-Coil Braid <- mana gems (Mana Surge)
 }
 
 ItemRack.Menu = {}
@@ -3518,6 +3533,11 @@ function ItemRack.UpdateMenuCooldowns()
 		if baseID and baseID>0 and ItemRack.menuOpen<20 then
 			local cdFrame = _G["ItemRackMenu"..i.."Cooldown"]
 			local start, duration, enable = GetItemCooldown(baseID)
+			-- Items gated by another item's cooldown (see ItemRack.CooldownProxies)
+			-- have no cooldown of their own. Show the gating item's instead.
+			if ItemRack.ApplyProxyCooldown then
+				start, duration, enable = ItemRack.ApplyProxyCooldown(baseID, start, duration, enable)
+			end
 			local observed = ItemRack.ObserveItemCooldown(exactID,baseID,
 				start,duration,enable,"menu")
 
