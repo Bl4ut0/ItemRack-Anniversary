@@ -128,27 +128,7 @@ function ItemRack.PauseAutomaticSwapForWorldTransition(reason)
 	end
 end
 
--- Legion artifact items that act as two items
-ItemRack.PhantomItem = {
-	[128293] = true, -- Blades of the Fallen Prince (frost death knight)
-	[127830] = true, -- Twinblades of the Deceiver (havoc demon hunter)
-	[128831] = true, -- Aldrachi Warblades (vengeance demon hunter)
-	[128859] = true, -- Fangs of Ashamane (feral druid)
-	[128822] = true, -- Claws of Ursoc (guardian druid)
-	[133959] = true, -- Heart of the Phoenix (fire mage)
-	[133948] = true, -- Fists of the Heavens (windwalker monk)
-	[128867] = true, -- Oathseeker (prot pally)
-	[133958] = true, -- Secrets of the Void (shadow priest)
-	[128869] = true, -- The Kingslayers (assassin rogue)
-	[134552] = true, -- The Dreadblades (outlaw rogue)
-	[128479] = true, -- Fangs of the Devourer (subtlety rogue)
-	[128936] = true, -- The Highkeeper's Ward (ele shaman)
-	[128873] = true, -- Fury of the Stonemother (enh shaman)
-	[128934] = true, -- Shield of the Sea Queen (resto shaman)
-	[128943] = true, -- Skull of the Man'ari (demo lock)
-	[134553] = true, -- Warswords of the Valarjar (fury warrior)
-	[128289] = true, -- Scale of the Earth-Warder (prot warrior)
-}
+ItemRack.PhantomItem = {} -- Legion artifact items; unused in Classic/TBC (retained for backward compatibility)
 
 ItemRack.UniqueGems = {
 	-- Wrath JC gems
@@ -670,9 +650,11 @@ function ItemRack.EquipSet(setname, disableSound, isSecureKeybind)
 		return
 	end
 	
-	local swapStr = ""
-	for k,v in pairs(swap) do swapStr = swapStr .. k..":"..v.." " end
-	ItemRack.Debug("Equip", "EquipSet swap list generated:", swapStr)
+	if ItemRack.DebugAll or (ItemRack.DebugTags and ItemRack.DebugTags.Equip) then
+		local swapStr = ""
+		for k,v in pairs(swap) do swapStr = swapStr .. k..":"..v.." " end
+		ItemRack.Debug("Equip", "EquipSet swap list generated:", swapStr)
+	end
  
 	-- if in combat, dead, or casting, queue non-weapon items for later
 	-- PickupInventoryItem is blocked by the game during InCombatLockdown() for armor, but weapons (16, 17, 18) can swap in combat if not casting/dead

@@ -144,7 +144,7 @@ check(eventState.includes('function EventFrames.ReleaseSlots'), 'Manual equipmen
 const stance = between(
   events,
   'function ItemRack.ProcessStanceEvent()',
-  'local mountZoneRecheckPending'
+  'local function getActiveMountEvents'
 );
 check(
   stance.includes('table.sort(names)') &&
