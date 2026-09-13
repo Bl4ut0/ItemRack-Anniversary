@@ -49,7 +49,7 @@ function trackedChanges() {
   const status = git(['status', '--porcelain', '--untracked-files=no']);
   if (!status) return [];
   return status.split(/\r?\n/).map((line) => {
-    const statusPath = line.slice(3);
+    const statusPath = line.trim().replace(/^..\s*/, '');
     const renameIndex = statusPath.lastIndexOf(' -> ');
     return (renameIndex >= 0 ? statusPath.slice(renameIndex + 4) : statusPath).replace(/\\/g, '/');
   });
