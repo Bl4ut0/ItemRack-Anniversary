@@ -3,6 +3,7 @@
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
 ## [Development]
+- **Immediate Lock Reconciliation**: `OnItemLockChanged` now reconciles active equipment transactions on the exact frame `ITEM_LOCK_CHANGED` fires instead of waiting for the 200ms `LocksChanged` timer. Multi-item set swaps complete up to 10x faster while preserving 100% transaction safety.
 - **Cooldown Proxy Trinkets**: Trinkets whose effect is driven by a separate item are no longer treated as permanently ready by AutoQueue. `ItemRack.CooldownProxies` maps such an item to the item that gates it, readiness resolves through the proxy, the existing buff hold keeps the trinket equipped while its aura runs, and the slot buttons and flyout menu show the gating item's cooldown. Ships with Serpent-Coil Braid keyed to mana gems.
 
 

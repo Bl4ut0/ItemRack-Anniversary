@@ -1850,6 +1850,9 @@ function ItemRack.OnCastingStop(self,event,unit,castID)
 end
 
 function ItemRack.OnItemLockChanged()
+	if ItemRack.ActiveEquipmentTransaction then
+		ItemRack.ReconcileEquipmentTransaction("ITEM_LOCK_CHANGED")
+	end
 	ItemRack.StartTimer("LocksChanged")
 	ItemRack.LocksHaveChanged = 1
 end
