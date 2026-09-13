@@ -600,21 +600,17 @@ function ItemRackOpt.SaveSet()
 	-- Clear legacy assignments for this set to avoid stale links/conflicts
 	if ItemRackUser.Events.Set[event1] == setname then
 		ItemRackUser.Events.Set[event1] = nil
-		ItemRackUser.Events.Enabled[event1] = nil
 	end
 	if ItemRackUser.Events.Set[event2] == setname then
 		ItemRackUser.Events.Set[event2] = nil
-		ItemRackUser.Events.Enabled[event2] = nil
 	end
 
 	if ItemRackOptSpec1:GetChecked() then
 		set.AssociatedSpec = 1
 		ItemRackUser.Events.Set[event1] = setname
-		ItemRackUser.Events.Enabled[event1] = true
 	elseif ItemRackOptSpec2:GetChecked() then
 		set.AssociatedSpec = 2
 		ItemRackUser.Events.Set[event2] = setname
-		ItemRackUser.Events.Enabled[event2] = true
 	end
 	
 	if ItemRackUser.EnableEvents == "OFF" and set.AssociatedSpec then
