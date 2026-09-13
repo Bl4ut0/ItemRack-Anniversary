@@ -13,6 +13,7 @@ BlizzardInterfaceCode/
 WeakAuras/
 
 # Local files
+.env
 CURSEFORGE_DESCRIPTION.md
 RELEASE_NOTES.md
 DEAD_ENDS.md
@@ -32,6 +33,22 @@ OmniCC_Config/
 !.tools/check_queue_watchdog_regressions.js
 !.tools/check_regressions.js
 !.tools/check_release_flow.js
+!.tools/lib/
+!.tools/lib/lua_harness.js
+!.tools/test_transactions_lua.js
+!.tools/test_transaction_engine_lua.js
+!.tools/test_event_frames_lua.js
+!.tools/test_event_integration_lua.js
+!.tools/test_event_processors_lua.js
+!.tools/test_queue_policy_lua.js
+!.tools/test_queue_runtime_lua.js
+!.tools/test_queue_intents_lua.js
+!.tools/test_queue_migration_lua.js
+!.tools/test_cooldown_state_lua.js
+!.tools/test_cooldown_integration_lua.js
+!.tools/test_inventory_refresh_lua.js
+!.tools/test_set_bindings_lua.js
+!.tools/check_secure_templates.js
 !.tools/create_release.js
 !.tools/install_local.ps1
 node_modules/
