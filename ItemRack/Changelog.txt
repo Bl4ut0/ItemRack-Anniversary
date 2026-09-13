@@ -1,4 +1,6 @@
 __ Development __
+
+__ New in 4.46-beta1 - By Bl4ut0 __
 - Reconciles active equipment transactions immediately when ITEM_LOCK_CHANGED fires, eliminating the 200ms timer delay between individual item swaps while preserving complete transaction safety.
 - Trinkets driven by a separate item (such as Serpent-Coil Braid keyed to mana gems) are no longer treated as permanently ready by AutoQueue. Cooldowns and aura holds resolve through ItemRack.CooldownProxies.
 
