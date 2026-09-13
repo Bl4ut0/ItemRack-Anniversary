@@ -5,17 +5,13 @@ All notable changes to the TBC Anniversary port of ItemRack will be documented i
 ## [Development]
 
 
-## [4.45-beta3] - 2026-09-06
+## [4.45] - 2026-09-12
+### Bug Fixes & Improvements
 - **Script Event Consent Boundary**: Saving valid Script events through ItemRack's editor now records interface approval for their exact name, trigger, and Lua source. Scripts introduced or changed outside that interface remain disabled until the player deliberately enables and accepts them through a warning prompt; unchanged packaged defaults remain privately trusted.
 - **Injected Script Fail-Closed Guards**: Event registration, deferred-trigger detection, final dispatch, and logout persistence independently reject unapproved source before compilation or SavedVariables output. Rejected or invalid new events are removed, while rejected changes restore the last approved version disabled.
-
-## [4.45-beta2] - 2026-09-03
 - **Deterministic Large-Profile Test Suite**: Added production-Lua workloads that model users with 64 overlapping sets, a 96-entry event/queue context, 931 migrated queues, and 97 multi-slot equipment transactions. Seeded buried removal, shared/repeated sets, atomic queue provenance, hostile SavedVariables shapes, lock contention, destination rejection, and exact rollback now run in the standard `npm test` gate.
 - **Same-Event Generation Replacement**: The expanded suite found that replacing an event with a narrower newer generation removed logical ownership but could leave old-only gear physically equipped. Event-frame replacement now coalesces the old Pop and new Activate plans, restores dropped slots, preserves the correct lower prior, and avoids briefly restoring retained targets.
 - **Cumulative Beta Publication Notes**: Generated GitHub and CurseForge notes for beta2 and later now include every earlier beta from the same version line, newest first. Repository changelog sections remain separate so eventual stable consolidation does not duplicate fixes.
-
-## [4.45-beta1] - 2026-09-03
-### Bug Fixes & Improvements
 - **Primary Reliability Overhaul**: This beta is the consolidated remediation from the v4.24-to-development audit of historical source, release packages, GitHub reports, and all available CurseForge comments. It replaces accumulated symptom guards in event restoration, equipment mutation, queues, cooldowns, bindings, and visual buttons with explicit ownership/state boundaries and production-Lua regression coverage. It is intentionally a beta so previously affected users can validate the overhaul in the live WoW client before stable promotion.
 - **Canonical Event Ownership and Restoration**: Replaced the shared per-set live restore graph with ordered event frames and per-slot prior values. Shared-set Ghostwolf/Mounted ownership, buried removal, repeated `X → Y → X` sets, manual slot release, Zone-under-Mounted rebasing, and stale generations now reconcile without a lower event overwriting higher or manually selected gear.
 - **Recoverable Legacy Event Upgrade**: Captures legacy `EventStack`, active flags, mappings, and referenced `old`/`oldset` history before defaults are refreshed. Ordered evidence is migrated once; ambiguous unordered multi-event state is backed up and left unowned rather than guessed, and unknown future schemas suspend automatic swaps without rewriting data.
