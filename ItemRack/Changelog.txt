@@ -1,4 +1,7 @@
 __ Development __
+- Refactored ItemRackTransaction.lua and ItemRackEquip.lua so non-conflicting gear moves in a set swap pipeline simultaneously in a single frame, restoring 1-frame instant equipment transformations while preserving full atomic rollback safety if any destination or server check fails.
+- Fixed dual-spec Enhancement Shaman keybind/set equips bouncing gear on and off in an infinite loop and failing with "dont have dual spec". Off-hand weapons are safely deferred until after the spec transition completes, equipping immediately upon talent group change.
+- Fixed the minimap button lock function by integrating with LibDBIcon-1.0 (LDBIcon:Lock / Unlock) and adding an explicit "Lock minimap button" checkbox under Interface & Misc options.
 
 __ New in 4.46-beta1 - By Bl4ut0 __
 - Reconciles active equipment transactions immediately when ITEM_LOCK_CHANGED fires, eliminating the 200ms timer delay between individual item swaps while preserving complete transaction safety.

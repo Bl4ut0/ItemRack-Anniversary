@@ -3,6 +3,9 @@
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
 ## [Development]
+- **Instant Single-Frame Batch Pipelining (CurseForge: RollType)**: Refactored `ItemRackTransaction.lua` and `ItemRackEquip.lua` so all non-conflicting gear moves in a set swap are pipelined and submitted simultaneously in a single frame. Equipment transforms instantly as in legacy versions, while preserving full atomic rollback safety if any destination slot or server verification rejects a move.
+- **Dual-Spec Weapon Deferral & Shaman Support (CurseForge: darthwhisper)**: Fixed an issue where switching to a specialization with Dual Wield (e.g. Enhancement Shaman) via set keybind caused gear to continuously swap on/off and fail with "dont have dual spec". ItemRack now checks dual-wield capability; when switching to a dual-wield spec, off-hand weapons are safely deferred until after the talent switch completes, allowing the rest of the set to equip cleanly in 1 frame and equipping the off-hand weapon immediately upon `ACTIVE_TALENT_GROUP_CHANGED`.
+- **Minimap Button Lock Support (CurseForge: RollType)**: Fixed the minimap button lock setting not preventing the button from being dragged. Integrated `ItemRack.ReflectLock()` with `LibDBIcon-1.0` (`LDBIcon:Lock` / `LDBIcon:Unlock`) and added an explicit "Lock minimap button" checkbox under Interface & Misc options.
 
 
 ## [4.46-beta1] - 2026-09-12

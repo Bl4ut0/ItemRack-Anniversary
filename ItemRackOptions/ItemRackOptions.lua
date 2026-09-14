@@ -217,6 +217,7 @@ function ItemRackOpt.OnLoad(self)
 		{type="label",label="Interface & Misc"},
 		{type="check",optset=ItemRackSettings,variable="ShowMinimap",label="Show minimap button",tooltip="Show the minimap button to access options or change sets."},
 		{type="check",optset=ItemRackSettings,variable="MinimapTooltip",depend="ShowMinimap",label="Show minimap tooltip",tooltip="If tooltips enabled, show what mouse clicks will do when clicking the minimap button."},
+		{type="check",optset=ItemRackSettings,variable="LockMinimap",depend="ShowMinimap",label="Lock minimap button",tooltip="Prevent the minimap button from being moved."},
 		{type="check",optset=ItemRackSettings,variable="TrinketMenuMode",label="TrinketMenu mode",tooltip="When mouseover of either trinket slot, open anchored to the top trinket.  Left click of a menu item will equip to the top trinket.  Right click will equip to the bottom trinket."},
 		{type="check",optset=ItemRackSettings,variable="AnchorOther",depend="TrinketMenuMode",label="Anchor other trinket",tooltip="In TrinketMenu mode, trinket menus dock to the top trinket.  Check this to anchor them to the bottom trinket."},
 		{type="check",optset=ItemRackSettings,variable="EquipToggle",label="Toggle sets on equip",tooltip="When a set is equipped, if it's already equipped, unequip it."},
@@ -1203,6 +1204,8 @@ function ItemRackOpt.OptListCheckButtonOnClick(self,override)
 	elseif opt.variable=="ShowMinimap" then
 		opt.optset["minimap"]["hide"] = check ~= "ON" and true or false
 		ItemRack.ShowMinimap()
+	elseif opt.variable=="Locked" or opt.variable=="LockMinimap" then
+		ItemRack.ReflectLock()
 	elseif opt.variable=="EnableQueues" or opt.variable=="EnablePerSetQueues" or opt.variable=="EnableQueueContextCheck" then
 		ItemRack.UpdateCombatQueue()
 	elseif opt.variable=="TinyTooltips" then

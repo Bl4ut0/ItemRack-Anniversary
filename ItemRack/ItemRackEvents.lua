@@ -2226,33 +2226,52 @@ function ItemRack.ProcessSpecializationEvent(force)
 		retrySets[preserveRequestedSet] = true
 		if ItemRack.UpdateCurrentSet then ItemRack.UpdateCurrentSet() end
 	end
-	for setname in pairs(retrySets) do ItemRack.ScheduleDualWieldRetry(setname) end
+	for setname in pairs(retrySets) do
+		ItemRack.ScheduleDualWieldRetry(setname)
+		-- Immediate retry after specialization event has already settled
+		if C_Timer and C_Timer.After then
+			C_Timer.After(0.2, function()
+				ItemRack.RetryDualWieldWeapons(setname)
+			end)
+		else
+			ItemRack.RetryDualWieldWeapons(setname)
+		end
+	end
 end
 
 -- Dual-Wield Retry: Re-attempt weapon equip after spec change if offhand wasn't equipped
 -- Uses EquipItemByID directly instead of temporary sets to avoid queue conflicts
-function ItemRack.ScheduleDualWieldRetry(setname)
+function ItemRack.ScheduleDualWieldRetry(setname, targetSpec)
 	if not setname or not ItemRackUser.Sets[setname] then return end
 	
 	local set = ItemRackUser.Sets[setname].equip
 	-- Only proceed if the set has an offhand weapon defined
 	if not set or not set[17] or set[17] == 0 then return end
 	
-	-- Capture the current spec at schedule time for later verification
-	local getSpec = GetActiveTalentGroup or (C_Talent and C_Talent.GetActiveTalentGroup)
-	local scheduledSpec = getSpec and getSpec() or nil
+	-- Target spec for verification: if set has AssociatedSpec, that's what we expect
+	local expectedSpec = targetSpec or (ItemRackUser.Sets[setname] and ItemRackUser.Sets[setname].AssociatedSpec)
+	if not expectedSpec then
+		local getSpec = GetActiveTalentGroup or (C_Talent and C_Talent.GetActiveTalentGroup)
+		expectedSpec = getSpec and getSpec() or nil
+	end
+
+	ItemRack.PendingDualWieldRetry = ItemRack.PendingDualWieldRetry or {}
+	ItemRack.PendingDualWieldRetry[setname] = expectedSpec
 	
 	-- Schedule a delayed check to retry the offhand after dual-wield is recognized
 	-- Must wait longer than the 5-second spec change cast to ensure dual-wield is granted
 	-- Single attempt only - no retry loop to avoid pestering the user
 	C_Timer.After(5.5, function()
-		ItemRack.RetryDualWieldWeapons(setname, scheduledSpec)
+		ItemRack.RetryDualWieldWeapons(setname, expectedSpec)
 	end)
 end
 
 function ItemRack.RetryDualWieldWeapons(setname, expectedSpec)
 	-- Re-validate set still exists (could have been deleted)
 	if not setname or not ItemRackUser.Sets[setname] then return end
+	if ItemRack.PendingDualWieldRetry then
+		ItemRack.PendingDualWieldRetry[setname] = nil
+	end
 	
 	-- Verify we're still on the expected spec (user might have walked away or switched again)
 	local getSpec = GetActiveTalentGroup or (C_Talent and C_Talent.GetActiveTalentGroup)
@@ -2263,7 +2282,10 @@ function ItemRack.RetryDualWieldWeapons(setname, expectedSpec)
 	end
 	
 	-- Check if the player can now dual-wield
-	local canDualWield = CanDualWield and CanDualWield()
+	local canDualWield = ItemRack.CanPlayerDualWield and ItemRack.CanPlayerDualWield()
+	if not canDualWield and CanDualWield then
+		canDualWield = CanDualWield()
+	end
 	if not canDualWield then 
 		-- Spec doesn't support dual-wield, exit gracefully
 		return 
@@ -2278,18 +2300,18 @@ function ItemRack.RetryDualWieldWeapons(setname, expectedSpec)
 	-- If offhand is defined but not correctly equipped, retry using EquipItemByID
 	-- This doesn't use temporary sets, so it won't pollute the SetsWaiting queue
 	if intendedOffhand and intendedOffhand ~= 0 and not ItemRack.MatchesStoredItemID(intendedOffhand, currentOffhand) then
-		ItemRack.Print("Dual-wield detected, retrying offhand weapon...")
+		ItemRack.Print("Dual-wield detected, equipping offhand weapon...")
 		
 		-- Use EquipItemByID which handles combat queue properly
 		-- and doesn't create temporary sets
 		ItemRack.EquipItemByID(intendedOffhand, 17, false, nil, nil, "dual_wield_retry")
-		
-		-- Also retry mainhand if needed
-		local currentMainhand = ItemRack.GetID(16)
-		local intendedMainhand = set[16]
-		if intendedMainhand and intendedMainhand ~= 0 and not ItemRack.MatchesStoredItemID(intendedMainhand, currentMainhand) then
-			ItemRack.EquipItemByID(intendedMainhand, 16, false, nil, nil, "dual_wield_retry")
-		end
+	end
+	
+	-- Also retry mainhand if needed
+	local currentMainhand = ItemRack.GetID(16)
+	local intendedMainhand = set[16]
+	if intendedMainhand and intendedMainhand ~= 0 and not ItemRack.MatchesStoredItemID(intendedMainhand, currentMainhand) then
+		ItemRack.EquipItemByID(intendedMainhand, 16, false, nil, nil, "dual_wield_retry")
 	end
 end
 
