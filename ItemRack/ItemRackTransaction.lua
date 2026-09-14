@@ -152,45 +152,14 @@ local function PrepareSteps(request)
 	return true
 end
 
-local function SubmitCurrentStep(request)
-	local step = request.steps[request.stepIndex]
-	if not step then
-		FinishRequest(request, request.rollbackReason and "failed_rolled_back" or "complete", request.rollbackReason)
-		return
-	end
-
-	if CursorHasItem() then
-		FinishRequest(request, "blocked", "cursor_occupied")
-		return
-	end
-	if SpellIsTargeting() then
-		FinishRequest(request, "blocked", "spell_targeting")
-		return
-	end
-	if LocationLocked(step.from) or LocationLocked(step.to) then
-		step.status = "blocked"
-		request.status = "blocked"
-		ScheduleObservation(request)
-		return
-	end
-
-	local currentSource = ReadLocation(step.from)
-	local currentDestination = ReadLocation(step.to)
-	if not SameIdentity(currentSource, step.sourceBefore)
-	or not SameIdentity(currentDestination, step.destinationBefore) then
-		FinishRequest(request, "failed", "prestate_changed")
-		return
-	end
-
+local function SubmitStep(step)
 	step.status = "submitting"
-	request.status = "submitting"
 	local sourceOK, sourceError = pcall(PickupLocation, step.from)
 	if not sourceOK then
 		step.submitError = tostring(sourceError)
 		step.status = "submitted"
 		step.submittedAt = GetTime()
-		ScheduleObservation(request)
-		return
+		return false
 	end
 
 	-- Cursor ownership begins only after our source pickup.  A pre-existing user
@@ -222,15 +191,85 @@ local function SubmitCurrentStep(request)
 	step.status = "submitted"
 	step.submittedAt = GetTime()
 	step.unchangedSamples = 0
+	return true
+end
+
+local function SubmitCurrentStep(request)
+	local step = request.steps[request.stepIndex]
+	if not step then
+		FinishRequest(request, request.rollbackReason and "failed_rolled_back" or "complete", request.rollbackReason)
+		return
+	end
+
+	if CursorHasItem() then
+		FinishRequest(request, "blocked", "cursor_occupied")
+		return
+	end
+	if SpellIsTargeting() then
+		FinishRequest(request, "blocked", "spell_targeting")
+		return
+	end
+	if LocationLocked(step.from) or LocationLocked(step.to) then
+		step.status = "blocked"
+		request.status = "blocked"
+		ScheduleObservation(request)
+		return
+	end
+
+	local currentSource = ReadLocation(step.from)
+	local currentDestination = ReadLocation(step.to)
+	if not SameIdentity(currentSource, step.sourceBefore)
+	or not SameIdentity(currentDestination, step.destinationBefore) then
+		FinishRequest(request, "failed", "prestate_changed")
+		return
+	end
+
+	request.status = "submitting"
+	local usedLocations = {}
+	SubmitStep(step)
+	usedLocations[LocationKey(step.from)] = true
+	usedLocations[LocationKey(step.to)] = true
+
+	-- Batch subsequent independent steps synchronously within the same frame
+	local idx = request.stepIndex + 1
+	while idx <= #request.steps do
+		local nextStep = request.steps[idx]
+		if nextStep.status ~= "planned" then
+			break
+		end
+		if CursorHasItem() or SpellIsTargeting() then
+			break
+		end
+		local fromKey = LocationKey(nextStep.from)
+		local toKey = LocationKey(nextStep.to)
+		if usedLocations[fromKey] or usedLocations[toKey] then
+			break -- dependency on an inflight unconfirmed step
+		end
+		if LocationLocked(nextStep.from) or LocationLocked(nextStep.to) then
+			break -- endpoint locked
+		end
+		local nSource = ReadLocation(nextStep.from)
+		local nDest = ReadLocation(nextStep.to)
+		if not SameIdentity(nSource, nextStep.sourceBefore)
+		or not SameIdentity(nDest, nextStep.destinationBefore) then
+			break -- prestate changed
+		end
+
+		SubmitStep(nextStep)
+		usedLocations[fromKey] = true
+		usedLocations[toKey] = true
+		idx = idx + 1
+	end
+
 	request.status = "observing"
 	ScheduleObservation(request)
 end
 
 local function BeginRollback(request, reason)
 	local rollback = {}
-	for index = request.stepIndex - 1, 1, -1 do
+	for index = #request.steps, 1, -1 do
 		local original = request.steps[index]
-		if original.status == "confirmed" then
+		if original.status == "confirmed" or (original.status == "submitted" and SameIdentity(ReadLocation(original.to), original.expectedDestinationState)) then
 			table.insert(rollback, {
 				from = original.to,
 				to = original.from,
@@ -259,76 +298,82 @@ end
 function ItemRack.ReconcileEquipmentTransaction(reason)
 	local request = ItemRack.ActiveEquipmentTransaction
 	if not request or request.finished then return false end
-	local step = request.steps[request.stepIndex]
-	if not step then
-		FinishRequest(request, request.rollbackReason and "failed_rolled_back" or "complete", request.rollbackReason)
-		return true
-	end
 
-	if step.status == "blocked" then
-		if CursorHasItem() or SpellIsTargeting() or LocationLocked(step.from) or LocationLocked(step.to) then
+	while request.stepIndex <= #request.steps do
+		local step = request.steps[request.stepIndex]
+		if not step then break end
+
+		if step.status == "blocked" then
+			if CursorHasItem() or SpellIsTargeting() or LocationLocked(step.from) or LocationLocked(step.to) then
+				if GetTime() >= request.deadline then
+					FinishRequest(request, "blocked", "lock_timeout")
+				else
+					ScheduleObservation(request)
+				end
+				return false
+			end
+			step.status = "planned"
+			SubmitCurrentStep(request)
+			return true
+		end
+
+		if step.status == "planned" then
+			SubmitCurrentStep(request)
+			return true
+		end
+
+		if step.status ~= "submitted" then
+			return false
+		end
+
+		if CursorHasItem() or LocationLocked(step.from) or LocationLocked(step.to) then
 			if GetTime() >= request.deadline then
-				FinishRequest(request, "blocked", "lock_timeout")
+				BeginRollback(request, "settlement_timeout")
 			else
 				ScheduleObservation(request)
 			end
 			return false
 		end
-		step.status = "planned"
-		SubmitCurrentStep(request)
-		return true
-	end
 
-	if step.status ~= "submitted" then
-		return false
-	end
-	if CursorHasItem() or LocationLocked(step.from) or LocationLocked(step.to) then
-		if GetTime() >= request.deadline then
-			BeginRollback(request, "settlement_timeout")
-		else
+		local sourceState = ReadLocation(step.from)
+		local destinationState = ReadLocation(step.to)
+		if SameIdentity(sourceState, step.expectedSourceState)
+		and SameIdentity(destinationState, step.expectedDestinationState) then
+			step.status = "confirmed"
+			step.confirmedAt = GetTime()
+			request.stepIndex = request.stepIndex + 1
+		elseif SameIdentity(sourceState, step.sourceBefore)
+		and SameIdentity(destinationState, step.destinationBefore) then
+			step.unchangedSamples = (step.unchangedSamples or 0) + 1
+			if step.unchangedSamples >= 2
+			and GetTime() - step.submittedAt >= ItemRack.TransactionSettleDelay then
+				if request.rollbackReason then
+					FinishRequest(request, "partial_failure", request.rollbackReason..":rollback_rejected")
+				else
+					BeginRollback(request, step.submitError and "api_error" or "destination_rejected")
+				end
+				return false
+			end
 			ScheduleObservation(request)
-		end
-		return false
-	end
-
-	local sourceState = ReadLocation(step.from)
-	local destinationState = ReadLocation(step.to)
-	if SameIdentity(sourceState, step.expectedSourceState)
-	and SameIdentity(destinationState, step.expectedDestinationState) then
-		step.status = "confirmed"
-		step.confirmedAt = GetTime()
-		request.stepIndex = request.stepIndex + 1
-		if request.stepIndex > #request.steps then
-			FinishRequest(request, request.rollbackReason and "failed_rolled_back" or "complete", request.rollbackReason)
-		else
-			SubmitCurrentStep(request)
-		end
-		return true
-	end
-
-	if SameIdentity(sourceState, step.sourceBefore)
-	and SameIdentity(destinationState, step.destinationBefore) then
-		step.unchangedSamples = (step.unchangedSamples or 0) + 1
-		if step.unchangedSamples >= 2
-		and GetTime() - step.submittedAt >= ItemRack.TransactionSettleDelay then
+			return false
+		elseif GetTime() >= request.deadline then
 			if request.rollbackReason then
-				FinishRequest(request, "partial_failure", request.rollbackReason..":rollback_rejected")
+				FinishRequest(request, "partial_failure", request.rollbackReason..":rollback_inconsistent")
 			else
-				BeginRollback(request, step.submitError and "api_error" or "destination_rejected")
+				BeginRollback(request, "inconsistent_state")
 			end
 			return false
-		end
-	elseif GetTime() >= request.deadline then
-		if request.rollbackReason then
-			FinishRequest(request, "partial_failure", request.rollbackReason..":rollback_inconsistent")
 		else
-			BeginRollback(request, "inconsistent_state")
+			ScheduleObservation(request)
+			return false
 		end
-		return false
 	end
 
-	ScheduleObservation(request)
-	return false
+	if request.stepIndex > #request.steps then
+		FinishRequest(request, request.rollbackReason and "failed_rolled_back" or "complete", request.rollbackReason)
+		return true
+	end
+	return true
 end
 
 function ItemRack.StartEquipmentTransaction(spec)

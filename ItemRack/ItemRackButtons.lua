@@ -732,6 +732,11 @@ function ItemRack.UpdateButtonCooldowns()
 			local start, duration, enable = GetInventoryItemCooldown("player",i)
 			local currentItemID = GetInventoryItemID("player", i)
 			local exactID = ItemRack.GetID(i)
+			-- Items gated by another item's cooldown (see ItemRack.CooldownProxies)
+			-- have no cooldown of their own. Show the gating item's instead.
+			if ItemRack.ApplyProxyCooldown then
+				start, duration, enable = ItemRack.ApplyProxyCooldown(currentItemID, start, duration, enable)
+			end
 			local observed = ItemRack.ObserveItemCooldown(exactID,currentItemID,
 				start,duration,enable,"button")
 

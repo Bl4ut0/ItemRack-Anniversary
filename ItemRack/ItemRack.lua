@@ -58,6 +58,10 @@ ItemRack.DebugTags = { -- per-tag toggles; explicit defaults allow /itemrack deb
 	Combat = false
 }
 ItemRack.DebugAll = false -- master override to enable all tags
+
+ItemRack.CooldownProxies = {
+	[30720] = { id = 22044, buff = 37445 }, -- Serpent-Coil Braid <- mana gems (Mana Surge)
+}
 ItemRack.DebugChat = false -- whether to print debug messages to the chat frame
 
 function ItemRack.Debug(tag, ...)
@@ -377,6 +381,17 @@ ItemRack.NoTitansGrip = {
 	["Staves"] = 1
 }
 
+-- Items whose usefulness is gated by another item's cooldown (e.g. Serpent-Coil
+-- Braid keys off mana gems). id = the gating item. buff = the aura the pairing
+-- grants. The queue's existing "hold while this item's buff runs" check keys on
+-- GetItemSpell, which cannot see an equip effect, so the aura has to be named
+-- here. Give buff as a spell ID so the name resolves in the client's own locale.
+-- Mana gem ranks share one cooldown category tracked independent of possession,
+-- so any single rank ID is a valid probe.
+ItemRack.CooldownProxies = {
+	[30720] = { id = 22044, buff = 37445 }, -- Serpent-Coil Braid <- mana gems (Mana Surge)
+}
+
 ItemRack.Menu = {}
 ItemRack.LockList = {} -- index -2 to 11, flag whether item is tagged already for swap
 if ItemRack.IsClassic() then
@@ -493,7 +508,7 @@ function ItemRack.InitEventHandlers()
 	handler.CONFIRM_SUMMON = ItemRack.OnSummonPending
 	handler.CANCEL_SUMMON = ItemRack.OnSummonCanceled
 	handler.PLAYER_LOGOUT = ItemRack.OnPlayerLogout
-	handler.ACTIVE_TALENT_GROUP_CHANGED = ItemRack.UpdateClassSpecificStuff
+	handler.ACTIVE_TALENT_GROUP_CHANGED = ItemRack.OnActiveTalentGroupChanged
 	if ItemRack.IsEngravingActive() then
 		handler.RUNE_UPDATED = ItemRack.OnRuneUpdated
 		handler.ENGRAVING_MODE_CHANGED = ItemRack.OnRuneUpdated
@@ -1835,6 +1850,9 @@ function ItemRack.OnCastingStop(self,event,unit,castID)
 end
 
 function ItemRack.OnItemLockChanged()
+	if ItemRack.ActiveEquipmentTransaction then
+		ItemRack.ReconcileEquipmentTransaction("ITEM_LOCK_CHANGED")
+	end
 	ItemRack.StartTimer("LocksChanged")
 	ItemRack.LocksHaveChanged = 1
 end
@@ -2106,11 +2124,90 @@ function ItemRack.OnBankOpen()
 	end
 end
 
+local function safeCheckSpellKnown(spellID)
+	if type(spellID) ~= "number" then return false end
+	if C_SpellBook and C_SpellBook.IsSpellInSpellBook then
+		local ok, known = pcall(C_SpellBook.IsSpellInSpellBook, spellID)
+		if ok and known then return true end
+	end
+	if IsSpellKnown then
+		local ok, known = pcall(IsSpellKnown, spellID)
+		if ok and known then return true end
+	end
+	if IsPlayerSpell then
+		local ok, known = pcall(IsPlayerSpell, spellID)
+		if ok and known then return true end
+	end
+	return false
+end
+
+function ItemRack.CanPlayerDualWield()
+	local _,class = UnitClass("player")
+	if class == "ROGUE" or class == "DEATHKNIGHT" then
+		return true
+	end
+	if CanDualWield and type(CanDualWield) == "function" then
+		local ok, res = pcall(CanDualWield)
+		if ok and res then return true end
+	end
+	-- Spell IDs: 674 (Warrior/Rogue/Hunter/DK Dual Wield), 30798 (Shaman Dual Wield talent), 408496 (SoD DW Rune)
+	if safeCheckSpellKnown(674) or safeCheckSpellKnown(30798) or safeCheckSpellKnown(408496) then
+		return true
+	end
+	local dwSpellName = nil
+	if C_Spell and C_Spell.GetSpellInfo then
+		local ok, info = pcall(C_Spell.GetSpellInfo, 674)
+		if ok and type(info) == "table" and info.name then
+			dwSpellName = info.name
+		end
+	end
+	if not dwSpellName and GetSpellInfo then
+		local ok, res = pcall(GetSpellInfo, 674)
+		if ok then
+			if type(res) == "string" then
+				dwSpellName = res
+			elseif type(res) == "table" and res.name then
+				dwSpellName = res.name
+			end
+		end
+	end
+	if not dwSpellName then
+		dwSpellName = "Dual Wield"
+	end
+	if class == "SHAMAN" and GetNumTalentTabs and GetNumTalents and GetTalentInfo then
+		local ok, tabs = pcall(GetNumTalentTabs)
+		if ok and type(tabs) == "number" then
+			for tab = 1, tabs do
+				local okTal, numTalents = pcall(GetNumTalents, tab)
+				if okTal and type(numTalents) == "number" then
+					for tal = 1, numTalents do
+						local okInfo, name, _, _, _, currentRank = pcall(GetTalentInfo, tab, tal)
+						if okInfo and name and currentRank and currentRank > 0 then
+							if name == dwSpellName or string.find(name, dwSpellName, 1, true) or string.find(name, "Dual Wield", 1, true) then
+								return true
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	local level = UnitLevel and UnitLevel("player") or 0
+	if (class == "WARRIOR" or class == "HUNTER") and level >= 20 then
+		return true
+	end
+	return false
+end
+
 function ItemRack.UpdateClassSpecificStuff()
 	local _,class = UnitClass("player")
 
-	if class=="WARRIOR" or class=="ROGUE" or class=="HUNTER" or class=="MAGE" or class=="WARLOCK" or class=="SHAMAN" or class=="DEATHKNIGHT" then
+	if class=="WARRIOR" or class=="ROGUE" or class=="HUNTER" or class=="DEATHKNIGHT" then
 		ItemRack.CanWearOneHandOffHand = 1
+	elseif class=="SHAMAN" then
+		ItemRack.CanWearOneHandOffHand = ItemRack.CanPlayerDualWield() and 1 or nil
+	else
+		ItemRack.CanWearOneHandOffHand = nil
 	end
 
 	if ItemRack.IsWrath() and class=="WARRIOR" then
@@ -2122,7 +2219,23 @@ function ItemRack.UpdateClassSpecificStuff()
 			ItemRack.SlotInfo[17].INVTYPE_2HWEAPON = nil
 		end
 	end
+end
 
+function ItemRack.OnActiveTalentGroupChanged()
+	ItemRack.UpdateClassSpecificStuff()
+	if ItemRack.PendingDualWieldRetry then
+		for setname, expectedSpec in pairs(ItemRack.PendingDualWieldRetry) do
+			if C_Timer and C_Timer.After then
+				C_Timer.After(0.2, function()
+					if ItemRack.RetryDualWieldWeapons then
+						ItemRack.RetryDualWieldWeapons(setname, expectedSpec)
+					end
+				end)
+			elseif ItemRack.RetryDualWieldWeapons then
+				ItemRack.RetryDualWieldWeapons(setname, expectedSpec)
+			end
+		end
+	end
 end
 
 function ItemRack.OnSetBagItem(tooltip, bag, slot)
@@ -2234,7 +2347,7 @@ function ItemRack.InitCore()
 	ItemRackFrame:RegisterEvent("BANKFRAME_CLOSED")
 	ItemRackFrame:RegisterEvent("BANKFRAME_OPENED")
 	ItemRackFrame:RegisterEvent("CHARACTER_POINTS_CHANGED")
-	if ItemRack.IsWrath() then
+	if ItemRack.IsWrath() or ItemRack.IsBCC() or ItemRack.IsCata() or (GetNumTalentGroups and GetNumTalentGroups() > 0) then
 		ItemRackFrame:RegisterEvent("PLAYER_TALENT_UPDATE")
 		ItemRackFrame:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
 	end
@@ -3054,7 +3167,7 @@ function ItemRack.PlayerCanWear(invslot,bag,slot)
 	end
 
 	local _,_,itemType = ItemRack.GetInfoByID(ItemRack.GetID(bag,slot))
-	if itemType=="INVTYPE_WEAPON" and invslot==17 and not ItemRack.CanWearOneHandOffHand then
+	if (itemType=="INVTYPE_WEAPON" or itemType=="INVTYPE_WEAPONOFFHAND") and invslot==17 and not ItemRack.CanWearOneHandOffHand then
 		-- if this is a One-Hand going to offhand, and player can't wear one-hand offhands, this item can't be worn
 		return nil
 	end
@@ -3518,6 +3631,11 @@ function ItemRack.UpdateMenuCooldowns()
 		if baseID and baseID>0 and ItemRack.menuOpen<20 then
 			local cdFrame = _G["ItemRackMenu"..i.."Cooldown"]
 			local start, duration, enable = GetItemCooldown(baseID)
+			-- Items gated by another item's cooldown (see ItemRack.CooldownProxies)
+			-- have no cooldown of their own. Show the gating item's instead.
+			if ItemRack.ApplyProxyCooldown then
+				start, duration, enable = ItemRack.ApplyProxyCooldown(baseID, start, duration, enable)
+			end
 			local observed = ItemRack.ObserveItemCooldown(exactID,baseID,
 				start,duration,enable,"menu")
 
@@ -5123,6 +5241,7 @@ function ItemRack.InitBroker()
 	ItemRackSettings.minimap = ItemRackSettings.minimap or { hide = false }
 	LDBIcon:Register("ItemRack", ItemRack.Broker, ItemRackSettings.minimap)
 	ItemRack.ShowMinimap()
+	ItemRack.ReflectLock()
 end
 
 function ItemRack.ShowMinimap()
@@ -5204,6 +5323,7 @@ function ItemRack.ReflectLock(override)
 			insets = { left = 4, right = 4, top = 4, bottom = 4 }
 		}
 	);
+	local shouldLockMinimap = ItemRackUser.Locked=="ON" or (ItemRackSettings and ItemRackSettings.LockMinimap=="ON") or override
 	if ItemRackUser.Locked=="ON" or override then
 		ItemRackMenuFrame:EnableMouse(0)
 		ItemRackMenuFrame:SetBackdropBorderColor(0,0,0,0)
@@ -5212,6 +5332,13 @@ function ItemRack.ReflectLock(override)
 		ItemRackMenuFrame:EnableMouse(1)
 		ItemRackMenuFrame:SetBackdropBorderColor(.3,.3,.3,1)
 		ItemRackMenuFrame:SetBackdropColor(1,1,1,1)
+	end
+	if LDBIcon and LDBIcon.Lock and LDBIcon.Unlock then
+		if shouldLockMinimap then
+			LDBIcon:Lock("ItemRack")
+		else
+			LDBIcon:Unlock("ItemRack")
+		end
 	end
 	if ItemRackOptFrame then
 		ItemRackOpt.ListScrollFrameUpdate()

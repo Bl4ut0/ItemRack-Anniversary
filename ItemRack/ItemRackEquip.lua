@@ -607,6 +607,30 @@ function ItemRack.EquipSet(setname, disableSound, isSecureKeybind)
 	for slot,target in pairs(plannedSwap) do
 		swap[slot] = target
 	end
+
+	local currentSpec = GetActiveTalentGroup and GetActiveTalentGroup()
+	local numGroups = GetNumTalentGroups and GetNumTalentGroups() or 0
+	local willSwitchSpec = (set.AssociatedSpec and numGroups > 1 and currentSpec and currentSpec ~= set.AssociatedSpec)
+	local canDualWield = ItemRack.CanPlayerDualWield and ItemRack.CanPlayerDualWield()
+
+	-- Defer or skip offhand weapon if the player cannot currently dual-wield
+	if swap[17] and swap[17] ~= 0 then
+		local _, _, itemType = ItemRack.GetInfoByID(swap[17])
+		local isOffhandWeapon = (itemType == "INVTYPE_WEAPON" or itemType == "INVTYPE_WEAPONOFFHAND" or itemType == "INVTYPE_2HWEAPON")
+		if isOffhandWeapon and not canDualWield then
+			if willSwitchSpec then
+				ItemRack.Debug("Equip", "Deferring offhand weapon for spec transition:", setname, swap[17])
+				swap[17] = nil
+				if ItemRack.ScheduleDualWieldRetry then
+					ItemRack.ScheduleDualWieldRetry(setname, set.AssociatedSpec)
+				end
+			else
+				ItemRack.Debug("Equip", "Skipping offhand weapon: Dual Wield not learned:", swap[17])
+				swap[17] = nil
+				ItemRack.Print("Cannot equip offhand weapon: Dual Wield proficiency required.")
+			end
+		end
+	end
 	
 	if ItemRack.ManualQueueChoice then
 		for i in pairs(set.equip) do
@@ -1057,6 +1081,9 @@ function ItemRack.IterateSwapList(setname, disableSound)
 
 	local treatAs2H = nil
 	local skip, inv, bag, slot
+	local batchSteps = {}
+	local swappedSlots = {}
+
 	for k=0,19+ItemRack.eqBackOfTheBusOffset do
 		local i = k
 		if k >= ItemRack.eqBackOfTheBusOffset then
@@ -1076,15 +1103,8 @@ function ItemRack.IterateSwapList(setname, disableSound)
 						if set.old[i] == nil then set.old[i] = ItemRack.GetID(i) end
 					end
 					ItemRack.Debug("Equip", "IterateSwapList emptying slot", i, "to bag", bag, "slot", slot)
-					local result = ItemRack.SubmitSetMoves(setname, disableSound, {
-						ItemRack.NewEquipmentMove(i,nil,bag,slot),
-					})
-					if result == "submitted" then
-						swap[k] = nil
-						return "submitted"
-					else
-						return "failed"
-					end
+					table.insert(batchSteps, ItemRack.NewEquipmentMove(i,nil,bag,slot))
+					swappedSlots[k] = true
 				else
 					ItemRack.Debug("Equip", "IterateSwapList aborted: No space to empty slot", i)
 					ItemRack.FailSetSwap(setname, "no_space", 1)
@@ -1109,12 +1129,11 @@ function ItemRack.IterateSwapList(setname, disableSound)
 							if set.old[i] == nil then set.old[i] = ItemRack.GetID(i) end
 							if set.old[i+1] == nil then set.old[i+1] = ItemRack.GetID(i+1) end
 						end
-						local steps = {}
 						if GetInventoryItemLink("player",17) then
 							local freeBag,freeSlot = ItemRack.FindSpace()
 							if freeBag then
 								ItemRack.Debug("Equip", "IterateSwapList emptying offhand to bag", freeBag, "slot", freeSlot)
-								table.insert(steps,ItemRack.NewEquipmentMove(17,nil,freeBag,freeSlot))
+								table.insert(batchSteps,ItemRack.NewEquipmentMove(17,nil,freeBag,freeSlot))
 							else
 								ItemRack.Debug("Equip", "IterateSwapList aborted: No space for offhand removal.")
 								ItemRack.FailSetSwap(setname, "no_space_for_offhand", 1)
@@ -1124,15 +1143,10 @@ function ItemRack.IterateSwapList(setname, disableSound)
 						ItemRack.Debug("Equip", "IterateSwapList swapping 2H weapon from bag", bag, "slot", slot, "to slot 16")
 						local equipMove = ItemRack.NewEquipmentMove(bag,slot,16,nil)
 						equipMove.expectedSource = swap[k]
-						table.insert(steps,equipMove)
-						local result = ItemRack.SubmitSetMoves(setname, disableSound, steps)
-						if result == "submitted" then
-							swap[k] = nil
-							swap[k+1] = nil -- fix by Romracer
-							return "submitted"
-						else
-							return "failed"
-						end
+						table.insert(batchSteps,equipMove)
+						swappedSlots[k] = true
+						swappedSlots[k+1] = true
+						skip = 1
 					else
 						if set.old then
 							if set.old[i] == nil then set.old[i] = ItemRack.GetID(i) end
@@ -1140,13 +1154,8 @@ function ItemRack.IterateSwapList(setname, disableSound)
 						ItemRack.Debug("Equip", "IterateSwapList executing normal move from bag", bag, "slot", slot, "--> slot", i)
 						local move = ItemRack.NewEquipmentMove(bag,slot,i,nil)
 						move.expectedSource = swap[k]
-						local result = ItemRack.SubmitSetMoves(setname, disableSound, { move })
-						if result == "submitted" then
-							swap[k] = nil
-							return "submitted"
-						else
-							return "failed"
-						end
+						table.insert(batchSteps, move)
+						swappedSlots[k] = true
 					end
 				elseif inv==(i+1) and ItemRack.MatchesStoredItemID(swap[k+1],ItemRack.GetID(i)) then
 					-- item is in other slot and other slot wants to go to this one
@@ -1155,31 +1164,30 @@ function ItemRack.IterateSwapList(setname, disableSound)
 						if set.old[i] == nil then set.old[i] = ItemRack.GetID(i) end
 						if set.old[i+1] == nil then set.old[i+1] = ItemRack.GetID(i+1) end
 					end
-					local result = ItemRack.SubmitSetMoves(setname, disableSound, {
-						ItemRack.NewEquipmentMove(i,nil,i+1,nil),
-					})
-					if result == "submitted" then
-						swap[k] = nil
-						swap[k+1] = nil
-						return "submitted"
-					else
-						return "failed"
-					end
+					table.insert(batchSteps, ItemRack.NewEquipmentMove(i,nil,i+1,nil))
+					swappedSlots[k] = true
+					swappedSlots[k+1] = true
+					skip = 1
 				elseif inv then
-					local result = ItemRack.SubmitSetMoves(setname, disableSound, {
-						ItemRack.NewEquipmentMove(inv,nil,i,nil),
-					})
-					if result == "submitted" then
-						swap[k] = nil
-						return "submitted"
-					else
-						return "failed"
-					end
+					table.insert(batchSteps, ItemRack.NewEquipmentMove(inv,nil,i,nil))
+					swappedSlots[k] = true
 				else
 					ItemRack.FailSetSwap(setname, "source_missing", 4)
 					return "failed"
 				end
 			end
+		end
+	end
+
+	if #batchSteps > 0 then
+		local result = ItemRack.SubmitSetMoves(setname, disableSound, batchSteps)
+		if result == "submitted" then
+			for slotKey in pairs(swappedSlots) do
+				swap[slotKey] = nil
+			end
+			return "submitted"
+		else
+			return "failed"
 		end
 	end
 	-- Only print abort message if there are no remaining items to retry.
