@@ -593,7 +593,7 @@ function ItemRack.ShouldHoldEquippedItem(slot, exactID, baseID, customReadyTime)
 	if ItemRack.QueueDiagnostic then
 		-- Report the gating item when one stands in, so a dump explains a
 		-- remaining time that belongs to no cooldown on the equipped item.
-		local proxy = ResolveProxy(exactID or baseID)
+		local proxy = ItemRack.ResolveProxy(exactID or baseID)
 		ItemRack.QueueDiagnostic("hold_decision", { hold = hold, proxy = proxy and proxy.id or nil, remaining = string.format("%.2f", timeLeft), slot = slot, threshold = threshold })
 	end
 	return hold
