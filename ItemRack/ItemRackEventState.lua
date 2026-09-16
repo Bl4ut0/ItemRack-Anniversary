@@ -96,6 +96,9 @@ function EventFrames.Activate(state, activation)
 	or type(activation.slots) ~= "table" then
 		return { changed=false, targets={}, reason="invalid_activation" }
 	end
+	if #state.order == 0 and state.baseSetName == nil then
+		state.baseSetName = activation.baseSetName
+	end
 
 	local existingId = state.byEvent[activation.eventName]
 	local replacementTargets = {}
@@ -245,11 +248,14 @@ function EventFrames.Pop(state, eventName, eventGeneration)
 		end
 	end
 
+	local restoredSetName = #state.order == 1 and state.baseSetName or nil
 	table.remove(state.order,removedIndex)
 	state.frames[frameId] = nil
 	state.byEvent[eventName] = nil
+	if #state.order == 0 then state.baseSetName = nil end
 	state.revision = state.revision + 1
-	return { removed=true, frameId=frameId, targets=targets, revision=state.revision }
+	return { removed=true, frameId=frameId, targets=targets,
+		restoredSetName=restoredSetName, revision=state.revision }
 end
 
 function EventFrames.SnapshotSet(set)

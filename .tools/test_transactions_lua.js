@@ -169,7 +169,7 @@ assert(ItemRack.AbortSwap == nil, "successful manual swap must not abort")
 );
 
 runCase(
-  'set preflight is atomic for missing duplicate and no-space targets',
+  'set preflight skips missing targets but remains atomic for no-space targets',
   `
 local bags = { [0] = { [1] = 9001, [2] = 6001 } }
 local inventory = { [13] = 8001, [14] = 8002 }
@@ -216,13 +216,16 @@ function GetItemInfo() return nil,nil,nil,nil,nil,nil,"Trinkets" end
   [preflightSetSwap],
   `
 local mixed, mixedReason, missing = ItemRack.PreflightSetSwap("Mixed")
-assert(mixed == nil and string.match(mixedReason,"^missing_items"), "one absent set item must fail the whole preflight")
+assert(mixed and mixed[13] == 9001 and mixed[14] == nil and string.match(mixedReason,"^missing_items"),
+  "one absent set item must not block an available set move")
 assert(#missing == 1 and missing[1].slot == 14, "preflight must enumerate the unsatisfied slot")
-assert(ItemRackUser.Sets.Mixed.old[13] == 7777 and ItemRackUser.Sets.Mixed.oldset == "Older", "failed preflight must not mutate history")
-assert(ItemRackUser.CurrentSet == "Base" and pickupCalls == 0, "failed preflight must not mutate gear or CurrentSet")
+assert(ItemRackUser.Sets.Mixed.old[13] == 7777 and ItemRackUser.Sets.Mixed.oldset == "Older", "preflight must not mutate history")
+assert(ItemRackUser.CurrentSet == "Base" and pickupCalls == 0, "preflight must not mutate gear or CurrentSet")
 
-local duplicate, duplicateReason = ItemRack.PreflightSetSwap("Duplicate")
-assert(duplicate == nil and string.match(duplicateReason,"^missing_items"), "one physical copy cannot satisfy two requested slots")
+local duplicate, duplicateReason, duplicateMissing = ItemRack.PreflightSetSwap("Duplicate")
+assert(duplicate and duplicate[13] == 9001 and duplicate[14] == nil
+  and string.match(duplicateReason,"^missing_items") and #duplicateMissing == 1,
+  "one physical copy may satisfy one requested slot but must not be promised twice")
 
 local empty, emptyReason = ItemRack.PreflightSetSwap("Empty")
 assert(empty == nil and string.match(emptyReason,"^no_space"), "full bags plus an empty target must fail before submission")

@@ -37,6 +37,7 @@ OmniCC_Config/
 !.tools/lib/lua_harness.js
 !.tools/test_transactions_lua.js
 !.tools/test_transaction_engine_lua.js
+!.tools/test_identity_matching_lua.js
 !.tools/test_event_frames_lua.js
 !.tools/test_event_integration_lua.js
 !.tools/test_event_processors_lua.js

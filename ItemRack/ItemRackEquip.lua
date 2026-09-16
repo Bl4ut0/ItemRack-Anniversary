@@ -432,6 +432,19 @@ function ItemRack.PreflightSetSwap(setname)
 		end
 	end
 
+	-- Reserve every exact unsatisfied copy before permitting compatibility
+	-- fallbacks. Otherwise an early missing variant can consume a later slot's
+	-- exact enchanted/gemmed copy merely because both share a base item ID.
+	local exactSources = {}
+	for targetSlot=0,19 do
+		local target = set.equip[targetSlot]
+		if target and target ~= 0
+		and not ItemRack.MatchesStoredItemID(target,ItemRack.GetID(targetSlot)) then
+			local inv,bag = ItemRack.FindItem(target,1,true)
+			if inv or bag then exactSources[targetSlot] = true end
+		end
+	end
+
 	for targetSlot=0,19 do
 		local target = set.equip[targetSlot]
 		if target ~= nil then
@@ -442,11 +455,15 @@ function ItemRack.PreflightSetSwap(setname)
 					requiredFreeSlots = requiredFreeSlots + 1
 				end
 			elseif not ItemRack.MatchesStoredItemID(target,current) then
-				local inv,bag,slot = ItemRack.FindItem(target,1)
-				if not inv and not bag then
-					table.insert(missing,{ slot=targetSlot, id=target })
-				else
+				if exactSources[targetSlot] then
 					swap[targetSlot] = target
+				else
+					local inv,bag = ItemRack.FindItem(target,1)
+					if not inv and not bag then
+						table.insert(missing,{ slot=targetSlot, id=target })
+					elseif inv ~= targetSlot then
+						swap[targetSlot] = target
+					end
 				end
 			end
 		end
@@ -482,17 +499,18 @@ function ItemRack.PreflightSetSwap(setname)
 	end
 	ItemRack.ClearLockList()
 
+	local missingReason
 	if #missing > 0 then
 		local labels = {}
 		for _,entry in ipairs(missing) do
 			table.insert(labels,"slot "..tostring(entry.slot).." ["..tostring(ItemRack.GetInfoByID(entry.id)).."]")
 		end
-		return nil, "missing_items: "..table.concat(labels,", "), missing
+		missingReason = "missing_items: "..table.concat(labels,", ")
 	end
 	if freeSlots < requiredFreeSlots then
 		return nil, "no_space: requires "..tostring(requiredFreeSlots)..", available "..tostring(freeSlots)
 	end
-	return swap
+	return swap, missingReason, missing
 end
 
 function ItemRack.EquipSet(setname, disableSound, isSecureKeybind)
@@ -599,10 +617,14 @@ function ItemRack.EquipSet(setname, disableSound, isSecureKeybind)
 	end
 	local inCombat = InCombatLockdown()
 	local isInternalSet = setname and string.sub(setname, 1, 1) == "~" -- Internal sets like ~Unequip, ~CombatQueue, ~DualWieldRetry
-	local plannedSwap, preflightReason = ItemRack.PreflightSetSwap(setname)
+	local plannedSwap, preflightReason, missingItems = ItemRack.PreflightSetSwap(setname)
 	if not plannedSwap then
 		ItemRack.FailSetSwap(setname, preflightReason, string.match(preflightReason or "","^no_space") and 1 or 4)
 		return
+	end
+	if missingItems and #missingItems > 0 then
+		ItemRack.Print("Set \""..tostring(setname).."\" skipped unavailable items ("..
+			tostring(preflightReason)..") and will equip the items that are present.")
 	end
 	for slot,target in pairs(plannedSwap) do
 		swap[slot] = target
@@ -1142,7 +1164,7 @@ function ItemRack.IterateSwapList(setname, disableSound)
 						end
 						ItemRack.Debug("Equip", "IterateSwapList swapping 2H weapon from bag", bag, "slot", slot, "to slot 16")
 						local equipMove = ItemRack.NewEquipmentMove(bag,slot,16,nil)
-						equipMove.expectedSource = swap[k]
+						equipMove.expectedSource = ItemRack.GetID(bag,slot)
 						table.insert(batchSteps,equipMove)
 						swappedSlots[k] = true
 						swappedSlots[k+1] = true
@@ -1153,7 +1175,7 @@ function ItemRack.IterateSwapList(setname, disableSound)
 						end
 						ItemRack.Debug("Equip", "IterateSwapList executing normal move from bag", bag, "slot", slot, "--> slot", i)
 						local move = ItemRack.NewEquipmentMove(bag,slot,i,nil)
-						move.expectedSource = swap[k]
+						move.expectedSource = ItemRack.GetID(bag,slot)
 						table.insert(batchSteps, move)
 						swappedSlots[k] = true
 					end
