@@ -4,6 +4,12 @@ All notable changes to the TBC Anniversary port of ItemRack will be documented i
 
 ## [Development]
 
+### Bug Fixes & Improvements
+- **Mounted Set/Queue Restoration (CurseForge: baniro_)**: Event frames now retain the manually equipped base-set identity while temporary movement or mount sets are active. Stopping on a mount restores both the physical items and the prior set's per-set queue context instead of falling back to Custom.
+- **Partial Sets With Missing Items**: A missing saved item no longer cancels every otherwise valid move in the set. ItemRack reports and skips unavailable slots while equipping the items that are present; no-space and unsafe two-hand transitions remain fail-closed.
+- **Cooldown Module Failure Containment (CurseForge: Antatra)**: The periodic cooldown loop now detects an unavailable cooldown-state module, reports the incomplete load once, and returns safely instead of producing a new Lua error every second.
+- **Exact Enchant/Gem Copy Selection (GitHub #24: Bisonpasfute)**: Saved sets, direct item clicks, queues, bag/bank searches, and the queue editor now distinguish copies that share a base item ID but differ by enchant, gems, suffix, or rune. Searches follow the established Retail behavior—prefer the recorded copy, then allow a compatible base-item substitute only when the exact copy is unavailable—while intentionally bare default IDs remain wildcards.
+
 
 ## [4.46] - 2026-09-14
 ### Bug Fixes & Improvements

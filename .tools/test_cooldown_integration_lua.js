@@ -22,6 +22,7 @@ local slotBase = 100
 local slotCooldown = { 95, 60, 1 }
 local itemCooldowns = { [100]={ 0, 0, 0 } }
 local notifications = {}
+local loadWarnings = {}
 
 local function NewFrame()
   return {
@@ -70,6 +71,7 @@ ItemRack = {
     where.textDuration=duration
   end,
   Notify=function(message) table.insert(notifications,message) end,
+  Print=function(message) table.insert(loadWarnings,message) end,
   RefreshButtonVisibility=function() ItemRack.visibilityRefreshes=(ItemRack.visibilityRefreshes or 0)+1 end,
   PeriodicQueueCheck=function() ItemRack.queueChecks=(ItemRack.queueChecks or 0)+1 end,
 }
@@ -198,6 +200,19 @@ ItemRack.CooldownUpdate()
 check(ItemRackUser.ItemsUsed[500] == nil and #notifications == 1
   and notifications[1] == "Item500 ready!",
   "expired authority must permit exactly one ready notification")
+
+-- CurseForge Antatra_: an incomplete/mixed install must not turn the periodic
+-- timer into thousands of repeated nil-call errors.
+local ensureCooldownState = ItemRack.EnsureCooldownState
+local observeItemCooldown = ItemRack.ObserveItemCooldown
+ItemRack.EnsureCooldownState = nil
+ItemRack.ObserveItemCooldown = nil
+local firstSafe = pcall(ItemRack.CooldownUpdate)
+local secondSafe = pcall(ItemRack.CooldownUpdate)
+check(firstSafe and secondSafe and #loadWarnings == 1,
+  "missing cooldown authority must fail closed and report only once")
+ItemRack.EnsureCooldownState = ensureCooldownState
+ItemRack.ObserveItemCooldown = observeItemCooldown
 
 print(string.format("[COOLDOWN INTEGRATION LUA] %d renderer, arena, queue, and notification checks passed.",checks))
 `, 'cooldown-integration');

@@ -1626,11 +1626,11 @@ function ItemRackOpt.PopulateSortList(slot)
 				end
 			else
 				local duplicateKey
-				if ItemRack.HasRuneID(entry.id) then
-					local itemFields = tostring(entry.id):match(ItemRack.iSPatternItemFieldsFromIR) or tostring(entry.id)
-					duplicateKey = "rune:"..itemFields..":"..tostring(ItemRack.GetRuneID(entry.id))
+				if ItemRack.IsBareItemID(entry.id) then
+					duplicateKey = "base:"..tostring(ItemRack.GetIRString(entry.id,true))
 				else
-					duplicateKey = "legacy:"..tostring(ItemRack.GetIRString(entry.id,true))
+					local itemFields = tostring(entry.id):match(ItemRack.iSPatternItemFieldsFromIR) or tostring(entry.id)
+					duplicateKey = "exact:"..itemFields..":"..tostring(ItemRack.GetRuneID(entry.id) or "")
 				end
 				if seen[duplicateKey] then
 					-- Duplicate item found, remove it
@@ -1655,17 +1655,17 @@ end
 
 function ItemRackOpt.AddToSortList(sortList,id)
 	local found
-	-- Rune-aware entries are duplicates only when their item fields and rune
-	-- match. Legacy entries retain the historical base-ID de-duplication.
+	-- Full saved identities are duplicates only when their item fields and rune
+	-- match. Only deliberately bare defaults retain base-ID de-duplication.
 	for i=1,#(sortList) do
 		if sortList[i].id == 0 and id == 0 then
 			found = true
 			
 			break
 		elseif sortList[i].id ~= 0 and id ~= 0 then
-			local existingHasRune = ItemRack.HasRuneID(sortList[i].id)
-			local newHasRune = ItemRack.HasRuneID(id)
-			if ItemRack.SameExactID(sortList[i].id,id) or (not existingHasRune and not newHasRune and ItemRack.SameID(sortList[i].id,id)) then
+			local bothBare = ItemRack.IsBareItemID(sortList[i].id) and ItemRack.IsBareItemID(id)
+			if ItemRack.MatchesStoredItemFields(sortList[i].id,id)
+			or (bothBare and ItemRack.SameID(sortList[i].id,id)) then
 				found = true
 				break
 			end

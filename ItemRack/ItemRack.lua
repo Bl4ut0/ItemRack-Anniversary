@@ -59,9 +59,6 @@ ItemRack.DebugTags = { -- per-tag toggles; explicit defaults allow /itemrack deb
 }
 ItemRack.DebugAll = false -- master override to enable all tags
 
-ItemRack.CooldownProxies = {
-	[30720] = { id = 22044, buff = 37445 }, -- Serpent-Coil Braid <- mana gems (Mana Surge)
-}
 ItemRack.DebugChat = false -- whether to print debug messages to the chat frame
 
 function ItemRack.Debug(tag, ...)
@@ -2565,6 +2562,13 @@ function ItemRack.HasRuneID(id)
 	return ItemRack.GetRuneID(id) ~= nil
 end
 
+-- Packaged defaults and very old profiles may intentionally store only a base
+-- item ID (for example "11122"). Only those entries are wildcards. A normal
+-- saved item string carries enchant/gem/suffix identity and must stay exact.
+function ItemRack.IsBareItemID(id)
+	return tostring(id or ""):match("^%-?%d+$") ~= nil
+end
+
 -- Returns the SoD rune texture for a rune-aware ItemRack ID. AppendRuneID
 -- populates the cache while live equipment, bags, and bank slots are scanned;
 -- FindItem supplies a safe fallback for saved IDs that have not been seen yet.
@@ -2916,16 +2920,14 @@ function ItemRack.RefreshEquippedRuneIdentity(equipmentSlot,expectedRuneID,deadl
 	return false
 end
 
--- Rune-aware saved entries require the same item instance and rune. Legacy
--- entries without rune metadata retain ItemRack's historical base-ID fallback.
+-- A fully saved entry must match its item-identifying fields. Legacy entries
+-- without rune metadata tolerate the same physical copy gaining a rune, while
+-- intentionally bare base IDs retain their historical wildcard behavior.
 function ItemRack.MatchesStoredItemID(expectedID,currentID)
-	if ItemRack.SameExactID(expectedID,currentID) then
-		return true
+	if ItemRack.IsBareItemID(expectedID) then
+		return ItemRack.SameID(expectedID,currentID)
 	end
-	if ItemRack.HasRuneID(expectedID) then
-		return false
-	end
-	return ItemRack.SameID(expectedID,currentID)
+	return ItemRack.MatchesStoredItemFields(expectedID,currentID)
 end
 
 -- takes an ItemRack-style ID and returns the name, texture, equipslot and quality
@@ -2957,12 +2959,12 @@ end
 -- nil,bag,slot = item found in a bag; inv,nil,nil = item found in one of the player's equipment slots; nil,nil,nil = item not found (at least not in equipment/inventory, but it might still exist in bank, we cannot check that though since the player has to be at the bank to read its contents)
 -- what it does: it first looks for an EXACT match in the list of "known IDs", which is a cache of the last known location of every item the player has in their equipment and inventory
 -- it then looks for an EXACT match in the player's equipment and inventory, and if that fails it looks for a BASEID match in the player's equipment and inventory
-function ItemRack.FindItem(id,lock)
+function ItemRack.FindItem(id,lock,exactOnly)
 
 	local locklist, getid, sameid = ItemRack.LockList, ItemRack.GetID, ItemRack.SameID --GetID will be used to look up the ItemRack-style ID for each item we pass over while we loop through the player's equipment/inventory
 
 	id = ItemRack.UpdateIRString(id) --we must update the incoming ItemRack-style ID to always match the player's current level no matter what, since all WoW ItemStrings contain the player's current level at the time of query, thus if we don't update the level in our OLD ID it won't match the CURRENT ID even if it is the EXACT same item. this simple update ensures that the exact item can be accurately located even if the player has dinged since last saving the set.
-	local allowBaseFallback = not ItemRack.HasRuneID(id)
+	local allowBaseFallback = not exactOnly and not ItemRack.HasRuneID(id)
 
 	-- look for item in known items cache first (this cache is frequently rebuilt, such as when clicking the buttons to change a set, AS WELL as when the actual set change takes place, it's a bit overkill in fact, but at least it is up to date -- in fact the entire design is stupid. if the cache is ALWAYS rebuilt EVERY TIME a set change takes place, then the MANUAL search code further down will never take place unless the item is COMPLETELY MISSING. likewise, it means that we're constantly rebuilding a cache of ItemRack-style IDs, and then doing the EXACT same job AGAIN further down, in the "search for..." sections at the bottom of this function... bad design and lots of redundancy, heh. a better design would be to just search through our cache twice, first to look for an exact match, and then to look for a baseID match.)
 	local knownID = ItemRack.KnownItems[id]
@@ -2985,7 +2987,7 @@ function ItemRack.FindItem(id,lock)
 	-- search bags
 	for i=4,0,-1 do
 		for j=1,GetContainerNumSlots(i) do
-			if id==getid(i,j) and (not lock or not locklist[i][j]) then
+			if ItemRack.MatchesStoredItemFields(id,getid(i,j)) and (not lock or not locklist[i][j]) then
 				if lock then locklist[i][j]=1 end
 				return nil,i,j
 			end
@@ -2993,7 +2995,7 @@ function ItemRack.FindItem(id,lock)
 	end
 	-- search worn equipment
 	for i=0,19 do
-		if id==getid(i) and (not lock or not locklist[-2][i]) then
+		if ItemRack.MatchesStoredItemFields(id,getid(i)) and (not lock or not locklist[-2][i]) then
 			if lock then locklist[-2][i]=1 end
 			return i
 		end
@@ -3018,7 +3020,7 @@ function ItemRack.FindItem(id,lock)
 	end
 	-- if bank is open, search bank
 	if ItemRack.BankOpen then
-		local b,s = ItemRack.FindInBank(id,lock)
+		local b,s = ItemRack.FindInBank(id,lock,exactOnly)
 		if b then return nil,b,s end
 	end
 end
@@ -3026,7 +3028,7 @@ end
 -- Searches only carried bags for an ItemRack-style ID. Unlike FindItem, this
 -- deliberately ignores equipped slots and the bank so queue selection cannot
 -- stop on an item that is already worn in the opposite ring/trinket slot.
--- Exact matches are preferred, with a base-ID fallback for migrated item data.
+-- Full identities are preferred, with a base-ID fallback for compatibility.
 function ItemRack.FindItemInBags(id)
 	id = ItemRack.UpdateIRString(id)
 	local allowBaseFallback = not ItemRack.HasRuneID(id)
@@ -3034,7 +3036,7 @@ function ItemRack.FindItemInBags(id)
 	for bag=4,0,-1 do
 		for slot=1,GetContainerNumSlots(bag) do
 			local bagID = ItemRack.GetID(bag,slot)
-			if id==bagID then
+			if ItemRack.MatchesStoredItemFields(id,bagID) then
 				return bag,slot
 			elseif allowBaseFallback and not fallbackBag and ItemRack.SameID(id,bagID) then
 				fallbackBag,fallbackSlot = bag,slot
@@ -3046,18 +3048,18 @@ end
 
 -- searches player's bank and returns bag,slot of a specific ItemRack-style ID (62384:0:4041:4041:0:0:0:0:85:146) or the first matching item with the same base id (62384) if specific id not found
 -- bag,slot = item found in a bank bag; nil, nil = item not found in bank
-function ItemRack.FindInBank(id,lock)
+function ItemRack.FindInBank(id,lock,exactOnly)
 
 	local locklist, getid, sameid = ItemRack.LockList, ItemRack.GetID, ItemRack.SameID --GetID will be used to look up the ItemRack-style ID for each item we pass over while we loop through the player's bank
 
 	id = ItemRack.UpdateIRString(id) --just as with the FindItem() patch above, we must ensure that the incoming ID to this function is brought up to date before we start scanning
-	local allowBaseFallback = not ItemRack.HasRuneID(id)
+	local allowBaseFallback = not exactOnly and not ItemRack.HasRuneID(id)
 
 	if ItemRack.BankOpen then -- only proceed if bank is open
 		for _,i in pairs(ItemRack.BankSlots) do -- try to find an exact match at first
 			if ItemRack.ValidBag(i) then
 				for j=1,GetContainerNumSlots(i) do
-					if id==getid(i,j) and (not lock or not locklist[i][j]) then
+					if ItemRack.MatchesStoredItemFields(id,getid(i,j)) and (not lock or not locklist[i][j]) then
 						if lock then locklist[i][j]=1 end
 						return i,j
 					end
@@ -4024,7 +4026,7 @@ function ItemRack.EquipItemByID(id,slot,isAutoQueue,sourceBag,sourceSlot,origin)
 			table.insert(steps, ItemRack.NewEquipmentMove(17,nil,bfree,sfree))
 		end
 		local equipMove = ItemRack.NewEquipmentMove(b,s,slot,nil)
-		equipMove.expectedSource = id
+		equipMove.expectedSource = ItemRack.GetID(b,s)
 		table.insert(steps, equipMove)
 	else
 		local b,s = ItemRack.FindSpace()
@@ -4542,7 +4544,7 @@ end
 
 function ItemRack.AddToCombatQueue(slot,id,isAutoQueue)
 	-- Skip if the saved item is already equipped. Legacy entries can use the
-	-- historical base-ID fallback; rune-aware entries require their saved rune.
+	-- historical base-ID fallback; full entries require their saved item fields.
 	if id and id ~= 0 then
 		local equippedState, equippedID = ItemRack.GetEquippedSlotState(slot)
 		if equippedState == "resolved" and ItemRack.MatchesStoredItemID(id, equippedID) then
@@ -4970,6 +4972,15 @@ end
 
 function ItemRack.CooldownUpdate()
 	local start,duration,enable,name,remain
+	if type(ItemRack.EnsureCooldownState) ~= "function"
+	or type(ItemRack.ObserveItemCooldown) ~= "function" then
+		if not ItemRack.CooldownAuthorityUnavailableReported then
+			ItemRack.CooldownAuthorityUnavailableReported = true
+			ItemRack.Print("Cooldown tracking could not start because its state module did not load. Other ItemRack features will continue working; reinstall the complete addon package if this persists.")
+		end
+		return
+	end
+	ItemRack.CooldownAuthorityUnavailableReported = nil
 	local cooldownState = ItemRack.EnsureCooldownState()
 	ItemRack.ItemsUsedCooldownGeneration = ItemRack.ItemsUsedCooldownGeneration or {}
 	for i in pairs(ItemRackUser.ItemsUsed) do

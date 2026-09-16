@@ -60,17 +60,16 @@ function ItemRack.ClearManualQueueChoice(slot)
 	end
 end
 
--- A legacy queue entry has no rune suffix and therefore resolves any carried
--- copy with the same base ID. That fallback remains necessary for profiles
--- created before rune-aware IDs existed, but it becomes ambiguous once the
--- active part of the same queue contains an explicit rune entry for that item.
-function ItemRack.QueueHasExplicitRuneEntry(list,baseID)
+-- A deliberately bare queue seed can resolve any carried copy with the same
+-- base ID. It becomes ambiguous as soon as the active queue also names a full
+-- enchant/gem/suffix/rune identity for that item.
+function ItemRack.QueueHasExplicitIdentityEntry(list,baseID)
 	if not list or not baseID or baseID == 0 then return false end
 	baseID = tostring(baseID)
 	for i=1,#list do
 		local entryID = list[i].id
 		if entryID == 0 then break end
-		if ItemRack.HasRuneID(entryID)
+		if not ItemRack.IsBareItemID(entryID)
 		and tostring(ItemRack.GetIRString(entryID,true)) == baseID then
 			return true
 		end
@@ -81,23 +80,22 @@ end
 function ItemRack.IsQueueEntryUnambiguous(list,index)
 	local entry = list and list[index]
 	if not entry or not entry.id or entry.id == 0 then return false end
-	if ItemRack.HasRuneID(entry.id) then return true end
+	if not ItemRack.IsBareItemID(entry.id) then return true end
 	local baseID = ItemRack.GetIRString(entry.id,true)
-	return not ItemRack.QueueHasExplicitRuneEntry(list,baseID)
+	return not ItemRack.QueueHasExplicitIdentityEntry(list,baseID)
 end
 
--- Resolve exact rune/item identity before considering a legacy base-ID
--- wildcard, regardless of the entries' order in the queue. Never use an
--- ambiguous wildcard when this queue has explicit rune identities available.
+-- Resolve full item identity before considering an intentional bare-ID
+-- wildcard, regardless of queue order.
 function ItemRack.FindQueueEntryIndex(list,currentID)
 	if not list or not currentID or currentID == 0 then return nil end
 	local legacyFallback
 	for i=1,#list do
 		local entryID = list[i].id
 		if entryID == 0 then break end
-		if ItemRack.SameExactID(entryID,currentID) then
+		if ItemRack.MatchesStoredItemFields(entryID,currentID) then
 			return i
-		elseif not legacyFallback and not ItemRack.HasRuneID(entryID)
+		elseif not legacyFallback and ItemRack.IsBareItemID(entryID)
 		and ItemRack.IsQueueEntryUnambiguous(list,i)
 		and ItemRack.SameID(entryID,currentID) then
 			legacyFallback = i
@@ -224,8 +222,8 @@ function ItemRack.GetNextItemInQueue(slot)
 
 	local exactID = ItemRack.GetID(slot)
 	
-	-- Locate the exact rune identity first. A legacy base-ID entry is used only
-	-- when this queue has no explicit rune entry for the same item.
+	-- Locate the full saved identity first. A bare-ID wildcard is used only when
+	-- this queue has no explicit identity for the same item.
 	local idx = ItemRack.FindQueueEntryIndex(list,exactID) or 0
 
 	-- Look forward from current item
@@ -287,8 +285,8 @@ function ItemRack.ManualQueueAdvance(slot)
 	local equippedBaseID = ItemRack.GetIRString(equippedExactID, true)
 	ItemRack.Debug("Queue", "ManualAdvance slot", slot, "equipped:", equippedBaseID)
 	
-	-- Find current item in queue (exact rune identity first, with a legacy
-	-- fallback only when no explicit rune entry makes that fallback ambiguous).
+	-- Find current item in queue (full identity first, with a bare-ID fallback
+	-- only when no explicit entry makes that wildcard ambiguous).
 	local currentIdx = ItemRack.FindQueueEntryIndex(list,equippedExactID) or 0
 	
 	ItemRack.Debug("Queue", "ManualAdvance currentIdx:", currentIdx)
@@ -772,8 +770,8 @@ function ItemRack.AutoQueueItemToEquip(slot, baseID, enable, ready, setname, que
 		-- If there is nothing at the top of our queue, return nil.
 		if entryID==0 then
 			return nil
-		-- A legacy entry can ask FindItemInBags for an arbitrary same-base copy.
-		-- Once this queue has rune-specific entries for that item, only those exact
+		-- A bare entry can ask FindItemInBags for an arbitrary same-base copy.
+		-- Once this queue has full identities for that item, only those explicit
 		-- entries are eligible candidates.
 		elseif not ItemRack.IsQueueEntryUnambiguous(list,i) then
 			if ItemRack.QueueDiagnostic then

@@ -40,6 +40,18 @@ check(
   'Displayed identity must preserve enchant/gem fields and exact saved rune identity.'
 );
 
+const storedIdentity = between(
+  core,
+  'function ItemRack.MatchesStoredItemID',
+  '-- takes an ItemRack-style ID and returns the name'
+);
+check(
+  storedIdentity.includes('ItemRack.IsBareItemID(expectedID)') &&
+    storedIdentity.includes('ItemRack.MatchesStoredItemFields(expectedID,currentID)') &&
+    !storedIdentity.includes('ItemRack.HasRuneID(expectedID)'),
+  'Only deliberately bare item IDs may use base-ID wildcard matching.'
+);
+
 const runeUpdate = between(
   core,
   'function ItemRack.OnRuneUpdated',

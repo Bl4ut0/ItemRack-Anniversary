@@ -24,7 +24,8 @@ const queueMatcher = between(
   'function ItemRack.IsManualQueueChoice'
 );
 check(
-  queueMatcher.indexOf('ItemRack.SameExactID') < queueMatcher.lastIndexOf('return legacyFallback'),
+  queueMatcher.indexOf('ItemRack.MatchesStoredItemFields') < queueMatcher.lastIndexOf('return legacyFallback') &&
+    queueMatcher.includes('ItemRack.IsBareItemID(entryID)'),
   'Queue matching must check exact identity before returning a legacy fallback.'
 );
 check(

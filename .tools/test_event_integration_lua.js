@@ -16,6 +16,7 @@ function IsInInstance() return false,nil end
 function GetInstanceInfo() return nil,nil,nil,nil,nil,nil,nil,nil end
 function UnitClass() return "Shaman","SHAMAN" end
 function GetUnitSpeed() return 0 end
+C_Timer = { After=function(_,callback) callback() end }
 C_AddOns, C_Spell, C_Talent = nil,nil,nil
 
 local inventory = { [13]="Base13", [14]="Base14" }
@@ -30,6 +31,7 @@ ItemRack = {
     return "empty",0
   end,
   IsAutomaticSwapBlocked = function() return true end,
+  UpdateCurrentSet = function() end,
 }
 ItemRackSettings = { EventsVersion=20 }
 ItemRackUser = {
@@ -77,6 +79,39 @@ local stale = ItemRack.PopEvent("Ghostwolf",1)
 check(not stale.removed and next(stale.targets) == nil, "stale second pop must be a total no-op")
 local removeMounted = ItemRack.PopEvent("Mounted")
 check(removeMounted.targets[13] == "Base13", "final shared owner must restore base")
+
+-- CurseForge baniro_: a movement-gated mount event restored the trinket but
+-- discarded the manually selected set name, causing per-set queues to resolve
+-- through Custom. The final frame plan must restore both layers.
+ItemRackUser.EventState = ItemRack.EventFrames.NewState()
+ItemRackUser.EventStack = {}
+ItemRackUser.Sets.BaseSet = { equip={ [13]="Base13" }, Queues={ [14]={ "Queue14" } } }
+ItemRackUser.CurrentSet = "BaseSet"
+ItemRack.EventFramePendingTargets = {}
+ItemRack.EventFrameBatchDepth = 1
+local logicalMount = ItemRack.PushEvent("Mounted")
+check(ItemRackUser.EventState.baseSetName == "BaseSet",
+  "first event frame must retain the manual base-set identity")
+ItemRackUser.CurrentSet = "Zoom"
+ItemRack.EventFramePendingTargets = {}
+local logicalRestore = ItemRack.PopEvent("Mounted")
+check(logicalRestore.restoredSetName == "BaseSet" and logicalRestore.restoreLogicalSet,
+  "final event removal must carry its logical base-set restoration")
+local restorePlan = "~EventFrame:"..tostring(ItemRackUser.EventState.revision)
+ItemRack.EventFramePlans = {
+  [restorePlan]={
+    revision=ItemRackUser.EventState.revision,
+    targets=logicalRestore.targets,
+    restoreSetName=ItemRack.EventFramePendingSetName,
+  },
+}
+ItemRack.EventFramePlanActive = restorePlan
+ItemRackUser.Sets[restorePlan] = { equip=logicalRestore.targets }
+ItemRack.EventFramePendingTargets = {}
+ItemRack.EventFramePendingSetName = nil
+ItemRack.EventFramePlanFinished(restorePlan,true)
+check(ItemRackUser.CurrentSet == "BaseSet",
+  "successful mount restore must recover the prior set and its queue context")
 
 local lower = ItemRack.PushEvent("LowerX")
 local middle = ItemRack.PushEvent("MiddleY")

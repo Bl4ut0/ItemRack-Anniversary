@@ -1072,12 +1072,14 @@ end
 
 function ItemRack.ReleaseEventSlotsForManualChange(slots)
 	local state = ItemRack.EnsureEventFrameState()
-	if not ItemRack.EventFrames.ReleaseSlots(state,slots) then return false end
+	local changed = ItemRack.EventFrames.ReleaseSlots(state,slots)
+	ItemRack.EventFramePendingSetName = nil
 	for slot in pairs(slots or {}) do
 		if ItemRack.EventFramePendingTargets then
 			ItemRack.EventFramePendingTargets[slot] = nil
 		end
 	end
+	if not changed then return false end
 	ItemRack.RefreshEventStackProjection()
 	ItemRack.Debug("Events", "Manual equipment intent released automatic slot ownership at revision:", state.revision)
 	return true
@@ -1086,6 +1088,9 @@ end
 function ItemRack.QueueEventFrameTargets(result, disableSound)
 	if not result or type(result.targets) ~= "table" then return end
 	local state = ItemRack.EnsureEventFrameState()
+	if result.restoreLogicalSet and result.restoredSetName then
+		ItemRack.EventFramePendingSetName = result.restoredSetName
+	end
 	local pendingSet = ItemRack.PendingQueueEquipSet
 	if pendingSet and pendingSet.eventFrameRevision
 	and pendingSet.eventFrameRevision ~= state.revision
@@ -1098,7 +1103,12 @@ function ItemRack.QueueEventFrameTargets(result, disableSound)
 	end
 	ItemRack.EventFramePendingRevision = state.revision
 	if disableSound ~= nil then ItemRack.EventFramePendingDisableSound = disableSound end
-	if not ItemRack.EventFrameBatchDepth or ItemRack.EventFrameBatchDepth == 0 then
+	if not next(result.targets) and result.restoreLogicalSet and result.restoredSetName
+	and not ItemRack.GetTopEventFrame() then
+		ItemRackUser.CurrentSet = result.restoredSetName
+		ItemRack.EventFramePendingSetName = nil
+		if ItemRack.UpdateCurrentSet then C_Timer.After(0,ItemRack.UpdateCurrentSet) end
+	elseif not ItemRack.EventFrameBatchDepth or ItemRack.EventFrameBatchDepth == 0 then
 		ItemRack.TryReconcileEventFrames()
 	end
 end
@@ -1132,7 +1142,13 @@ function ItemRack.EventFramePlanFinished(setname, succeeded, reason)
 	end
 	local top = ItemRack.GetTopEventFrame()
 	if succeeded then
-		ItemRackUser.CurrentSet = top and top.setName or nil
+		if top then
+			ItemRackUser.CurrentSet = top.setName
+		elseif plan.restoreSetName and ItemRackUser.Sets[plan.restoreSetName] then
+			ItemRackUser.CurrentSet = plan.restoreSetName
+		else
+			ItemRackUser.CurrentSet = nil
+		end
 	end
 	ItemRack.RefreshEventStackProjection()
 	if next(ItemRack.EventFramePendingTargets or {}) and (succeeded or plan.revision ~= state.revision) then
@@ -1159,7 +1175,12 @@ function ItemRack.TryReconcileEventFrames(force)
 	ItemRack.EventFramePendingTargets = {}
 	ItemRack.EventFramePendingRevision = nil
 	ItemRack.EventFramePlans = ItemRack.EventFramePlans or {}
-	ItemRack.EventFramePlans[setname] = { revision=revision, targets=targets }
+	ItemRack.EventFramePlans[setname] = {
+		revision=revision,
+		targets=targets,
+		restoreSetName=ItemRack.EventFramePendingSetName,
+	}
+	ItemRack.EventFramePendingSetName = nil
 	ItemRack.EventFramePlanActive = setname
 	ItemRackUser.Sets[setname] = { equip=CopyTable(targets) }
 	local previousEventEquipment = ItemRack.IsEventEquipment
@@ -1288,9 +1309,10 @@ function ItemRack.PushEvent(eventName, belowEventName)
 	local slots, observed = {}, {}
 	local blockedReason
 	if setname and ItemRackUser.Sets[setname] then
-		local ready, reason = ItemRack.PreflightSetSwap(setname)
+		local ready, reason, missing = ItemRack.PreflightSetSwap(setname)
 		if ready then
 			slots = ItemRack.EventFrames.SnapshotSet(ItemRackUser.Sets[setname])
+			for _,entry in ipairs(missing or {}) do slots[entry.slot] = nil end
 			for slot in pairs(slots) do observed[slot] = ItemRack.GetID(slot) end
 		else
 			blockedReason = reason
@@ -1309,6 +1331,7 @@ function ItemRack.PushEvent(eventName, belowEventName)
 		setName=setname,
 		origin=eventData and eventData.Type,
 		restoreOnExit=eventData and eventData.Unequip and true or false,
+		baseSetName=ItemRackUser.CurrentSet,
 		beforeFrameId=beforeFrameId,
 		slots=slots,
 		observed=observed,
@@ -1337,6 +1360,7 @@ function ItemRack.PopEvent(eventName, expectedGeneration)
 	end
 	local generation = expectedGeneration
 	if generation == nil and frame then generation = frame.eventGeneration end
+	local restoreLogicalSet = frame and ItemRackUser.CurrentSet == frame.setName
 	local result = ItemRack.EventFrames.Pop(state,eventName,generation)
 	if not result.removed then
 		ItemRack.Debug("Events", "PopEvent ignored unowned or stale event:", eventName, result.reason or "")
@@ -1345,6 +1369,7 @@ function ItemRack.PopEvent(eventName, expectedGeneration)
 	if ItemRack.EventFrameBlockedActivations then
 		ItemRack.EventFrameBlockedActivations[eventName] = nil
 	end
+	result.restoreLogicalSet = restoreLogicalSet and result.restoredSetName ~= nil
 	-- Unequip=false retains already-observed gear, but an activation that has
 	-- not been submitted yet must not survive its owner. Replace only that
 	-- owner's still-pending target with the remaining effective owner (if any).

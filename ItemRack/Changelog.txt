@@ -1,4 +1,8 @@
 __ Development __
+- Fixed movement-gated Mounted events restoring the physical trinket but losing the prior set name and its per-set queues. Event frames now carry the manual base-set identity through final restoration.
+- Restored legacy partial-set behavior: unavailable saved items are reported and skipped without blocking valid moves, while full-bag and unsafe two-hand transitions remain fail-closed.
+- Contained incomplete cooldown-module loads so the periodic timer reports one actionable warning instead of producing repeated Lua errors.
+- Fixed GitHub #24 by distinguishing same-base copies with different enchants, gems, suffixes, or runes in sets, direct clicks, queues, searches, and the queue editor. Full identities are preferred, compatible fallback remains available when the recorded copy is absent, and intentionally bare defaults remain wildcards.
 
 __ New in 4.46 - By Bl4ut0 __
 - Refactored ItemRackTransaction.lua and ItemRackEquip.lua so non-conflicting gear moves in a set swap pipeline simultaneously in a single frame, restoring 1-frame instant equipment transformations while preserving full atomic rollback safety if any destination or server check fails.
