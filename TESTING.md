@@ -74,6 +74,14 @@ establish that report's cause or resolution. The SecureCmdOptionParse comment
 by maxon_iv is a longstanding macro enhancement request, not a demonstrated
 recent-release regression.
 
+Additional pre-deployment compatibility checks in those standard suites cover
+zero-bar numeric Warrior/Rogue/Shaman identities, humanoid form 0, repeated
+stance evaluation without frame or gear churn, Dire Bear/Aquatic spell IDs,
+exact carried rune lookup, explicit unengraved rune 0, wrong-rune refusal,
+and observed partial-set completion when a later item is missing or only one
+physical copy exists for two requested slots. Class identity cases model API
+responses, not actual client spellbooks or stance availability.
+
 ## Large-profile coverage
 
 | Workload | Generated profile | Code-level use cases and invariants |

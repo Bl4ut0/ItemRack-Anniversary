@@ -260,6 +260,45 @@ forms = { { name="Bear Form", spellID=5487 }, { name="Travel Form", spellID=783 
 check(ItemRack.GetStanceNumber("Bear Form") == 1 and ItemRack.GetStanceNumber(4) == 2,
   "legacy named form-info return values must remain compatible")
 
+-- Neighboring compatibility: numeric identities must not depend on a form
+-- bar for Warriors, Rogues, or Shamans. Repeated evaluations cannot manufacture
+-- extra frames; transitions, including humanoid 0, must retire the prior owner.
+for _,class in ipairs({ "WARRIOR", "ROGUE", "SHAMAN" }) do
+  reset()
+  playerClass,formCount = class,0
+  for stance=0,3 do
+    check(ItemRack.GetStanceNumber(stance) == stance,
+      class.." numeric stance must resolve without bar entries")
+  end
+end
+reset()
+playerClass,formCount = "WARRIOR",0
+for stance=0,3 do
+  addEvent("Warrior"..stance,{ Type="Stance", Stance=stance, Unequip=1 },
+    "WarriorSet"..stance,{ [13]="WarriorItem"..stance })
+end
+for stance=0,3 do
+  currentStance = stance
+  ItemRack.ProcessStanceEvent()
+  finishObservedPlan()
+  check(#ItemRackUser.EventStack == 1 and ItemRackEvents["Warrior"..stance].Active
+    and inventory[13] == "WarriorItem"..stance,
+    "stance transition must equip only the new owner, including humanoid 0")
+  local revision = ItemRackUser.EventState.revision
+  ItemRack.ProcessStanceEvent()
+  check(ItemRackUser.EventState.revision == revision
+    and not next(ItemRack.EventFramePendingTargets),
+    "repeated unchanged stance evaluation must create no frame or gear churn")
+end
+reset()
+playerClass,modernFormInfo,formCount = "DRUID",true,2
+forms = { { spellID=9634 }, { spellID=1066 } }
+check(ItemRack.GetStanceNumber(1) == 1 and ItemRack.GetStanceNumber(2) == 2,
+  "Dire Bear and Aquatic numeric defaults must resolve without spell-name APIs")
+forms = { { spellID=999999 }, {} }
+check(ItemRack.GetStanceNumber("Unknown Form") == nil,
+  "unknown spell IDs and absent identities must not activate a named stance")
+
 -- Multiple Buff+OnMovement owners share one generation-bound expiry. One
 -- callback retires all of them in sorted order rather than one pairs() winner.
 reset()

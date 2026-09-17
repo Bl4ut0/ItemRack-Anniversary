@@ -77,6 +77,33 @@ check(not ItemRack.MatchesStoredItemID(runeWanted,runeOther),
 check(ItemRack.MatchesStoredItemID(wanted,runeOther),
   "a pre-rune full identity may follow the same physical copy after engraving")
 
+-- Lookup-level SoD compatibility checks, not a reproduction of leocard's
+-- missing-item report: recorded runes must never fall back to the wrong rune.
+bags[0] = { [1]=runeOther, [2]=runeWanted }
+inventory = { [9]=runeOther }
+ItemRack.ClearTestLocks = function()
+  ItemRack.LockList[0] = {}; ItemRack.LockList[-2] = {}
+end
+ItemRack.ClearTestLocks()
+inv,bag,slot = ItemRack.FindItem(runeWanted,true)
+check(not inv and bag == 0 and slot == 2,
+  "carried exact rune copy must win over an earlier wrong-rune copy")
+bags[0][2] = nil
+ItemRack.ClearTestLocks()
+inv,bag,slot = ItemRack.FindItem(runeWanted,true)
+check(not inv and not bag,
+  "missing recorded rune must not select a compatible base item with another rune")
+bags[0][2] = wanted..":runeid:0"
+ItemRack.ClearTestLocks()
+inv,bag,slot = ItemRack.FindItem(wanted..":runeid:0",true)
+check(not inv and bag == 0 and slot == 2,
+  "explicitly unengraved rune 0 must distinguish an engraved copy")
+bags[0][2] = runeWanted
+ItemRack.ClearTestLocks()
+inv,bag,slot = ItemRack.FindItem(wanted,true)
+check(not inv and bag == 0 and slot == 1,
+  "pre-rune full identities must retain physical-field compatibility")
+
 local queueList = { { id=wrong }, { id=wanted } }
 check(ItemRack.FindQueueEntryIndex(queueList,wantedLong) == 2,
   "queue lookup must distinguish same-base copies by enchant")

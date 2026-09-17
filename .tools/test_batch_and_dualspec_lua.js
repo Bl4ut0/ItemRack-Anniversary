@@ -481,21 +481,23 @@ const identityFunctions = [
   'SameExactID', 'MatchesStoredItemFields', 'MatchesStoredItemID', 'FindItem',
 ].map(name => extractFunction('ItemRack/ItemRack.lua', `ItemRack.${name}`)).join('\n');
 
-for (const mode of ['later-slot', 'already-equipped', 'wildcard-first', 'paired-exchange']) {
+for (const mode of ['later-slot', 'already-equipped', 'wildcard-first', 'paired-exchange', 'missing-later', 'duplicate-one-copy']) {
   const satisfied = mode === 'already-equipped';
   const paired = mode === 'paired-exchange';
+  const partial = mode === 'missing-later' || mode === 'duplicate-one-copy';
+  const duplicate = mode === 'duplicate-one-copy';
   runCase(
     `exact-copy-reservation-${mode}`,
     `${commonSetup}
 local absent = "${mode === 'wildcard-first' ? '19001' : '19001:1:0:0:0:0:0:0:70:0'}"
 local exact = "19001:2:0:0:0:0:0:0:70:0"
 local substitute = "19001:3:0:0:0:0:0:0:70:0"
-local bags = { [0] = ${paired ? '{}' : satisfied ? '{ [1]=substitute }' : '{ [1]=exact, [2]=substitute }'} }
+local bags = { [0] = ${paired ? '{}' : duplicate ? '{ [1]=exact }' : satisfied || partial ? '{ [1]=substitute }' : '{ [1]=exact, [2]=substitute }'} }
 local inventory = { [11]=${paired ? 'substitute' : '"19002"'}, [12]=${satisfied || paired ? 'exact' : '"19003"'} }
 cursor = nil
 ItemRack.SlotInfo[11] = { name="Finger0Slot" }
 ItemRack.SlotInfo[12] = { name="Finger1Slot" }
-ItemRackUser.Sets["RingSet"] = { equip={ [11]=${paired ? 'exact' : 'absent'}, [12]=${paired ? 'substitute' : 'exact'} }, old={} }
+ItemRackUser.Sets["RingSet"] = { equip={ [11]=${paired || duplicate ? 'exact' : partial ? 'substitute' : 'absent'}, [12]=${paired ? 'substitute' : mode === 'missing-later' ? '"19999:1:0:0:0:0:0:0:70:0"' : 'exact'} }, old={} }
 ItemRack.KnownItems = {}
 ItemRack.BankOpen = false
 ItemRack.iSPatternBaseIDFromIR = "^(%-?%d+)"
@@ -526,11 +528,11 @@ ${identityFunctions}
 `,
     `${equipSource}
 local planned,reason,missing = ItemRack.PreflightSetSwap("RingSet")
-assert(planned and #missing == 0,"both ring targets must have distinct available sources")
+assert(planned and #missing == ${partial ? '1' : '0'},"preflight must distinguish available sources from genuinely missing targets")
 ItemRack.EquipSet("RingSet")
 RunTimers()
-assert(inventory[11] == ${paired ? 'exact' : 'substitute'},"earlier target must receive its distinct planned source")
-assert(inventory[12] == ${paired ? 'substitute' : 'exact'},"later exact copy must remain assigned to its saved slot")
+assert(inventory[11] == ${paired || duplicate ? 'exact' : 'substitute'},"available earlier target must equip its distinct planned source")
+assert(inventory[12] == ${paired ? 'substitute' : partial ? '"19003"' : 'exact'},"later target must keep its exact copy or retain existing gear when missing")
 assert(ItemRackUser.CurrentSet == "RingSet","observed batch must commit the logical set")
 assert(cursor == nil and ItemRack.ActiveEquipmentTransaction == nil,"batch must leave no cursor or transaction residue")
 `
