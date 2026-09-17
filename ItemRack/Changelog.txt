@@ -1,4 +1,6 @@
 __ Development __
+
+__ New in 4.48 - By Bl4ut0 __
 - Fixed Ghost Wolf events on clients reporting stance 1 but zero shapeshift-bar forms. Named forms now support legacy names and modern spell IDs, with language-independent matching for packaged Druid forms. Added permanent Ghost Wolf, named-form, and shared Mounted restoration regressions.
 - Fixed set execution discarding preflight's exact-copy reservations, which could let an earlier substitute take the enchanted/gemmed copy saved for a later slot. Observed multi-slot transaction regressions now guard this behavior.
 

@@ -4,6 +4,9 @@ All notable changes to the TBC Anniversary port of ItemRack will be documented i
 
 ## [Development]
 
+
+## [4.48] - 2026-09-17
+### Bug Fixes & Improvements
 - **Ghost Wolf and Stance Resolution**: Numeric stance events no longer require a populated shapeshift bar, fixing Ghost Wolf on clients reporting form 1 with zero bar forms. Named forms now support both legacy name returns and modern spell-ID returns; packaged Druid forms use stable spell IDs to work independently of client language. Added the sanitized live-report reproduction and shared Ghost Wolf/Mounted restoration checks to the standard test gate.
 - **Exact-Copy Reservations During Set Execution**: Swap execution now preserves exact-copy priority after preflight, preventing an earlier compatible substitute from consuming the copy saved for a later slot. Added observed multi-slot transaction regressions, including an already-equipped exact copy.
 
