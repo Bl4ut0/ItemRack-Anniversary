@@ -1,4 +1,6 @@
 __ Development __
+
+__ New in 4.47 - By Bl4ut0 __
 - Fixed movement-gated Mounted events restoring the physical trinket but losing the prior set name and its per-set queues. Event frames now carry the manual base-set identity through final restoration.
 - Restored legacy partial-set behavior: unavailable saved items are reported and skipped without blocking valid moves, while full-bag and unsafe two-hand transitions remain fail-closed.
 - Contained incomplete cooldown-module loads so the periodic timer reports one actionable warning instead of producing repeated Lua errors.
