@@ -28,6 +28,60 @@ through Fengari. It does not replace the focused regression files under
 `.tools`; it adds long-lived profile shapes and operation sequences that are
 hard to reproduce manually on a character with only a few saved sets.
 
+## User-report regression workflow
+
+Every reproducible user-reported bug must leave a permanent regression in the
+standard suite before its fix is considered complete:
+
+1. Record the report URL or reporter, affected addon/client version, exact item
+   identities, relevant settings and profile shape, action sequence, and expected
+   result. Use a sanitized diagnostic fixture when needed; do not commit private
+   player data or the entire diagnostic dump unnecessarily.
+2. Reproduce the smallest failure against production Lua with modeled WoW API
+   responses. Give the case a descriptive name and reference the report in a
+   comment. Prefer extending the owning focused suite rather than creating one
+   suite per issue.
+3. Demonstrate that the new case fails against the pre-fix implementation and
+   passes with the correction. Assert the final equipment, logical set/queue
+   context, persistence, and cleanup relevant to the report, not just submitted
+   API calls. Add neighboring compatibility cases when the correction changes
+   shared behavior.
+4. Add any new test file to `package.json` so `npm test` runs it automatically.
+   Ensure it is tracked by Git even when `.tools` is otherwise ignored. A manual
+   one-off test is not permanent regression coverage.
+5. Run the focused suite and the complete `npm test` gate. Keep the case after
+   the issue closes and include the report-to-test mapping in the fix summary.
+6. For behavior outside the modeled API boundary, retain an explicit in-game
+   reproduction/acceptance checklist. Request missing evidence when a report
+   cannot be reproduced; do not invent a passing fixture or call the original
+   client behavior verified solely because the automated suite is green.
+
+### Report coverage in the standard gate
+
+| Report or failure | Permanent focused coverage |
+|---|---|
+| CurseForge baniro_: Mounted movement restores gear but loses the set and queues | `.tools/test_event_integration_lua.js` verifies final base-set and queue-context restoration. |
+| Missing saved items block the remaining set | `.tools/test_transactions_lua.js` verifies partial-set planning while retaining unsafe-transition guards. |
+| CurseForge Antatra: missing cooldown-state function produces recurring errors | `.tools/test_cooldown_integration_lua.js` verifies missing-module containment and one warning; it does not establish why the original client module failed to load. |
+| GitHub #24: two Bracers of Nimble Thought with different enchants resolve to the wrong copy | `.tools/test_identity_matching_lua.js` uses the reported item/enchant identities and covers exact-first lookup, compatible fallback, queues, and the picker. |
+| Live 4.47 Ghost Wolf report: form 1, zero bar forms, enabled event never activates | `.tools/test_event_processors_lua.js` reproduces the reported API values and sanitized specialization/Ghost Wolf/Mounted profile. It verifies event ownership, modeled plan completion, final equipment and logical queue context, plus numeric and legacy/modern localized named-form compatibility. Protected equipment actions still require client acceptance. |
+| GitHub #24 follow-up audit: an early fallback steals a later exact source during execution | `.tools/test_batch_and_dualspec_lua.js` reproduces the execution-order failure with synthetic ring identities through production lookup, set planning, batching, and observed transaction completion; also checks an already-equipped exact target, an early wildcard, and a paired-slot exchange. This is not a reproduction of the untriaged SoD report. |
+
+The recent CurseForge report by leocard about SoD items being reported missing
+still needs client build, saved/live item and rune identities, and a diagnostic
+dump. Rune-specific matching remains strict; passing synthetic cases does not
+establish that report's cause or resolution. The SecureCmdOptionParse comment
+by maxon_iv is a longstanding macro enhancement request, not a demonstrated
+recent-release regression.
+
+Additional pre-deployment compatibility checks in those standard suites cover
+zero-bar numeric Warrior/Rogue/Shaman identities, humanoid form 0, repeated
+stance evaluation without frame or gear churn, Dire Bear/Aquatic spell IDs,
+exact carried rune lookup, explicit unengraved rune 0, wrong-rune refusal,
+and observed partial-set completion when a later item is missing or only one
+physical copy exists for two requested slots. Class identity cases model API
+responses, not actual client spellbooks or stance availability.
+
 ## Large-profile coverage
 
 | Workload | Generated profile | Code-level use cases and invariants |

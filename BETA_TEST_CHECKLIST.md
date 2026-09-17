@@ -28,6 +28,10 @@ Use the packaged build from `.versions/Release/v{Version}`. Reload the UI after 
 - Manually equip the current specialization's assigned set, enable its event, then switch specializations. The event must not claim or later unequip the manually owned set unless it actually created an event-stack layer.
 - Disable and re-enable the global event system while remaining in the same spec. Confirm specialization, stance, zone, and buff state are reconciled without duplicate swaps.
 - Add a one-shot Script event triggered by `PLAYER_ENTERING_WORLD`, cross a loading screen, and confirm it runs exactly once after the transition hold with its original arguments.
+- On a Shaman, enable the default stance-1 Ghostwolf event and assign a visibly different set. Enter Ghost Wolf, including on a client where `GetNumShapeshiftForms()` returns 0; confirm gear swaps and the Ghostwolf frame appears in the dump. Leave the form and confirm the prior set and per-set queues restore.
+- Assign the same travel set to Ghostwolf and movement-gated Mounted above an enabled specialization event. Enter Ghost Wolf, mount and move, then leave Ghost Wolf while Mounted still owns the set. Confirm no premature restoration; stopping movement must finally restore the specialization set and its queue context. Repeat with PvP exclusions enabled.
+- On a Druid, test numeric Bear/Aquatic/Cat/Travel defaults and named Moonkin/Tree events for the forms the character knows, including a non-English client. Test a custom event using the localized form name. Confirm entering/leaving forms changes and restores only the expected owned slots.
+- For two same-base ring/trinket copies with different enchants or gems, save the exact later-slot copy alongside an earlier variant that is no longer carried. Keep a compatible spare available. Confirm the early slot receives the spare while the later slot receives its exact saved copy, and repeat with that exact copy already equipped.
 
 ## 4. Script event approval and mutation
 

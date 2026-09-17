@@ -1101,6 +1101,27 @@ function ItemRack.IterateSwapList(setname, disableSound)
 	ItemRack.AbortSwap = nil
 	ItemRack.ClearLockList()
 
+	-- Rebuild preflight's reservations from current locations for this pass.
+	-- Clearing the lock list must not let an earlier compatibility fallback
+	-- steal a later exact copy, or one already satisfying an untouched slot.
+	for i=0,19 do
+		local target = set.equip[i]
+		if target and target ~= 0
+		and ItemRack.MatchesStoredItemID(target,ItemRack.GetID(i)) then
+			ItemRack.LockList[-2][i] = 1
+		end
+	end
+	local exactSources = {}
+	for k=0,19+ItemRack.eqBackOfTheBusOffset do
+		local i = k >= ItemRack.eqBackOfTheBusOffset and k-ItemRack.eqBackOfTheBusOffset or k
+		local target = swap[k]
+		if target and target ~= 0
+		and not ItemRack.MatchesStoredItemID(target,ItemRack.GetID(i)) then
+			local inv,bag,slot = ItemRack.FindItem(target,1,true)
+			if inv or bag then exactSources[k] = { inv=inv, bag=bag, slot=slot } end
+		end
+	end
+
 	local treatAs2H = nil
 	local skip, inv, bag, slot
 	local batchSteps = {}
@@ -1133,7 +1154,12 @@ function ItemRack.IterateSwapList(setname, disableSound)
 					return "failed"
 				end
 			else
-				inv,bag,slot = ItemRack.FindItem(swap[k],1)
+				local source = exactSources[k]
+				if source then
+					inv,bag,slot = source.inv,source.bag,source.slot
+				else
+					inv,bag,slot = ItemRack.FindItem(swap[k],1)
+				end
 				ItemRack.Debug("Equip", "IterateSwapList FindItem returned: inv=", inv, "bag=", bag, "slot=", slot, "for intended ID:", swap[k])
 				if bag then
 					if i==16 and ItemRack.HasTitansGrip then

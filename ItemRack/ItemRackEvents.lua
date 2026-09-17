@@ -1575,32 +1575,67 @@ local druidStanceNames = {
 	[4] = { "Travel Form" },
 }
 
-function ItemRack.GetStanceNumber(name)
-	local numForms = GetNumShapeshiftForms()
-	if not numForms or numForms == 0 then return end
+local druidStanceSpells = {
+	[1] = { [5487]=true, [9634]=true }, -- Bear / Dire Bear
+	[2] = { [1066]=true }, -- Aquatic
+	[3] = { [768]=true }, -- Cat
+	[4] = { [783]=true }, -- Travel
+}
+local packagedStanceSpells = {
+	["Moonkin Form"] = 24858,
+	["Tree of Life"] = 33891,
+}
 
-	-- Check exact form name match against current stance bar
-	for i = 1, numForms do
-		local _, formName = GetShapeshiftFormInfo(i)
-		if name == formName then
-			return i
-		end
+local function GetStanceFormIdentity(index)
+	local _,second,_,fourth,fifth = GetShapeshiftFormInfo(index)
+	-- Legacy clients returned the name second; modern Classic returns active,
+	-- castable, and spellID instead. Never compare a configured name to active.
+	if type(second) == "string" then
+		return second,type(fifth) == "number" and fifth or nil
 	end
+	local spellID = type(fourth) == "number" and fourth or nil
+	local formName
+	if spellID then
+		if C_Spell and C_Spell.GetSpellName then
+			formName = C_Spell.GetSpellName(spellID)
+		end
+		if not formName and C_Spell and C_Spell.GetSpellInfo then
+			local info = C_Spell.GetSpellInfo(spellID)
+			formName = info and info.name
+		end
+		if not formName and GetSpellInfo then formName = GetSpellInfo(spellID) end
+	end
+	return formName,spellID
+end
 
-	-- Fallback for numeric stance IDs (e.g. default Druid stance events with Stance = 1, 2, 3, 4)
+function ItemRack.GetStanceNumber(name)
 	local stanceNum = tonumber(name)
-	if stanceNum then
-		local _, playerClass = UnitClass("player")
-		if playerClass == "DRUID" and druidStanceNames[stanceNum] then
-			for i = 1, numForms do
-				local _, formName = GetShapeshiftFormInfo(i)
-				for _, targetName in ipairs(druidStanceNames[stanceNum]) do
-					if formName == targetName then
-						return i
-					end
-				end
+	if not stanceNum and type(name) ~= "string" then return end
+	-- Ghost Wolf reports current form 1 while GetNumShapeshiftForms() is 0.
+	-- Numeric stance identity (including humanoid 0) does not require a bar.
+	if stanceNum == 0 then return 0 end
+	local _,playerClass = UnitClass("player")
+	if stanceNum and (playerClass ~= "DRUID" or not druidStanceNames[stanceNum]) then
+		return stanceNum
+	end
+	local numForms = GetNumShapeshiftForms() or 0
+	for i=1,numForms do
+		local formName,spellID = GetStanceFormIdentity(i)
+		if not stanceNum then
+			if name == formName or (spellID and packagedStanceSpells[name] == spellID) then
+				return i
+			end
+		elseif druidStanceSpells[stanceNum][spellID] then
+			return i
+		else
+			for _,targetName in ipairs(druidStanceNames[stanceNum]) do
+				if formName == targetName then return i end
 			end
 		end
+	end
+	-- Preserve numeric compatibility when the bar is absent or a legacy client
+	-- cannot supply form identities; unknown names remain unresolved.
+	if stanceNum then
 		return stanceNum
 	end
 end
@@ -1630,6 +1665,9 @@ function ItemRack.ProcessStanceEvent()
 		local stance = not excluded and ItemRack.GetStanceNumber(eventData.Stance)
 		local desired = stance ~= nil and stance == currentStance
 		local ownsFrame = state.byEvent[eventName] ~= nil
+		ItemRack.Debug("Events", "ProcessStanceEvent checking", eventName,
+			"current:", currentStance, "configured:", eventData.Stance,
+			"resolved:", stance, "excluded:", excluded, "owned:", ownsFrame, "desired:", desired)
 		if desired and not ownsFrame then
 			table.insert(entries,eventName)
 			eventData.Active = nil
