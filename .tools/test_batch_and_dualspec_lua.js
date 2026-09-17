@@ -1,5 +1,5 @@
 const fs = require('fs');
-const { runLua } = require('./lib/lua_harness');
+const { extractFunction, runLua } = require('./lib/lua_harness');
 
 const transactionSource = fs.readFileSync('ItemRack/ItemRackTransaction.lua', 'utf8');
 const equipSource = fs.readFileSync('ItemRack/ItemRackEquip.lua', 'utf8');
@@ -473,5 +473,69 @@ assert(ItemRack.CanPlayerDualWield() == true, "Warrior level 20 must return true
   'batch-dualspec:can-player-dualwield-spellbook-safety'
 );
 
-console.log('[BATCH & DUAL-SPEC LUA] 23 batch execution, rollback safety, dual-spec, minimap, and spellbook safety assertions passed.');
+// GitHub #24 follow-up audit: preflight reservations must survive execution,
+// not just exact-first lookup. Ring identities are synthetic, not a new claim
+// that the original bracer report or the untriaged SoD report used this shape.
+const identityFunctions = [
+  'SameID', 'GetRuneID', 'HasRuneID', 'IsBareItemID', 'SameItemFields',
+  'SameExactID', 'MatchesStoredItemFields', 'MatchesStoredItemID', 'FindItem',
+].map(name => extractFunction('ItemRack/ItemRack.lua', `ItemRack.${name}`)).join('\n');
+
+for (const mode of ['later-slot', 'already-equipped', 'wildcard-first', 'paired-exchange']) {
+  const satisfied = mode === 'already-equipped';
+  const paired = mode === 'paired-exchange';
+  runCase(
+    `exact-copy-reservation-${mode}`,
+    `${commonSetup}
+local absent = "${mode === 'wildcard-first' ? '19001' : '19001:1:0:0:0:0:0:0:70:0'}"
+local exact = "19001:2:0:0:0:0:0:0:70:0"
+local substitute = "19001:3:0:0:0:0:0:0:70:0"
+local bags = { [0] = ${paired ? '{}' : satisfied ? '{ [1]=substitute }' : '{ [1]=exact, [2]=substitute }'} }
+local inventory = { [11]=${paired ? 'substitute' : '"19002"'}, [12]=${satisfied || paired ? 'exact' : '"19003"'} }
+cursor = nil
+ItemRack.SlotInfo[11] = { name="Finger0Slot" }
+ItemRack.SlotInfo[12] = { name="Finger1Slot" }
+ItemRackUser.Sets["RingSet"] = { equip={ [11]=${paired ? 'exact' : 'absent'}, [12]=${paired ? 'substitute' : 'exact'} }, old={} }
+ItemRack.KnownItems = {}
+ItemRack.BankOpen = false
+ItemRack.iSPatternBaseIDFromIR = "^(%-?%d+)"
+ItemRack.iSPatternItemFieldsFromIR = "^(%-?%d+:%-?%d*:%-?%d*:%-?%d*:%-?%d*:%-?%d*:%-?%d*:%-?%d*)"
+ItemRack.iSPatternRuneIDFromIR = ":runeid:(%d+)$"
+function ItemRack.GetIRString(value,base)
+  if base then return tostring(value or ""):match("^(%-?%d+)") or 0 end
+  return value or 0
+end
+function ItemRack.UpdateIRString(value) return value end
+function ItemRack.GetID(bag,slot)
+  if slot then return bags[bag] and bags[bag][slot] or 0 end
+  return inventory[bag] or 0
+end
+function ItemRack.GetInfoByID() return "Ring",nil,"INVTYPE_FINGER" end
+function ItemRack.ValidBag(bag) return bag == 0 end
+function GetContainerNumSlots(bag) return bag == 0 and 2 or 0 end
+function GetContainerItemLink(bag,slot) return bags[bag] and bags[bag][slot] end
+function GetInventoryItemID(_,slot) return inventory[slot] end
+function GetInventoryItemLink(_,slot) return inventory[slot] end
+function PickupContainerItem(bag,slot)
+  local held = cursor; cursor = bags[bag][slot]; bags[bag][slot] = held
+end
+function PickupInventoryItem(slot)
+  local held = cursor; cursor = inventory[slot]; inventory[slot] = held
+end
+${identityFunctions}
+`,
+    `${equipSource}
+local planned,reason,missing = ItemRack.PreflightSetSwap("RingSet")
+assert(planned and #missing == 0,"both ring targets must have distinct available sources")
+ItemRack.EquipSet("RingSet")
+RunTimers()
+assert(inventory[11] == ${paired ? 'exact' : 'substitute'},"earlier target must receive its distinct planned source")
+assert(inventory[12] == ${paired ? 'substitute' : 'exact'},"later exact copy must remain assigned to its saved slot")
+assert(ItemRackUser.CurrentSet == "RingSet","observed batch must commit the logical set")
+assert(cursor == nil and ItemRack.ActiveEquipmentTransaction == nil,"batch must leave no cursor or transaction residue")
+`
+  );
+}
+
+console.log('[BATCH & DUAL-SPEC LUA] Batch execution, exact-copy reservations, rollback safety, dual-spec, minimap, and spellbook safety assertions passed.');
 

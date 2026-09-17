@@ -56,7 +56,7 @@ standard suite before its fix is considered complete:
    cannot be reproduced; do not invent a passing fixture or call the original
    client behavior verified solely because the automated suite is green.
 
-### 4.47 report coverage in the standard gate
+### Report coverage in the standard gate
 
 | Report or failure | Permanent focused coverage |
 |---|---|
@@ -64,6 +64,15 @@ standard suite before its fix is considered complete:
 | Missing saved items block the remaining set | `.tools/test_transactions_lua.js` verifies partial-set planning while retaining unsafe-transition guards. |
 | CurseForge Antatra: missing cooldown-state function produces recurring errors | `.tools/test_cooldown_integration_lua.js` verifies missing-module containment and one warning; it does not establish why the original client module failed to load. |
 | GitHub #24: two Bracers of Nimble Thought with different enchants resolve to the wrong copy | `.tools/test_identity_matching_lua.js` uses the reported item/enchant identities and covers exact-first lookup, compatible fallback, queues, and the picker. |
+| Live 4.47 Ghost Wolf report: form 1, zero bar forms, enabled event never activates | `.tools/test_event_processors_lua.js` reproduces the reported API values and sanitized specialization/Ghost Wolf/Mounted profile. It verifies event ownership, modeled plan completion, final equipment and logical queue context, plus numeric and legacy/modern localized named-form compatibility. Protected equipment actions still require client acceptance. |
+| GitHub #24 follow-up audit: an early fallback steals a later exact source during execution | `.tools/test_batch_and_dualspec_lua.js` reproduces the execution-order failure with synthetic ring identities through production lookup, set planning, batching, and observed transaction completion; also checks an already-equipped exact target, an early wildcard, and a paired-slot exchange. This is not a reproduction of the untriaged SoD report. |
+
+The recent CurseForge report by leocard about SoD items being reported missing
+still needs client build, saved/live item and rune identities, and a diagnostic
+dump. Rune-specific matching remains strict; passing synthetic cases does not
+establish that report's cause or resolution. The SecureCmdOptionParse comment
+by maxon_iv is a longstanding macro enhancement request, not a demonstrated
+recent-release regression.
 
 ## Large-profile coverage
 
