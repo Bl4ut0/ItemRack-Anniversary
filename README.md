@@ -140,6 +140,11 @@ deep event stacks, legacy queue migrations, and serialized equipment failures.
 See [TESTING.md](TESTING.md) for the scenario matrix, reproduction seed, and the
 client behaviors that still require in-game beta testing.
 
+Every reproducible user-reported bug gains a permanent named regression in this
+standard gate. Follow the [user-report regression workflow](TESTING.md#user-report-regression-workflow)
+when implementing fixes; client-only failures also retain an in-game acceptance
+checklist.
+
 ## Support
 
 For issues specific to the TBC Anniversary port, please open an issue on this GitHub repository.
