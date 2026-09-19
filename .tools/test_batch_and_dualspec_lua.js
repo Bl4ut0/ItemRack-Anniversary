@@ -473,6 +473,53 @@ assert(ItemRack.CanPlayerDualWield() == true, "Warrior level 20 must return true
   'batch-dualspec:can-player-dualwield-spellbook-safety'
 );
 
+// Modern / Forever client MenuMouseover safety: MouseIsOver and GetMouseFocus removed
+const menuMouseoverFunc = extractFunction('ItemRack/ItemRack.lua', 'ItemRack.MenuMouseover');
+
+runCase(
+  'menu-mouseover-modern-client',
+  `${commonSetup}
+MouseIsOver = nil
+GetMouseFocus = nil
+local fociTarget = {
+  GetName = function() return "ItemRackMenu1" end,
+  IsVisible = function() return true end,
+  IsMouseOver = function() return true end
+}
+GetMouseFoci = function() return { fociTarget } end
+
+-- Compatibility shim from ItemRack.lua
+if not MouseIsOver then
+  MouseIsOver = function(frame, ...)
+    return (frame and frame.IsMouseOver and frame:IsMouseOver(...)) and true or false
+  end
+  _G.MouseIsOver = MouseIsOver
+end
+
+ItemRackMenuFrame = {
+  IsVisible = function() return true end,
+  Hide = function() end,
+  IsMouseOver = function() return false end,
+}
+ItemRack.MenuMouseoverFrames = { ["ItemRackMenu1"] = true }
+ItemRack.StopTimer = function() end
+IsShiftKeyDown = function() return false end
+
+${menuMouseoverFunc}
+`,
+  `
+local success, err = pcall(ItemRack.MenuMouseover)
+assert(success, "ItemRack.MenuMouseover must not throw when MouseIsOver/GetMouseFocus are nil: " .. tostring(err))
+
+-- Case 2: Mouse outside menu and outside mouseover frames -> should hide
+GetMouseFoci = function() return {} end
+local hidden = false
+ItemRackMenuFrame.Hide = function() hidden = true end
+ItemRack.MenuMouseover()
+assert(hidden == true, "ItemRack.MenuMouseover must hide menu when mouse is outside")
+`
+);
+
 // GitHub #24 follow-up audit: preflight reservations must survive execution,
 // not just exact-first lookup. Ring identities are synthetic, not a new claim
 // that the original bracer report or the untriaged SoD report used this shape.

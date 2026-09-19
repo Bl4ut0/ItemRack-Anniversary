@@ -94,14 +94,24 @@ function ItemRack.PrintDebugStatus()
 	ItemRack.Print("Layers: " .. table.concat(states, ", "))
 end
 
--- by Mikinho - Fix for latest update for Classic Era/SoD v11504
+-- by Mikinho - Fix for latest update for Classic Era/SoD v11504 & Modern/Camelot 1.60+
 local GetMouseFocus = GetMouseFocus
 if not GetMouseFocus and GetMouseFoci then
-    local GetMouseFoci = GetMouseFoci
-          GetMouseFocus = function()
-          return GetMouseFoci()[1]
-      end
+	GetMouseFocus = function()
+		local foci = GetMouseFoci()
+		return foci and foci[1]
+	end
+	_G.GetMouseFocus = GetMouseFocus
 end
+
+-- Compatibility shim for MouseIsOver (removed in Modern/Camelot 1.60+)
+if not MouseIsOver then
+	MouseIsOver = function(frame, ...)
+		return (frame and frame.IsMouseOver and frame:IsMouseOver(...)) and true or false
+	end
+	_G.MouseIsOver = MouseIsOver
+end
+
 
 
 -- Compatibility shim for CastingInfo/ChannelInfo (moved to UnitCastingInfo/UnitChannelInfo in some versions)
@@ -3702,7 +3712,7 @@ function ItemRack.WriteMenuCooldowns()
 end
 
 function ItemRack.MenuMouseover()
-	local frame = GetMouseFocus()
+	local frame = (GetMouseFocus and GetMouseFocus()) or (GetMouseFoci and GetMouseFoci()[1])
 	local frameName = nil
 	local frameVisible = nil
 	local IRmouseOverFrame = nil
@@ -3715,14 +3725,26 @@ function ItemRack.MenuMouseover()
 		local ok, isVis = pcall(frame.IsVisible, frame)
 		if ok then frameVisible = isVis end
 	end
+
+	local function SafeMouseIsOver(f)
+		if not f then return false end
+		if f.IsMouseOver then
+			local ok, res = pcall(f.IsMouseOver, f)
+			return ok and res and true or false
+		elseif MouseIsOver then
+			local ok, res = pcall(MouseIsOver, f)
+			return ok and res and true or false
+		end
+		return false
+	end
 	
 	if frameName then IRmouseOverFrame = ItemRack.MenuMouseoverFrames[frameName] end
-	if MouseIsOver(ItemRackMenuFrame) or IsShiftKeyDown() or (frame and frameName and frameVisible and IRmouseOverFrame) then
+	if SafeMouseIsOver(ItemRackMenuFrame) or IsShiftKeyDown() or (frame and frameName and frameVisible and IRmouseOverFrame) then
 		return -- keep menu open if mouse over menu, shift is down or mouse is immediately over a mouseover frame
 	end
 	for i in pairs(ItemRack.MenuMouseoverFrames) do
 		frame = _G[i]
-		if frame and frame:IsVisible() and MouseIsOver(frame) then
+		if frame and frame:IsVisible() and SafeMouseIsOver(frame) then
 			return -- keep menu open if some frame beneath mouse is a mouseover frame
 		end
 	end

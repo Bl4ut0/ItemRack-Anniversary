@@ -70,6 +70,8 @@ standard suite before its fix is considered complete:
 | CurseForge fr33lanc3 / ConaldPetersen / PR #25: queue diagnostic branch calls unqualified ResolveProxy causing nil error on Classic Era | `.tools/test_queue_runtime_lua.js` reproduces the nil global call in `ShouldHoldEquippedItem` under active `QueueDiagnostic` and verifies resolution via `ItemRack.ResolveProxy`; `.tools/check_regressions.js` guards against unqualified global calls. |
 | ItemRackOptions XML relative frame error: ItemRackOptItemStatsPriority cannot find relative frame ItemRackOptItemStatsDelay | `.tools/check_regressions.js` ensures `ItemRackOptItemStatsDelay` is instantiated without an errant `virtual="true"` attribute. |
 | Classic Era nil talent/item API calls: GetTalentTabInfo in GetSpecName, GetItemFamily in ValidBag, and IsEquippableItem in PopulateKnownItems | `.tools/check_regressions.js` verifies `C_Item` fallback shims and nil-safety guards in `ItemRack.lua`, `ItemRackEquip.lua`, and `ItemRackOptions.lua`. |
+| Forever / Camelot 1.60 report: MenuMouseover nil error (count 1413) due to missing `MouseIsOver` | `.tools/test_batch_and_dualspec_lua.js` tests `ItemRack.MenuMouseover` without `MouseIsOver` and with `GetMouseFoci`; `.tools/check_regressions.js` verifies the global shim and safe mouseover checks. |
+| Forever client: suppress breakout menu during Equipment Manager | `.tools/check_regressions.js` verifies `ItemRack.IsEquipmentManagerOpen` suppression logic and hooks. |
 
 The recent CurseForge report by leocard about SoD items being reported missing
 still needs client build, saved/live item and rune identities, and a diagnostic

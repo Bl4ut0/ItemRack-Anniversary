@@ -198,6 +198,27 @@ check(
   !technicalChanges.includes('Calling `Show()` on `GameTooltip` is safe and taint-free'),
   'Technical guidance must not claim insecure tooltip Show calls are safe.'
 );
+check(
+  core.includes('MouseIsOver = function(frame, ...)') &&
+    core.includes('_G.MouseIsOver = MouseIsOver'),
+  'ItemRack.lua must provide a global MouseIsOver compatibility shim for modern/Camelot clients.'
+);
+check(
+  core.includes('SafeMouseIsOver') &&
+    core.includes('GetMouseFoci and GetMouseFoci()[1]'),
+  'MenuMouseover must use SafeMouseIsOver and fall back to GetMouseFoci when GetMouseFocus is nil.'
+);
+check(
+  core.includes('ItemRack.IsEquipmentManagerOpen') &&
+    core.includes('PaperDollItemSlotButton_OnEnter'),
+  'ItemRack must detect when Equipment Manager is open and suppress breakout menu.'
+);
+check(
+  options.includes('ItemRackOpt.GetSpecName') &&
+    options.includes('GetTalentTabInfo'),
+  'ItemRackOptions must safely query talent/spec info without nil errors.'
+);
+
 
 const shouldHold = between(
   queue,
