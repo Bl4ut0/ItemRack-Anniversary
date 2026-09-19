@@ -46,33 +46,36 @@ end
 
 function ItemRackOpt.GetSpecName(group)
 	local maxPoints, maxName = 0, "None"
-	local activeGroup = GetActiveTalentGroup and GetActiveTalentGroup()
-	if not GetTalentTabInfo then
-		return group == 1 and "Primary Spec" or "Secondary Spec"
-	end
+	local activeGroup = (GetActiveTalentGroup and GetActiveTalentGroup()) or (C_SpecializationInfo and C_SpecializationInfo.GetActiveSpecGroup and C_SpecializationInfo.GetActiveSpecGroup()) or 1
 	
 	for i=1,3 do
-		-- Handle different API return styles between old and modern Classic clients
-		local arg1, arg2, arg3, arg4, arg5, arg6, arg7 = GetTalentTabInfo(i, false, false, group)
-		
 		local name, points
-		-- Modern/Shimmed API: (specId, name, description, icon, pointsSpent, ...)
-		if type(arg1) == "number" then
-			name = arg2
-			points = arg5
-		-- Old API: (name, icon, pointsSpent, ...)
-		else
-			name = arg1
-			points = arg3
-		end
-
-		-- Fallback: If still zero/none and we are querying active group, try without group index
-		if (not points or points == 0) and (activeGroup and group == activeGroup) then
-			local f1, f2, f3, f4, f5 = GetTalentTabInfo(i)
-			if type(f1) == "number" then
-				name, points = f2, f5 -- Note: if the shim applies to single-arg call too
-			else
-				name, points = f1, f3
+		if GetTalentTabInfo then
+			local ok, arg1, arg2, arg3, arg4, arg5 = pcall(GetTalentTabInfo, i, false, false, group)
+			if ok then
+				if type(arg1) == "number" then
+					name = arg2
+					points = arg5
+				else
+					name = arg1
+					points = arg3
+				end
+			end
+			if (not points or points == 0) and (activeGroup and group == activeGroup) then
+				local okFallback, f1, f2, f3, f4, f5 = pcall(GetTalentTabInfo, i)
+				if okFallback then
+					if type(f1) == "number" then
+						name, points = f2, f5
+					else
+						name, points = f1, f3
+					end
+				end
+			end
+		elseif C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo then
+			local ok, specId, specName, _, _, _, _, pointsSpent = pcall(C_SpecializationInfo.GetSpecializationInfo, i, false, false, nil, nil, group)
+			if ok then
+				name = specName
+				points = pointsSpent
 			end
 		end
 
@@ -82,7 +85,15 @@ function ItemRackOpt.GetSpecName(group)
 			maxName = name
 		end
 	end
-	if maxPoints == 0 then return group == 1 and "Primary Spec" or "Secondary Spec" end
+	if maxPoints == 0 then
+		if C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo then
+			local ok, _, specName = pcall(C_SpecializationInfo.GetSpecializationInfo, group or 1)
+			if ok and specName then
+				return specName
+			end
+		end
+		return group == 1 and "Primary Spec" or "Secondary Spec"
+	end
 	return maxName
 end
 

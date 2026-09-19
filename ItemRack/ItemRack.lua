@@ -119,6 +119,18 @@ end
 if not GetNumTalentGroups and C_SpecializationInfo and C_SpecializationInfo.GetNumSpecGroups then
 	GetNumTalentGroups = C_SpecializationInfo.GetNumSpecGroups
 end
+if not GetTalentTabInfo and C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo then
+	GetTalentTabInfo = function(specializationIndex, isInspect, isPet, groupIndex)
+		local specId, name, description, icon, role, primaryStat, pointsSpent, background, previewPointsSpent, isUnlocked = C_SpecializationInfo.GetSpecializationInfo(specializationIndex, isInspect, isPet, nil, nil, groupIndex)
+		return specId, name, description, icon, pointsSpent, background, previewPointsSpent, isUnlocked
+	end
+end
+if not GetNumTalentTabs and C_SpecializationInfo and C_SpecializationInfo.GetNumSpecializationsForClassID then
+	GetNumTalentTabs = function()
+		local _, _, classID = UnitClass("player")
+		return classID and C_SpecializationInfo.GetNumSpecializationsForClassID(classID) or 3
+	end
+end
 
 -- Compatibility shim for AuraUtil.FindAuraByName (may not exist in TBC 2.5.5)
 if not AuraUtil or not AuraUtil.FindAuraByName then
@@ -4493,6 +4505,41 @@ end
 
 function ItemRack.newPaperDollFrame_OnShow()
 	ItemRack.UpdateCombatQueue()
+	if not ItemRack.sidebarHooked then
+		ItemRack.sidebarHooked = true
+		if PaperDollFrame and PaperDollFrame.EquipmentManagerPane then
+			PaperDollFrame.EquipmentManagerPane:HookScript("OnShow", function()
+				if ItemRackMenuFrame:IsVisible() and ItemRack.menuDockedTo then
+					ItemRackMenuFrame:Hide()
+					ItemRack.menuDockedTo = nil
+				end
+			end)
+		end
+		if EquipmentFlyoutFrame then
+			EquipmentFlyoutFrame:HookScript("OnShow", function()
+				if ItemRackMenuFrame:IsVisible() and ItemRack.menuDockedTo then
+					ItemRackMenuFrame:Hide()
+					ItemRack.menuDockedTo = nil
+				end
+			end)
+		end
+		if GearManagerDialog then
+			GearManagerDialog:HookScript("OnShow", function()
+				if ItemRackMenuFrame:IsVisible() and ItemRack.menuDockedTo then
+					ItemRackMenuFrame:Hide()
+					ItemRack.menuDockedTo = nil
+				end
+			end)
+		end
+		if PaperDollFrame_SetSidebar then
+			hooksecurefunc("PaperDollFrame_SetSidebar", function(self, index)
+				if ItemRack.IsEquipmentManagerOpen() and ItemRackMenuFrame:IsVisible() then
+					ItemRackMenuFrame:Hide()
+					ItemRack.menuDockedTo = nil
+				end
+			end)
+		end
+	end
 end
 
 function ItemRack.newUseInventoryItem(slot)
@@ -5053,8 +5100,35 @@ end
 
 --[[ Character sheet menus ]]
 
+function ItemRack.IsEquipmentManagerOpen()
+	if PaperDollFrame and PaperDollFrame.EquipmentManagerPane and PaperDollFrame.EquipmentManagerPane:IsShown() then
+		return true
+	end
+	if GearManagerDialog and GearManagerDialog:IsShown() then
+		return true
+	end
+	if EquipmentFlyoutFrame and EquipmentFlyoutFrame:IsShown() then
+		return true
+	end
+	if PaperDollFrame and PaperDollFrame.currentSideBar and PaperDollFrame.EquipmentManagerPane and PaperDollFrame.currentSideBar == PaperDollFrame.EquipmentManagerPane then
+		return true
+	end
+	return false
+end
+
 ItemRack.oldPaperDollItemSlotButton_OnEnter = PaperDollItemSlotButton_OnEnter
 function PaperDollItemSlotButton_OnEnter(self)
+	if ItemRack.IsEquipmentManagerOpen() then
+		if ItemRackMenuFrame:IsVisible() and ItemRack.menuDockedTo then
+			ItemRackMenuFrame:Hide()
+			ItemRack.menuDockedTo = nil
+		end
+		if ItemRack.oldPaperDollItemSlotButton_OnEnter then
+			ItemRack.oldPaperDollItemSlotButton_OnEnter(self)
+		end
+		return
+	end
+
 	local name = self:GetName()
 	local isMenuOpening = ItemRack.menuDockedTo~=name and (ItemRackSettings.MenuOnShift=="OFF" or IsShiftKeyDown()) and ItemRackSettings.CharacterSheetMenus=="ON"
 	
