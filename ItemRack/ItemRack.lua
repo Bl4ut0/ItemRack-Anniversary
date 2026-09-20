@@ -180,6 +180,34 @@ end
 local GetItemFamily = _G.GetItemFamily
 local IsEquippableItem = _G.IsEquippableItem or (C_Item and C_Item.IsEquippableItem)
 
+if not IsEquippableItem then
+	IsEquippableItem = function(item)
+		if not item or item == 0 or item == "0" then return false end
+		if C_Item and C_Item.IsEquippableItem then
+			local num = tonumber(item)
+			local ok, isEquippable = pcall(C_Item.IsEquippableItem, num or item)
+			if ok then return isEquippable and true or false end
+		end
+		return false
+	end
+	_G.IsEquippableItem = IsEquippableItem
+end
+local IsEquippableItem = _G.IsEquippableItem
+
+if not IsEquippedItem then
+	IsEquippedItem = function(item)
+		if not item or item == 0 or item == "0" then return false end
+		if C_Item and C_Item.IsEquippedItem then
+			local num = tonumber(item)
+			local ok, isEquipped = pcall(C_Item.IsEquippedItem, num or item)
+			if ok then return isEquipped and true or false end
+		end
+		return false
+	end
+	_G.IsEquippedItem = IsEquippedItem
+end
+local IsEquippedItem = _G.IsEquippedItem
+
 function ItemRack.IsClassic()
 	-- Classic Era: TOC version 10000-19999 or project ID
 	if wowtoc >= 10000 and wowtoc < 20000 then
@@ -3305,7 +3333,16 @@ function ItemRack.PopulateKnownItems()
 		for j=1,GetContainerNumSlots(i) do
 			id = getid(i,j) --grab ItemRack-style ID for every bag item
 			if id~=0 then
-				if not IsEquippableItem or IsEquippableItem(ItemRack.GetIRString(id,true)) then --only proceed if this is an equippable item (test against the baseID of the item)
+				local baseID = ItemRack.GetIRString(id,true)
+				local isEquip = false
+				if IsEquippableItem then
+					local ok, res = pcall(IsEquippableItem, tonumber(baseID) or baseID)
+					if ok and res then isEquip = true end
+				elseif C_Item and C_Item.IsEquippableItem then
+					local ok, res = pcall(C_Item.IsEquippableItem, tonumber(baseID) or baseID)
+					if ok and res then isEquip = true end
+				end
+				if isEquip then
 					known[id] = i*100+j --we were able to generate a valid ID for this item, so store its location (as a bag container offset)
 				end
 			end
@@ -3316,8 +3353,19 @@ function ItemRack.PopulateKnownItems()
 			if ItemRack.ValidBag(i) then
 				for j=1,GetContainerNumSlots(i) do
 					id = getid(i,j)
-					if id~=0 and (not IsEquippableItem or IsEquippableItem(ItemRack.GetIRString(id,true))) then
-						known[id] = i*100+j
+					if id~=0 then
+						local baseID = ItemRack.GetIRString(id,true)
+						local isEquip = false
+						if IsEquippableItem then
+							local ok, res = pcall(IsEquippableItem, tonumber(baseID) or baseID)
+							if ok and res then isEquip = true end
+						elseif C_Item and C_Item.IsEquippableItem then
+							local ok, res = pcall(C_Item.IsEquippableItem, tonumber(baseID) or baseID)
+							if ok and res then isEquip = true end
+						end
+						if isEquip then
+							known[id] = i*100+j
+						end
 					end
 				end
 			end

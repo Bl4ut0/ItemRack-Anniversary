@@ -578,6 +578,62 @@ assert(res3 == nil, "ItemRack.ValidBag(3) with quiver must return nil")
 `
 );
 
+// Modern / Forever client PopulateKnownItems safety: IsEquippableItem moved to C_Item.IsEquippableItem
+const populateKnownFunc = extractFunction('ItemRack/ItemRack.lua', 'ItemRack.PopulateKnownItems');
+
+runCase(
+  'populate-known-items-modern-client',
+  `${commonSetup}
+IsEquippableItem = nil
+C_Item = {
+  IsEquippableItem = function(id)
+    if id == 6948 or id == "6948" then return false end -- Hearthstone not equippable
+    if id == 19001 or id == "19001" then return true end -- Ring
+    return false
+  end
+}
+if not IsEquippableItem then
+  IsEquippableItem = function(item)
+    if not item or item == 0 or item == "0" then return false end
+    if C_Item and C_Item.IsEquippableItem then
+      local num = tonumber(item)
+      local ok, isEquippable = pcall(C_Item.IsEquippableItem, num or item)
+      if ok then return isEquippable and true or false end
+    end
+    return false
+  end
+  _G.IsEquippableItem = IsEquippableItem
+end
+
+ItemRack.KnownItems = {}
+ItemRack.BankOpen = false
+ItemRack.GetID = function(bag, slot)
+  if slot then
+    if bag == 0 and slot == 1 then return "6948::::::::11:1485::75:::::::" end
+    if bag == 0 and slot == 2 then return "19001::::::::11:1485::75:::::::" end
+    return 0
+  end
+  return 0
+end
+ItemRack.GetIRString = function(link, base)
+  if not link then return "0" end
+  local id = tostring(link):match("^(%-?%d+)")
+  return id or "0"
+end
+function GetContainerNumSlots(bag) return bag == 0 and 2 or 0 end
+
+${populateKnownFunc}
+`,
+  `
+local ok, err = pcall(ItemRack.PopulateKnownItems)
+assert(ok, "ItemRack.PopulateKnownItems must not throw when IsEquippableItem is nil: " .. tostring(err))
+
+-- Verify ring was added to known items and hearthstone was skipped
+assert(ItemRack.KnownItems["6948::::::::11:1485::75:::::::"] == nil, "Non-equippable Hearthstone must not be in KnownItems")
+assert(ItemRack.KnownItems["19001::::::::11:1485::75:::::::"] == 2, "Equippable ring in bag 0 slot 2 must be recorded at offset 2")
+`
+);
+
 // GitHub #24 follow-up audit: preflight reservations must survive execution,
 // not just exact-first lookup. Ring identities are synthetic, not a new claim
 // that the original bracer report or the untriaged SoD report used this shape.

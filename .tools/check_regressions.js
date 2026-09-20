@@ -244,6 +244,17 @@ check(
     core.includes('pcall(GetItemFamily'),
   'ValidBag must use safe GetItemFamily and GetContainerNumFreeSlots checks.'
 );
+check(
+  core.includes('IsEquippableItem = function(item)') &&
+    core.includes('_G.IsEquippableItem = IsEquippableItem'),
+  'ItemRack.lua must provide a global IsEquippableItem compatibility shim for modern/Camelot clients.'
+);
+check(
+  core.includes('function ItemRack.PopulateKnownItems()') &&
+    core.includes('pcall(IsEquippableItem'),
+  'PopulateKnownItems must use safe IsEquippableItem calls with pcall and fallback.'
+);
+
 
 
 check(
