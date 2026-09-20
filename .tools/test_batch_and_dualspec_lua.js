@@ -520,6 +520,64 @@ assert(hidden == true, "ItemRack.MenuMouseover must hide menu when mouse is outs
 `
 );
 
+// Modern / Forever client ValidBag safety: GetItemFamily moved to C_Item.GetItemFamily
+const validBagFunc = extractFunction('ItemRack/ItemRack.lua', 'ItemRack.ValidBag');
+
+runCase(
+  'valid-bag-modern-client',
+  `${commonSetup}
+GetItemFamily = nil
+C_Item = {
+  GetItemFamily = function(id)
+    if id == 2102 or id == "2102" then return 0 end
+    if id == 2101 or id == "2101" then return 1 end -- quiver
+    return 0
+  end
+}
+if not GetItemFamily then
+  GetItemFamily = function(item)
+    if not item then return 0 end
+    if C_Item and C_Item.GetItemFamily then
+      local num = tonumber(item)
+      local ok, family = pcall(C_Item.GetItemFamily, num or item)
+      if ok and type(family) == "number" then return family end
+    end
+    return 0
+  end
+  _G.GetItemFamily = GetItemFamily
+end
+
+ContainerIDToInventoryID = function(bagid) return 30 + bagid end
+GetInventoryItemLink = function(unit, invid)
+  if invid == 34 then return "|cffffffff|Hitem:2102:0:0:0:0:0:0:0:70|h[Small Brown Pouch]|h|r" end
+  if invid == 33 then return "|cffffffff|Hitem:2101:0:0:0:0:0:0:0:70|h[Quiver]|h|r" end
+  return nil
+end
+ItemRack.GetIRString = function(link, base)
+  if not link then return "0" end
+  local id = link:match("item:(%d+)")
+  return id or "0"
+end
+
+${validBagFunc}
+`,
+  `
+-- Bag 0 and -1 are always valid
+assert(ItemRack.ValidBag(0) == 1, "Bag 0 must be valid")
+assert(ItemRack.ValidBag(-1) == 1, "Bag -1 must be valid")
+
+-- Bag 4 (Small Brown Pouch, family 0) must be valid WITHOUT throwing nil error
+local ok, res = pcall(ItemRack.ValidBag, 4)
+assert(ok, "ItemRack.ValidBag(4) must not throw: " .. tostring(res))
+assert(res == 1, "ItemRack.ValidBag(4) with pouch must return 1")
+
+-- Bag 3 (Quiver, family 1) must return nil
+local ok3, res3 = pcall(ItemRack.ValidBag, 3)
+assert(ok3, "ItemRack.ValidBag(3) must not throw")
+assert(res3 == nil, "ItemRack.ValidBag(3) with quiver must return nil")
+`
+);
+
 // GitHub #24 follow-up audit: preflight reservations must survive execution,
 // not just exact-first lookup. Ring identities are synthetic, not a new claim
 // that the original bracer report or the untriaged SoD report used this shape.

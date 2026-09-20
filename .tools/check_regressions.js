@@ -233,6 +233,18 @@ check(
   queue.includes('local ResolveProxy = ItemRack.ResolveProxy'),
   'ItemRackQueue must define a local ResolveProxy alias.'
 );
+check(
+  core.includes('GetItemFamily = function(item)') &&
+    core.includes('_G.GetItemFamily = GetItemFamily'),
+  'ItemRack.lua must provide a global GetItemFamily compatibility shim for modern/Camelot clients.'
+);
+check(
+  core.includes('function ItemRack.ValidBag(bagid)') &&
+    core.includes('GetContainerNumFreeSlots') &&
+    core.includes('pcall(GetItemFamily'),
+  'ValidBag must use safe GetItemFamily and GetContainerNumFreeSlots checks.'
+);
+
 
 check(
   !optionsXml.includes('ItemRackOptItemStatsDelay" numeric="true" historyLines="0" enableMouse="true" autoFocus="false" letters="3" virtual="true"') &&

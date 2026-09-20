@@ -163,7 +163,21 @@ end
 -- Compatibility shims for Item APIs (may not have globals if deprecation fallbacks disabled)
 local GetItemInfo = _G.GetItemInfo or (C_Item and C_Item.GetItemInfo)
 local GetItemCount = _G.GetItemCount or (C_Item and C_Item.GetItemCount)
-local GetItemFamily = _G.GetItemFamily or (C_Item and C_Item.GetItemFamily)
+if not GetItemFamily then
+	GetItemFamily = function(item)
+		if not item then return 0 end
+		if C_Item and C_Item.GetItemFamily then
+			local num = tonumber(item)
+			local ok, family = pcall(C_Item.GetItemFamily, num or item)
+			if ok and type(family) == "number" then
+				return family
+			end
+		end
+		return 0
+	end
+	_G.GetItemFamily = GetItemFamily
+end
+local GetItemFamily = _G.GetItemFamily
 local IsEquippableItem = _G.IsEquippableItem or (C_Item and C_Item.IsEquippableItem)
 
 function ItemRack.IsClassic()
@@ -307,9 +321,10 @@ do
 	end
 end
 
-local GetContainerNumSlots, GetContainerItemLink, GetContainerItemID, GetContainerItemCooldown, GetContainerItemInfo, GetItemCooldown, PickupContainerItem, ContainerIDToInventoryID
+local GetContainerNumSlots, GetContainerNumFreeSlots, GetContainerItemLink, GetContainerItemID, GetContainerItemCooldown, GetContainerItemInfo, GetItemCooldown, PickupContainerItem, ContainerIDToInventoryID
 if C_Container then
 	GetContainerNumSlots = C_Container.GetContainerNumSlots
+	GetContainerNumFreeSlots = C_Container.GetContainerNumFreeSlots
 	GetContainerItemLink = C_Container.GetContainerItemLink
 	GetContainerItemID = C_Container.GetContainerItemID
 	GetContainerItemCooldown = C_Container.GetContainerItemCooldown
@@ -325,8 +340,8 @@ if C_Container then
 		end
 	end
 else
-	GetContainerNumSlots, GetContainerItemLink, GetContainerItemID, GetContainerItemCooldown, GetContainerItemInfo, GetItemCooldown, PickupContainerItem, ContainerIDToInventoryID =
-	_G.GetContainerNumSlots, _G.GetContainerItemLink, _G.GetContainerItemID, _G.GetContainerItemCooldown, _G.GetContainerItemInfo, _G.GetItemCooldown, _G.PickupContainerItem, _G.ContainerIDToInventoryID
+	GetContainerNumSlots, GetContainerNumFreeSlots, GetContainerItemLink, GetContainerItemID, GetContainerItemCooldown, GetContainerItemInfo, GetItemCooldown, PickupContainerItem, ContainerIDToInventoryID =
+	_G.GetContainerNumSlots, _G.GetContainerNumFreeSlots, _G.GetContainerItemLink, _G.GetContainerItemID, _G.GetContainerItemCooldown, _G.GetContainerItemInfo, _G.GetItemCooldown, _G.PickupContainerItem, _G.ContainerIDToInventoryID
 end
 
 local LDB = LibStub("LibDataBroker-1.1")
@@ -3107,22 +3122,46 @@ end
 
 -- returns true if the bagid (0-4) is a normal "Container", as opposed to quivers and ammo pouches
 function ItemRack.ValidBag(bagid)
-	local baseID,bagtype
 	if bagid==0 or bagid==-1 then
 		return 1
-	else
-		local invID = ContainerIDToInventoryID(bagid)
-		baseID = ItemRack.GetIRString(GetInventoryItemLink("player",invID),true,true) --get the baseID for the container
-		if not GetItemFamily or GetItemFamily(baseID)==0 then
-			return 1
-		end
---		if baseID then
---			_,_,_,_,_,_,bagtype = GetItemInfo(baseID)
---			if bagtype=="Bag" or bagtype=="Conteneur" or bagtype=="Beh\195\164lter" then
---				return 1
---			end
---		end
 	end
+
+	-- Direct container free slots check if available (returns freeSlots, bagFamily)
+	if GetContainerNumFreeSlots then
+		local ok, _, bagFamily = pcall(GetContainerNumFreeSlots, bagid)
+		if ok and type(bagFamily) == "number" then
+			return bagFamily == 0 and 1 or nil
+		end
+	end
+
+	local invID = ContainerIDToInventoryID and ContainerIDToInventoryID(bagid)
+	local link = invID and GetInventoryItemLink("player",invID)
+	if not link then
+		local numSlots = GetContainerNumSlots and GetContainerNumSlots(bagid)
+		return (numSlots and numSlots > 0) and 1 or nil
+	end
+
+	local baseID = ItemRack.GetIRString(link,true,true) --get the baseID for the container
+	local family = nil
+	if baseID and baseID ~= 0 and baseID ~= "0" then
+		if GetItemFamily then
+			local ok, fam = pcall(GetItemFamily, tonumber(baseID) or baseID)
+			if ok and type(fam) == "number" then
+				family = fam
+			end
+		elseif C_Item and C_Item.GetItemFamily then
+			local ok, fam = pcall(C_Item.GetItemFamily, tonumber(baseID) or baseID)
+			if ok and type(fam) == "number" then
+				family = fam
+			end
+		end
+	end
+
+	if family ~= nil then
+		return family == 0 and 1 or nil
+	end
+
+	return 1
 end
 
 function ItemRack.ClearLockList() -- this function is called very frequently, such as every time you click a set popup button to change the current set, AS WELL as when the actual set change takes place, and will call PopulateKnownItems in order to re-build the cache of current item locations and their itemstrings

@@ -72,6 +72,7 @@ standard suite before its fix is considered complete:
 | Classic Era nil talent/item API calls: GetTalentTabInfo in GetSpecName, GetItemFamily in ValidBag, and IsEquippableItem in PopulateKnownItems | `.tools/check_regressions.js` verifies `C_Item` fallback shims and nil-safety guards in `ItemRack.lua`, `ItemRackEquip.lua`, and `ItemRackOptions.lua`. |
 | Forever / Camelot 1.60 report: MenuMouseover nil error (count 1413) due to missing `MouseIsOver` | `.tools/test_batch_and_dualspec_lua.js` tests `ItemRack.MenuMouseover` without `MouseIsOver` and with `GetMouseFoci`; `.tools/check_regressions.js` verifies the global shim and safe mouseover checks. |
 | Forever client: suppress breakout menu during Equipment Manager | `.tools/check_regressions.js` verifies `ItemRack.IsEquipmentManagerOpen` suppression logic and hooks. |
+| Forever / Camelot 1.60 report: `ItemRack.ValidBag` nil error due to missing `GetItemFamily` | `.tools/test_batch_and_dualspec_lua.js` tests `ItemRack.ValidBag` with `C_Item.GetItemFamily`; `.tools/check_regressions.js` verifies the global shim and safe `GetContainerNumFreeSlots`/family checks. |
 
 The recent CurseForge report by leocard about SoD items being reported missing
 still needs client build, saved/live item and rune identities, and a diagnostic
