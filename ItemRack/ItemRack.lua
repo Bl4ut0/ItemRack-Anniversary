@@ -208,6 +208,21 @@ if not IsEquippedItem then
 end
 local IsEquippedItem = _G.IsEquippedItem
 
+function ItemRack.IsPlayerMoving()
+	local ok, moving = pcall(function()
+		local speed = GetUnitSpeed and GetUnitSpeed("player")
+		if speed ~= nil then
+			return speed > 0
+		end
+		return nil
+	end)
+	if ok and moving ~= nil then
+		ItemRack.PlayerIsMoving = moving
+		return moving
+	end
+	return ItemRack.PlayerIsMoving or false
+end
+
 function ItemRack.IsClassic()
 	-- Classic Era: TOC version 10000-19999 or project ID
 	if wowtoc >= 10000 and wowtoc < 20000 then
@@ -4199,8 +4214,8 @@ function ItemRack.EquipItemByID(id,slot,isAutoQueue,sourceBag,sourceSlot,origin)
 end
 
 function ItemRack.PollMovement()
-	-- If speed is 0, they have landed and lost momentum. Re-evaluate Buffs and stop timer.
-	if GetUnitSpeed("player") == 0 then
+	-- If player is not moving, they have landed and lost momentum. Re-evaluate Buffs and stop timer.
+	if not ItemRack.IsPlayerMoving() then
 		ItemRack.ProcessBuffEvent()
 		ItemRack.StopTimer("MovementPollingTimer")
 	end

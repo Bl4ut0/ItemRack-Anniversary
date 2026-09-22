@@ -254,6 +254,18 @@ check(
     core.includes('pcall(IsEquippableItem'),
   'PopulateKnownItems must use safe IsEquippableItem calls with pcall and fallback.'
 );
+check(
+  core.includes('function ItemRack.IsPlayerMoving()') &&
+    events.includes('ItemRack.IsPlayerMoving'),
+  'ItemRack and ItemRackEvents must define ItemRack.IsPlayerMoving() to guard against secret value taint errors.'
+);
+check(
+  !events.includes('GetUnitSpeed("player") > 0') &&
+    !events.includes('local speed = GetUnitSpeed("player")') &&
+    !core.includes('GetUnitSpeed("player") == 0'),
+  'Movement evaluation must not perform direct comparison on GetUnitSpeed("player") without secret value guards.'
+);
+
 
 
 

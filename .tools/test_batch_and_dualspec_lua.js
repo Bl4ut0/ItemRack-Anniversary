@@ -634,6 +634,51 @@ assert(ItemRack.KnownItems["19001::::::::11:1485::75:::::::"] == 2, "Equippable 
 `
 );
 
+// Modern / Forever client movement safety: GetUnitSpeed returns a secret number value
+// Comparing a secret number value throws "attempt to compare local 'speed' (a secret number value...)"
+const isPlayerMovingFunc = extractFunction('ItemRack/ItemRack.lua', 'ItemRack.IsPlayerMoving');
+
+runCase(
+  'is-player-moving-secret-value',
+  `${commonSetup}
+-- Create a simulated "secret number" userdata or metatable object that throws when compared
+local secretNumber = setmetatable({}, {
+  __lt = function(a, b) error("attempt to compare local 'speed' (a secret number value, while execution tainted by 'ItemRack')", 2) end,
+  __le = function(a, b) error("attempt to compare local 'speed' (a secret number value, while execution tainted by 'ItemRack')", 2) end,
+  __eq = function(a, b) error("attempt to compare local 'speed' (a secret number value, while execution tainted by 'ItemRack')", 2) end,
+})
+
+GetUnitSpeed = function(unit)
+  return secretNumber
+end
+
+ItemRack.PlayerIsMoving = false
+
+${isPlayerMovingFunc}
+`,
+  `
+-- Case 1: When speed is a secret number and PlayerIsMoving is false -> returns false without error
+local ok, moving = pcall(ItemRack.IsPlayerMoving)
+assert(ok, "ItemRack.IsPlayerMoving must not throw on secret number value: " .. tostring(moving))
+assert(moving == false, "ItemRack.IsPlayerMoving must fall back to PlayerIsMoving (false)")
+
+-- Case 2: When PLAYER_STARTED_MOVING fired -> PlayerIsMoving is true -> returns true without error
+ItemRack.PlayerIsMoving = true
+local ok2, moving2 = pcall(ItemRack.IsPlayerMoving)
+assert(ok2, "ItemRack.IsPlayerMoving must not throw on secret number value")
+assert(moving2 == true, "ItemRack.IsPlayerMoving must return PlayerIsMoving (true)")
+
+-- Case 3: Normal client where speed is a standard number
+GetUnitSpeed = function(unit) return 7.5 end
+local ok3, moving3 = pcall(ItemRack.IsPlayerMoving)
+assert(ok3 and moving3 == true, "ItemRack.IsPlayerMoving must return true when speed > 0")
+
+GetUnitSpeed = function(unit) return 0 end
+local ok4, moving4 = pcall(ItemRack.IsPlayerMoving)
+assert(ok4 and moving4 == false, "ItemRack.IsPlayerMoving must return false when speed == 0")
+`
+);
+
 // GitHub #24 follow-up audit: preflight reservations must survive execution,
 // not just exact-first lookup. Ring identities are synthetic, not a new claim
 // that the original bracer report or the untriaged SoD report used this shape.

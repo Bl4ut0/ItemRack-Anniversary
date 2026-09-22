@@ -74,6 +74,8 @@ standard suite before its fix is considered complete:
 | Forever client: suppress breakout menu during Equipment Manager | `.tools/check_regressions.js` verifies `ItemRack.IsEquipmentManagerOpen` suppression logic and hooks. |
 | Forever / Camelot 1.60 report: `ItemRack.ValidBag` nil error due to missing `GetItemFamily` | `.tools/test_batch_and_dualspec_lua.js` tests `ItemRack.ValidBag` with `C_Item.GetItemFamily`; `.tools/check_regressions.js` verifies the global shim and safe `GetContainerNumFreeSlots`/family checks. |
 | Forever / Camelot 1.60 report: `PopulateKnownItems` nil error due to missing `IsEquippableItem` | `.tools/test_batch_and_dualspec_lua.js` tests `ItemRack.PopulateKnownItems` with `C_Item.IsEquippableItem`; `.tools/check_regressions.js` verifies the global shim and safe `IsEquippableItem` checks. |
+| Forever / Camelot 1.60 report: `ProcessBuffEvent` secret number comparison error on `GetUnitSpeed` | `.tools/test_batch_and_dualspec_lua.js` tests `ItemRack.IsPlayerMoving` with simulated secret number objects; `.tools/check_regressions.js` verifies `ItemRack.IsPlayerMoving` guards and absence of unguarded `GetUnitSpeed` comparisons. |
+
 
 
 The recent CurseForge report by leocard about SoD items being reported missing
