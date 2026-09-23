@@ -16,6 +16,9 @@ ItemRackOpt = {
 function ItemRackOpt.GetSpecName(group)
 	local maxPoints, maxName = 0, "None"
 	local activeGroup = GetActiveTalentGroup and GetActiveTalentGroup()
+	if not GetTalentTabInfo then
+		return group == 1 and "Primary Spec" or "Secondary Spec"
+	end
 	
 	for i=1,3 do
 		-- Handle different API return styles between old and modern Classic clients

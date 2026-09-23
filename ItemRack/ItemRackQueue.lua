@@ -489,6 +489,7 @@ function ItemRack.ResolveProxy(itemID)
 	local numericID = tonumber(ItemRack.GetIRString and ItemRack.GetIRString(itemID,true) or itemID)
 	return numericID and ItemRack.CooldownProxies and ItemRack.CooldownProxies[numericID]
 end
+local ResolveProxy = ItemRack.ResolveProxy
 
 -- Raw cooldown of the gating item, for display. Returns nil when itemID has no
 -- proxy, so callers fall through to the item's own (absent) cooldown.
@@ -593,7 +594,7 @@ function ItemRack.ShouldHoldEquippedItem(slot, exactID, baseID, customReadyTime)
 	if ItemRack.QueueDiagnostic then
 		-- Report the gating item when one stands in, so a dump explains a
 		-- remaining time that belongs to no cooldown on the equipped item.
-		local proxy = ResolveProxy(exactID or baseID)
+		local proxy = ItemRack.ResolveProxy(exactID or baseID)
 		ItemRack.QueueDiagnostic("hold_decision", { hold = hold, proxy = proxy and proxy.id or nil, remaining = string.format("%.2f", timeLeft), slot = slot, threshold = threshold })
 	end
 	return hold

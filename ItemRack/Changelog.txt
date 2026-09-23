@@ -1,4 +1,7 @@
 __ Development __
+- Fixed queue diagnostic branch attempting to call global ResolveProxy (nil) instead of ItemRack.ResolveProxy, resolving Lua errors during queue and trinket evaluation on Classic Era (PR #25).
+- Fixed ItemRackOptItemStatsPriority failing to anchor to ItemRackOptItemStatsDelay in ItemRackOptions.xml due to an errant virtual="true" attribute.
+- Added C_Item shims and nil guards for GetItemFamily, IsEquippableItem, GetItemInfo, and GetTalentTabInfo to ensure robust operation on modern and classic client variants.
 
 __ New in 4.48 - By Bl4ut0 __
 - Fixed Ghost Wolf events on clients reporting stance 1 but zero shapeshift-bar forms. Named forms now support legacy names and modern spell IDs, with language-independent matching for packaged Druid forms. Added permanent Ghost Wolf, named-form, and shared Mounted restoration regressions.

@@ -8,6 +8,8 @@ const equip = read('ItemRack/ItemRackEquip.lua');
 const events = read('ItemRack/ItemRackEvents.lua');
 const buttons = read('ItemRack/ItemRackButtons.lua');
 const options = read('ItemRackOptions/ItemRackOptions.lua');
+const queue = read('ItemRack/ItemRackQueue.lua');
+const optionsXml = read('ItemRackOptions/ItemRackOptions.xml');
 const buildScript = read('.tools/build_release_dev.ps1');
 const installScript = read('.tools/install_local.ps1');
 const releaseWorkflow = read('.agent/workflows/release.md');
@@ -195,6 +197,45 @@ check(
 check(
   !technicalChanges.includes('Calling `Show()` on `GameTooltip` is safe and taint-free'),
   'Technical guidance must not claim insecure tooltip Show calls are safe.'
+);
+
+const shouldHold = between(
+  queue,
+  'function ItemRack.ShouldHoldEquippedItem',
+  'function ItemRack.ProcessAutoQueue'
+);
+check(
+  shouldHold.includes('ItemRack.ResolveProxy(exactID or baseID)'),
+  'ShouldHoldEquippedItem must call ItemRack.ResolveProxy rather than an unqualified global.'
+);
+check(
+  queue.includes('local ResolveProxy = ItemRack.ResolveProxy'),
+  'ItemRackQueue must define a local ResolveProxy alias.'
+);
+
+check(
+  !optionsXml.includes('ItemRackOptItemStatsDelay" numeric="true" historyLines="0" enableMouse="true" autoFocus="false" letters="3" virtual="true"') &&
+    optionsXml.includes('ItemRackOptItemStatsDelay" numeric="true" historyLines="0" enableMouse="true" autoFocus="false" letters="3"'),
+  'ItemRackOptItemStatsDelay must be an instantiated concrete EditBox, not a virtual template.'
+);
+
+check(
+  core.includes('local GetItemFamily = _G.GetItemFamily or (C_Item and C_Item.GetItemFamily)') &&
+    core.includes('local IsEquippableItem = _G.IsEquippableItem or (C_Item and C_Item.IsEquippableItem)') &&
+    core.includes('if not GetItemFamily or GetItemFamily(baseID)==0 then') &&
+    core.includes('not IsEquippableItem or IsEquippableItem(ItemRack.GetIRString(id,true))'),
+  'ItemRack core must provide C_Item fallbacks and nil guards for GetItemFamily and IsEquippableItem.'
+);
+
+check(
+  equip.includes('local GetItemInfo = _G.GetItemInfo or (C_Item and C_Item.GetItemInfo)'),
+  'ItemRackEquip must provide a C_Item fallback for GetItemInfo.'
+);
+
+check(
+  options.includes('if not GetTalentTabInfo then') &&
+    options.includes('return group == 1 and "Primary Spec" or "Secondary Spec"'),
+  'ItemRackOpt.GetSpecName must guard against nil GetTalentTabInfo.'
 );
 
 const betaMarkdown = `# Changelog\n\n## [Development]\n\n### Bug Fixes & Improvements\n- Beta change\n\n## [4.0] - 2025-01-01\n- Old\n`;
