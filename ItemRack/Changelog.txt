@@ -1,4 +1,6 @@
 __ Development __
+
+__ New in 4.49 - By Bl4ut0 __
 - Fixed queue diagnostic branch attempting to call global ResolveProxy (nil) instead of ItemRack.ResolveProxy, resolving Lua errors during queue and trinket evaluation on Classic Era (PR #25).
 - Fixed ItemRackOptItemStatsPriority failing to anchor to ItemRackOptItemStatsDelay in ItemRackOptions.xml due to an errant virtual="true" attribute.
 - Added C_Item shims and nil guards for GetItemFamily, IsEquippableItem, GetItemInfo, and GetTalentTabInfo to ensure robust operation on modern and classic client variants.

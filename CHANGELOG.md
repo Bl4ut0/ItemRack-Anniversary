@@ -3,11 +3,13 @@
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
 ## [Development]
+
+
+## [4.49] - 2026-09-23
 ### Bug Fixes & Improvements
 - **Queue Event Diagnostic Crash (CurseForge: fr33lanc3 / ConaldPetersen / PR #25)**: Fixed a nil global call to `ResolveProxy` in `ItemRackQueue.lua` within `ShouldHoldEquippedItem`. Calls now properly invoke `ItemRack.ResolveProxy`, and a defensive local alias is established.
 - **Options Delay XML Frame Anchoring**: Removed an errant `virtual="true"` attribute on `ItemRackOptItemStatsDelay` in `ItemRackOptions.xml`, enabling the EditBox to instantiate correctly and resolving the anchor failure for `ItemRackOptItemStatsPriority`.
 - **Classic Client API Shims & Nil Safety**: Added `C_Item` fallback shims and nil-safety guards for `GetItemFamily`, `IsEquippableItem`, and `GetItemInfo` across `ItemRack.lua` and `ItemRackEquip.lua`, and nil-guarded `GetTalentTabInfo` in `ItemRackOptions.lua` for clients without talent tab access.
-
 
 ## [4.48] - 2026-09-17
 ### Bug Fixes & Improvements
