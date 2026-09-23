@@ -7,6 +7,8 @@ const findQueueEntry = extractFunction(queueFile, 'ItemRack.FindQueueEntryIndex'
 const isManual = extractFunction(queueFile, 'ItemRack.IsManualQueueChoice');
 const setManual = extractFunction(queueFile, 'ItemRack.SetManualQueueChoice');
 const autoQueue = extractFunction(queueFile, 'ItemRack.AutoQueueItemToEquip');
+const resolveProxy = extractFunction(queueFile, 'ItemRack.ResolveProxy');
+const shouldHold = extractFunction(queueFile, 'ItemRack.ShouldHoldEquippedItem');
 const isSetEquipped = extractFunction(equipFile, 'ItemRack.IsSetEquipped');
 
 runLua(String.raw`
@@ -39,6 +41,9 @@ ItemRack = {
   GetIRString=function(value) return tostring(value) end,
   GetProxyBuff=function() return nil end,
   ShouldHoldEquippedItem=function() return false end,
+  IsRecentEquip=function() return false end,
+  GetDefaultSwapIn=function() return 30 end,
+  GetItemCooldownLeft=function() return 0 end,
   ItemNearReady=function() return false end,
   IsCandidateReady=function() return false end,
   FindItemInBags=function() return nil end,
@@ -54,6 +59,8 @@ ${findQueueEntry}
 ${isManual}
 ${setManual}
 ${autoQueue}
+${resolveProxy}
+${shouldHold}
 ${isSetEquipped}
 
 local checks = 0
@@ -98,6 +105,28 @@ ItemRack.GetObservedItemCooldown=function() return { start=95, duration=60 } end
 candidate = ItemRack.AutoQueueItemToEquip(13,"999",1,false,"Cooldown",cooldownContext)
 check(candidate == nil,
   "false-zero raw slot sample must not bypass delay from shared authority")
+
+-- PR #25 / CurseForge fr33lanc3 / ConaldPetersen:
+-- Verify ShouldHoldEquippedItem executes cleanly with QueueDiagnostic active
+-- and correctly calls ItemRack.ResolveProxy without global ResolveProxy errors.
+local diagnosticEvents = {}
+ItemRack.QueueDiagnostic = function(event, data)
+  table.insert(diagnosticEvents, { event = event, data = data })
+end
+ItemRack.IsRecentEquip = function() return false end
+ItemRack.GetDefaultSwapIn = function() return 30 end
+ItemRack.GetItemCooldownLeft = function() return 5 end
+ItemRack.CooldownProxies = { [100] = { id = 9999 } }
+
+local held = ItemRack.ShouldHoldEquippedItem(13, "100", "100")
+check(held == true, "equipped item within threshold must be held")
+check(#diagnosticEvents == 1, "QueueDiagnostic must record hold decision")
+check(diagnosticEvents[1].data.proxy == 9999, "QueueDiagnostic must resolve proxy via ItemRack.ResolveProxy")
+
+diagnosticEvents = {}
+local heldNonProxy = ItemRack.ShouldHoldEquippedItem(13, "200", "200")
+check(heldNonProxy == true, "non-proxy item within threshold must be held")
+check(diagnosticEvents[1].data.proxy == nil, "non-proxy item must report nil proxy in QueueDiagnostic")
 
 print(string.format("[QUEUE RUNTIME LUA] %d purity and provenance checks passed.",checks))
 `, 'queue-runtime');

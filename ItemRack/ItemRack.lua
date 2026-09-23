@@ -141,6 +141,8 @@ end
 -- Compatibility shims for Item APIs (may not have globals if deprecation fallbacks disabled)
 local GetItemInfo = _G.GetItemInfo or (C_Item and C_Item.GetItemInfo)
 local GetItemCount = _G.GetItemCount or (C_Item and C_Item.GetItemCount)
+local GetItemFamily = _G.GetItemFamily or (C_Item and C_Item.GetItemFamily)
+local IsEquippableItem = _G.IsEquippableItem or (C_Item and C_Item.IsEquippableItem)
 
 function ItemRack.IsClassic()
 	-- Classic Era: TOC version 10000-19999 or project ID
@@ -3089,7 +3091,7 @@ function ItemRack.ValidBag(bagid)
 	else
 		local invID = ContainerIDToInventoryID(bagid)
 		baseID = ItemRack.GetIRString(GetInventoryItemLink("player",invID),true,true) --get the baseID for the container
-		if GetItemFamily(baseID)==0 then
+		if not GetItemFamily or GetItemFamily(baseID)==0 then
 			return 1
 		end
 --		if baseID then
@@ -3242,7 +3244,7 @@ function ItemRack.PopulateKnownItems()
 		for j=1,GetContainerNumSlots(i) do
 			id = getid(i,j) --grab ItemRack-style ID for every bag item
 			if id~=0 then
-				if IsEquippableItem(ItemRack.GetIRString(id,true)) then --only proceed if this is an equippable item (test against the baseID of the item)
+				if not IsEquippableItem or IsEquippableItem(ItemRack.GetIRString(id,true)) then --only proceed if this is an equippable item (test against the baseID of the item)
 					known[id] = i*100+j --we were able to generate a valid ID for this item, so store its location (as a bag container offset)
 				end
 			end
@@ -3253,7 +3255,7 @@ function ItemRack.PopulateKnownItems()
 			if ItemRack.ValidBag(i) then
 				for j=1,GetContainerNumSlots(i) do
 					id = getid(i,j)
-					if id~=0 and IsEquippableItem(ItemRack.GetIRString(id,true)) then
+					if id~=0 and (not IsEquippableItem or IsEquippableItem(ItemRack.GetIRString(id,true))) then
 						known[id] = i*100+j
 					end
 				end
