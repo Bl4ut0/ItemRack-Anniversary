@@ -224,8 +224,8 @@ function ItemRack.IsPlayerMoving()
 end
 
 function ItemRack.IsClassic()
-	-- Classic Era: TOC version 10000-19999 or project ID
-	if wowtoc >= 10000 and wowtoc < 20000 then
+	-- Classic Era / Forever: legacy 1.x and modern six-digit 1.x TOCs.
+	if (wowtoc >= 10000 and wowtoc < 20000) or (wowtoc >= 100000 and wowtoc < 200000) then
 		return true
 	end
 	return WOW_PROJECT_CLASSIC and WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
@@ -2410,13 +2410,17 @@ function ItemRack.InitCore()
 		ItemRack.LockList[i] = {}
 	end
 
-	hooksecurefunc("UseInventoryItem",ItemRack.newUseInventoryItem)
-	hooksecurefunc("UseAction",ItemRack.newUseAction)
-	hooksecurefunc("UseItemByName",ItemRack.newUseItemByName)
-	hooksecurefunc("PaperDollFrame_OnShow",ItemRack.newPaperDollFrame_OnShow)
-	hooksecurefunc(GameTooltip, "SetBagItem", ItemRack.OnSetBagItem)
-	hooksecurefunc(GameTooltip, "SetInventoryItem", ItemRack.OnSetInventoryItem)
-	hooksecurefunc(GameTooltip, "SetHyperlink", ItemRack.OnSetHyperlink)
+	if UseInventoryItem then hooksecurefunc("UseInventoryItem",ItemRack.newUseInventoryItem) end
+	if UseAction then hooksecurefunc("UseAction",ItemRack.newUseAction) end
+	if UseItemByName then
+		hooksecurefunc("UseItemByName",ItemRack.newUseItemByName)
+	elseif C_Item and C_Item.UseItemByName then
+		hooksecurefunc(C_Item, "UseItemByName", ItemRack.newUseItemByName)
+	end
+	if PaperDollFrame_OnShow then hooksecurefunc("PaperDollFrame_OnShow",ItemRack.newPaperDollFrame_OnShow) end
+	if GameTooltip and GameTooltip.SetBagItem then hooksecurefunc(GameTooltip, "SetBagItem", ItemRack.OnSetBagItem) end
+	if GameTooltip and GameTooltip.SetInventoryItem then hooksecurefunc(GameTooltip, "SetInventoryItem", ItemRack.OnSetInventoryItem) end
+	if GameTooltip and GameTooltip.SetHyperlink then hooksecurefunc(GameTooltip, "SetHyperlink", ItemRack.OnSetHyperlink) end
 
 	ItemRackFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 	ItemRackFrame:RegisterEvent("PLAYER_LOGOUT")

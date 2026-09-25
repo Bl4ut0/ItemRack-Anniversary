@@ -83,11 +83,11 @@ foreach ($tocPath in @('ItemRack/ItemRack.toc', 'ItemRackOptions/ItemRackOptions
 $releaseRoot = [System.IO.Path]::GetFullPath((Join-Path $outputRootFull 'Release'))
 $releasePath = [System.IO.Path]::GetFullPath((Join-Path $releaseRoot "v$Version"))
 $compressedPath = [System.IO.Path]::GetFullPath((Join-Path $outputRootFull 'Compressed'))
-$zipPath = [System.IO.Path]::GetFullPath((Join-Path $compressedPath "ItemRack-anniversary-$Version.zip"))
+$zipPath = [System.IO.Path]::GetFullPath((Join-Path $compressedPath "ItemRack-universal-$Version.zip"))
 $hashPath = "$zipPath.sha256"
 $temporarySuffix = [Guid]::NewGuid().ToString('N')
 $temporaryReleasePath = [System.IO.Path]::GetFullPath((Join-Path $releaseRoot ".v$Version.$temporarySuffix.tmp"))
-$temporaryZipPath = [System.IO.Path]::GetFullPath((Join-Path $compressedPath ".ItemRack-anniversary-$Version.$temporarySuffix.tmp.zip"))
+$temporaryZipPath = [System.IO.Path]::GetFullPath((Join-Path $compressedPath ".ItemRack-universal-$Version.$temporarySuffix.tmp.zip"))
 
 foreach ($candidate in @($releasePath, $temporaryReleasePath)) {
     Assert-ChildPath -Child $candidate -Parent $releaseRoot

@@ -5,7 +5,7 @@ This is the only release workflow. It has two tracks:
 - **Beta:** stays on `dev`, publishes a GitHub prerelease, installs that exact build locally, then restores the `dev` TOCs.
 - **Primary:** first creates and pushes a locally testable candidate on the production branch. It creates no tag or public release until the user explicitly accepts that exact candidate. Finalization then tags and publishes it, merges it back to `dev`, and restores the `dev` TOCs.
 
-All archives are exported from a committed Git ref. Never publish files copied from the mutable checkout. Generated archives, manifests, hashes, and post files live under `.versions/` and are intentionally not committed.
+All archives are exported from a committed Git ref. Never publish files copied from the mutable checkout. The single `ItemRack-universal-{Version}.zip` archive carries the shared Classic Era, Anniversary/TBC, and Forever/Camelot TOC metadata and runtime compatibility layer. Generated archives, manifests, hashes, and post files live under `.versions/` and are intentionally not committed.
 
 CurseForge publication remains manual. The final build generates `CURSEFORGE_RELEASE.md`, but testing a primary candidate does not publish anything to CurseForge.
 
@@ -82,14 +82,14 @@ The beta track never switches to or pushes the production branch.
    ```powershell
    node .tools/create_release.js build beta {Version} --ref "v{Version}"
    Get-Content -LiteralPath ".versions\Release\v{Version}\SOURCE_COMMIT.txt"
-   Get-FileHash -Algorithm SHA256 -LiteralPath ".versions\Compressed\ItemRack-anniversary-{Version}.zip"
-   Get-Content -LiteralPath ".versions\Compressed\ItemRack-anniversary-{Version}.zip.sha256"
+   Get-FileHash -Algorithm SHA256 -LiteralPath ".versions\Compressed\ItemRack-universal-{Version}.zip"
+   Get-Content -LiteralPath ".versions\Compressed\ItemRack-universal-{Version}.zip.sha256"
    ```
 
 5. Publish the GitHub prerelease from the already-pushed tag:
 
    ```powershell
-   gh release create "v{Version}" ".versions\Compressed\ItemRack-anniversary-{Version}.zip" ".versions\Compressed\ItemRack-anniversary-{Version}.zip.sha256" --title "v{Version} (Beta)" --notes-file ".versions\Release\v{Version}\GITHUB_RELEASE.md" --prerelease --latest=false --verify-tag
+   gh release create "v{Version}" ".versions\Compressed\ItemRack-universal-{Version}.zip" ".versions\Compressed\ItemRack-universal-{Version}.zip.sha256" --title "v{Version} (Beta)" --notes-file ".versions\Release\v{Version}\GITHUB_RELEASE.md" --prerelease --latest=false --verify-tag
    ```
 
 6. Install the exact staged tag locally. Run the script in the current PowerShell process so `-Confirm:$false` remains a switch value on Windows PowerShell 5.1.
@@ -159,8 +159,8 @@ The beta track never switches to or pushes the production branch.
    ```powershell
    node .tools/create_release.js build stable {Version} --ref {CandidateCommit}
    Get-Content -LiteralPath ".versions\Release\v{Version}\SOURCE_COMMIT.txt"
-   Get-FileHash -Algorithm SHA256 -LiteralPath ".versions\Compressed\ItemRack-anniversary-{Version}.zip"
-   Get-Content -LiteralPath ".versions\Compressed\ItemRack-anniversary-{Version}.zip.sha256"
+   Get-FileHash -Algorithm SHA256 -LiteralPath ".versions\Compressed\ItemRack-universal-{Version}.zip"
+   Get-Content -LiteralPath ".versions\Compressed\ItemRack-universal-{Version}.zip.sha256"
    ```
 
    Record the SHA-256 as `{TestedSHA256}`.
@@ -243,7 +243,7 @@ Finalization requires explicit user acceptance of `{CandidateCommit}`.
    ```powershell
    node .tools/create_release.js build stable {Version} --ref "v{Version}"
    Get-Content -LiteralPath ".versions\Release\v{Version}\SOURCE_COMMIT.txt"
-   $finalHash = (Get-FileHash -Algorithm SHA256 -LiteralPath ".versions\Compressed\ItemRack-anniversary-{Version}.zip").Hash.ToLowerInvariant()
+   $finalHash = (Get-FileHash -Algorithm SHA256 -LiteralPath ".versions\Compressed\ItemRack-universal-{Version}.zip").Hash.ToLowerInvariant()
    $testedHash = "{TestedSHA256}".ToLowerInvariant()
    if ($finalHash -ne $testedHash) { throw "Tagged archive differs from the accepted candidate." }
    ```
@@ -251,7 +251,7 @@ Finalization requires explicit user acceptance of `{CandidateCommit}`.
 4. Publish the stable GitHub release:
 
    ```powershell
-   gh release create "v{Version}" ".versions\Compressed\ItemRack-anniversary-{Version}.zip" ".versions\Compressed\ItemRack-anniversary-{Version}.zip.sha256" --title "v{Version}" --notes-file ".versions\Release\v{Version}\GITHUB_RELEASE.md" --latest --verify-tag
+   gh release create "v{Version}" ".versions\Compressed\ItemRack-universal-{Version}.zip" ".versions\Compressed\ItemRack-universal-{Version}.zip.sha256" --title "v{Version}" --notes-file ".versions\Release\v{Version}\GITHUB_RELEASE.md" --latest --verify-tag
    ```
 
 5. Reinstall the verified tagged staging folder locally:

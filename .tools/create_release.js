@@ -533,7 +533,7 @@ function buildRelease(mode, version, args) {
     outputRoot
   );
 
-  const zipPath = path.join(outputRoot, 'Compressed', `ItemRack-anniversary-${version}.zip`);
+  const zipPath = path.join(outputRoot, 'Compressed', `ItemRack-universal-${version}.zip`);
   const hashPath = `${zipPath}.sha256`;
   for (const artifact of [
     zipPath,

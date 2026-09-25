@@ -57,11 +57,24 @@ check(
   !buildScript.includes('Copy-Item -LiteralPath $itemRackSource'),
   'The packager must not copy addon files from the mutable checkout.'
 );
+check(
+  buildScript.includes('ItemRack-universal-$Version.zip') &&
+    createRelease.includes('ItemRack-universal-${version}.zip') &&
+    !buildScript.includes('ItemRack-anniversary-$Version.zip'),
+  'Release tooling must produce one universal archive for all supported clients.'
+);
 
 check(
   installScript.includes('if ($destinations.Count -eq 0)') &&
     installScript.includes('No supported local WoW AddOns folders were found.'),
   'Local installation must fail when no supported client folder exists.'
+);
+check(
+  installScript.includes("'_classic_beta_'") &&
+    installScript.includes("'_anniversary_'") &&
+    installScript.includes("'_classic_'") &&
+    installScript.includes("'_classic_era_'"),
+  'The local installer must discover Forever/Camelot and official Classic client folders.'
 );
 check(
   installScript.includes('$completedDestinations += $addOnsPath') &&

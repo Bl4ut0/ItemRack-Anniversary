@@ -10,6 +10,8 @@ const buttons = read('ItemRack/ItemRackButtons.lua');
 const options = read('ItemRackOptions/ItemRackOptions.lua');
 const queue = read('ItemRack/ItemRackQueue.lua');
 const optionsXml = read('ItemRackOptions/ItemRackOptions.xml');
+const mainToc = read('ItemRack/ItemRack.toc');
+const optionsToc = read('ItemRackOptions/ItemRackOptions.toc');
 const buildScript = read('.tools/build_release_dev.ps1');
 const installScript = read('.tools/install_local.ps1');
 const releaseWorkflow = read('.agent/workflows/release.md');
@@ -27,6 +29,14 @@ function between(source, start, end) {
   assert.notStrictEqual(startIndex, -1, `Missing start marker: ${start}`);
   assert.notStrictEqual(endIndex, -1, `Missing end marker: ${end}`);
   return source.slice(startIndex, endIndex);
+}
+
+for (const [name, toc] of [['ItemRack', mainToc], ['ItemRackOptions', optionsToc]]) {
+  check(
+    toc.includes('## Interface: 11601, 16001, 11509, 11508, 20505, 20506') &&
+      toc.includes('## AllowLoadGameType: camelot'),
+    `${name} TOC must advertise the shared official Classic and Forever/Camelot client matrix.`
+  );
 }
 
 const tooltipHook = between(
@@ -276,10 +286,12 @@ check(
 );
 
 check(
-  core.includes('local GetItemFamily = _G.GetItemFamily or (C_Item and C_Item.GetItemFamily)') &&
-    core.includes('local IsEquippableItem = _G.IsEquippableItem or (C_Item and C_Item.IsEquippableItem)') &&
-    core.includes('if not GetItemFamily or GetItemFamily(baseID)==0 then') &&
-    core.includes('not IsEquippableItem or IsEquippableItem(ItemRack.GetIRString(id,true))'),
+  core.includes('GetItemFamily = function(item)') &&
+    core.includes('_G.GetItemFamily = GetItemFamily') &&
+    core.includes('IsEquippableItem = function(item)') &&
+    core.includes('_G.IsEquippableItem = IsEquippableItem') &&
+    core.includes('pcall(GetItemFamily') &&
+    core.includes('pcall(IsEquippableItem'),
   'ItemRack core must provide C_Item fallbacks and nil guards for GetItemFamily and IsEquippableItem.'
 );
 
@@ -289,7 +301,9 @@ check(
 );
 
 check(
-  options.includes('if not GetTalentTabInfo then') &&
+  options.includes('if GetTalentTabInfo then') &&
+    options.includes('elseif C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo then') &&
+    options.includes('pcall(GetTalentTabInfo') &&
     options.includes('return group == 1 and "Primary Spec" or "Secondary Spec"'),
   'ItemRackOpt.GetSpecName must guard against nil GetTalentTabInfo.'
 );
