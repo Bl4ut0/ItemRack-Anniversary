@@ -1,249 +1,115 @@
-# ItemRack — Universal Classic Edition
+# ItemRack — One addon for Classic, TBC Anniversary, and Forever
 
-## Overview
+ItemRack makes equipment management fast and predictable. Save full or partial gear sets, switch them from a menu or keybind, automate changes for game events, and rotate cooldown items through configurable queues.
 
-**ItemRack** is a context menu-based inventory manager for quickly swapping equipment and managing gear sets. Create sets for any scenario—PvP, Tanking, Healing, resist fights—and swap with a single click, keybind, or automatically via event triggers.
+## One universal download
 
-One download supports **Classic Era, Hardcore, Season of Discovery, Burning Crusade Classic Anniversary, and WoW Forever/Camelot**. Install the same `ItemRack-universal` archive on every supported client; the shared compatibility layer adapts to each client's APIs at runtime.
+The same `ItemRack-universal` package supports:
 
-The archive contains two required addon folders: `ItemRack` and the load-on-demand `ItemRackOptions`. These are two modules of one addon distribution, not separate client releases.
+- WoW Classic Era
+- Hardcore
+- Season of Discovery
+- Burning Crusade Classic Anniversary
+- WoW Forever/Camelot
 
----
+There is no separate TBC or Forever edition. One shared compatibility layer selects the legacy or modern APIs available in the running client.
 
-## 🚀 Recent Updates
+The ZIP installs two folders:
 
-### UI & Quality of Life Improvements
+- `ItemRack` — the main addon
+- `ItemRackOptions` — the load-on-demand configuration module
 
-* **Tooltips System Overhaul**:
-  * Options to disable ItemRack's custom tooltips entirely if preferred.
-  * **Tiny Tooltips on Quick Access Only**: Keeps your main Set button detailed while shrinking individual gear slot tooltips.
-  * Suppresses duplicate overlapping item comparison tooltips from the default WoW UI when holding Shift.
-* **Audio System Enhancements**:
-  * Dedicated options to mute all automatic swap sounds.
-  * **LibSoundIndex Integration (WIP)**: ItemRack optionally supports LibSoundIndex for surgical equipment-sound muting. If it is not installed, swaps use normal sound; ItemRack does not change the game's global SFX setting.
-* **Menu Mutual Exclusivity**: Features like `Menu on Shift` and `Menu on right click` are now mutually exclusive and auto-toggle each other to prevent control conflicts.
-* **Shift-Click Equip via Bank**: Holding Shift while clicking an item in an ItemRack popout menu with the bank open will properly equip it instead of depositing it.
-* **Diagnostic Debugging Dump (`/itemrack dump`)**: A native diagnostic system built directly into the UI. No more zipping `WTF` folders! Toggle `/itemrack debug` to start a **silent background trace** (holds up to 5,000 lines of combat/UI events). Replicate your bug, and type `/itemrack dump` to instantly extract the exact Event Stack, SV State, Audit History, and Combat Locks directly to your clipboard for easy bug reporting. Want to see the logs in real-time? Use `/itemrack debug chat` to print them to your chat frame.
-* **SavedVariables Auto-Repair**: On every login and reload, ItemRack automatically scans your character's saved data for corruption—circular set references, orphaned event stacks, invalid queue slots, and obsolete settings. Issues are silently auto-fixed in the background and a one-line chat notice appears if any repairs were made. Detailed repair logs are persisted in your SavedVariables (`ItemRackUser.LastRepair`) so they survive restarts and can be included in bug reports via `/itemrack dump`. Run `/itemrack debug audit` at any time to trigger a manual scan with full chat output.
+Keep both folders together in `Interface\AddOns`.
 
----
+## What ItemRack does
 
-## ⚠️ FAQ: Flyout Menu Opening on the Wrong Side?
+### Gear sets
 
-Several users have reported that character sheet flyout menus open in the wrong direction (e.g., left-side slots opening to the left and overlapping the screen edge, or right-side slots going the wrong way). **This is configurable!**
+- Save complete outfits or partial sets that affect only selected slots.
+- Equip sets from the minimap menu, set button, keybinds, macros, or events.
+- Continue equipping available pieces when an optional saved item is missing.
+- Prefer the exact saved copy when two items share a base ID but have different enchants, gems, suffixes, or runes.
 
-Open **ItemRack Options** (`/itemrack opt`) and look under the **"Character sheet menus"** section. You'll find two checkboxes:
+### Quick-access equipment menus
 
-* **"Left slots: menu on right"** — Flips left-side slots (Head, Neck, Shoulder, Back, Chest, Shirt, Tabard, Wrist) to show menus on the **RIGHT**.
-* **"Right slots: menu on left"** — Flips right-side slots (Hands, Waist, Legs, Feet, Rings, Trinkets) to show menus on the **LEFT**.
+- Alt-click character-sheet slots to create movable equipment buttons.
+- Hover buttons or character slots for compatible-item flyouts.
+- Configure menu direction, scale, spacing, tooltips, counts, and hotkey labels.
+- Lock the minimap and quick-access layout when it is positioned correctly.
 
-Toggle whichever option fixes the direction for your setup. Bottom weapon slots (Main Hand, Off Hand, Ranged) always dock vertically and are unaffected.
+### Specializations, stances, and events
 
----
+- Link sets to primary and secondary specializations.
+- Automate gear for mounting, movement, zones, buffs, drinking, combat state, Ghost Wolf, and Druid forms.
+- Preserve the player's newest manual choice when delayed automatic work is still pending.
+- Restore the correct prior set and its per-set queues after temporary event gear ends.
 
-## Validated Base Version
+Automatic specialization events are opt-in. Assign the set, then review and enable the event you want ItemRack to control.
 
-This adaptation is based on the **4.23 release by Rottenbeer** (released November 28th, 2024), updated to support the unique requirements of the Anniversary client.
+### AutoQueue
 
-### References to Previous Versions
+- Rank cooldown items by priority for each slot.
+- Save queue enablement and configuration per gear set.
+- Hold equipped items while their relevant buff remains active.
+- Support proxy cooldowns for items whose effect is gated by another item.
+- Track exact item variants so duplicate enchanted, gemmed, or runed copies do not burn one another.
 
-We stand on the shoulders of giants:
+### Reliable swapping
 
-* **Original Base Version**: [ItemRack on CurseForge](https://www.curseforge.com/wow/addons/itemrack)
-* **WoW Classic Version**: [ItemRack Classic on CurseForge](https://www.curseforge.com/wow/addons/itemrack-classic/)
+- Pipeline non-conflicting multi-item moves in one frame where the client allows it.
+- Queue restricted work through combat, casting, loading screens, and temporary item locks.
+- Handle two-handed weapons, off-hands, paired rings/trinkets, dual-wield specialization changes, and partial sets safely.
+- Reconcile the displayed set with the equipment the server actually accepted.
 
----
+## Script-event protection
 
-## Shared compatibility layer
+Custom Script events run Lua with addon privileges. ItemRack protects its editor and SavedVariables path with explicit approval:
 
-Classic clients now expose different combinations of legacy functions, modern namespaces, protected values, and UI frames. This release keeps those differences behind one tested code path instead of maintaining separate Forever and TBC editions.
+- Saving a valid script in ItemRack approves that exact event name, trigger, and source.
+- Scripts inserted or changed by another addon remain disabled until the player accepts a warning prompt.
+- Any source change invalidates the previous approval.
+- Rejected, malformed, oversized, or invalid external additions cannot persist through ItemRack's script-event storage.
 
-### Core Compatibility Fixes
+WoW addons share one Lua environment, so this cannot sandbox a hostile addon or WeakAura. Delete any untrusted addon or aura that supplied malicious code.
 
-* **"On-Use" Item Functionality Restored**: Solved "Action Blocked" errors by implementing **Secure Item Attributes** (`type="item"`). Trinkets and on-use items work directly from the rack without error, just like standard action bar buttons.
-* **API Compatibility Layer**: Full support for migrated WoW APIs including `C_Container`, `C_Item`, and `C_AddOns`. Cooldown tracking displays correctly on buttons.
-* **No More Yellow Triangles**: Fixed the graphical glitch in the Options menu caused by missing Atlas textures in the Anniversary client.
-* **Secure Button Templates**: Rewrote button initialization with a custom icon layering system, ensuring buttons look correct and function securely.
+## Installation
 
-### Dual Spec Support
+1. Download the latest ItemRack universal ZIP.
+2. Extract it into the active client's `Interface\AddOns` directory.
+3. Confirm both `ItemRack` and `ItemRackOptions` are present.
+4. Restart WoW or run `/reload`.
 
-* Automatically swaps gear sets when you change talent specializations.
-* UI adapts to show spec options only if Dual Spec is learned.
-* Spec checkboxes are dynamically labeled with your talent tree name (e.g., "Holy", "Arms").
+Optional: install LibSoundIndex if you want ItemRack to suppress selected equipment-swap sounds without changing the game's global sound setting.
 
-### Blizzard Keybinding Integration
+## Basic controls
 
-* All 20 equipment slots are registered in the Blizzard Keybindings panel under **AddOns > ItemRack**.
-* Each slot has a descriptive label (e.g., "Head (Slot 1)", "Off Hand / Shield / Held In Off-hand (Slot 17)").
-* Keybinds are saved immediately and persist through reloads.
+- `/itemrack opt` — open Options
+- Left-click minimap button — choose a saved set
+- Right-click minimap button — open Options
+- Alt-click a character equipment slot — add/remove its quick-access button
+- Alt-click the character model — add/remove the set button
+- Alt-left-click a quick-access slot — toggle its AutoQueue
+- Alt-right-click a quick-access slot — configure its queue
+- `/itemrack debug` — toggle diagnostic recording
+- `/itemrack dump` — open a copyable support report
 
-### Improved Cooldown Display
+## Getting help
 
-* **Large Numbers mode**: Cooldown text uses `mm:ss` / `h:mm` format with dynamic coloring—white above 60s, yellow under 60s, red under 5s.
-* WoW's native countdown numbers are suppressed on ItemRack buttons to prevent duplicate text.
-* **Stun & CC Immunity**: Cooldown indicator "swirls" on Quick Access buttons and popout menus are no longer falsely hidden by the game engine when your character is stunned or feared.
+When reporting a problem, include:
 
-### Event System Reliability
-
-* Buff events (Mounting, Drinking) properly track active state and cleanly revert gear when ending.
-* Nested event transitions (e.g., Drinking ending while Mounted) correctly restore the original gear state.
-* Stance events (Shapeshifting, Ghost Wolf) reliably revert gear even when the equipment API reports inconsistencies.
-* **Manual Override Protection**: If you manually swap gear while an event is active (like equipping a PvP flag-carry set before grabbing the flag), ItemRack will strictly respect your choice and won't aggressively fight to unequip or re-equip the background gear.
-
-### Tooltip Set Info
-
-* "Show set info in tooltips" now reliably displays which sets contain an item when hovering in your bags or character panel.
-* Uses exact item-field matching—correctly differentiates items with different enchants or gems.
-* Internal system sets are hidden from tooltips.
-
-### Queue System
-
-* **Per-Set Auto-Queue**: Each gear set now automatically saves which slot queues are enabled when created. Swapping sets cleanly activates or deactivates queues based on what the incoming set requires.
-* Fixed item duplication and multiple stop markers in queue lists.
-* Right-click queue cycling works reliably, including during combat (queued for after combat ends).
-* Combat queue shows overlay icons on slot buttons indicating pending swaps.
-* Advanced Queue configuration (Delay and Keep flags) accurately flow through the queue system.
-
-### UI Polish
-
-* **Smart Menu Docking**: Left-side character sheet slots default to opening menus to the left, and right-side slots open to the right. If this automatic direction is wrong for your setup, you can override it per-side in **Options** (under "Character sheet menus"):
-  * **"Left slots: menu on right"** — Flips left-side slots (Head, Neck, Shoulder, Back, Chest, Shirt, Tabard, Wrist) to show menus on the RIGHT instead of the left.
-  * **"Right slots: menu on left"** — Flips right-side slots (Hands, Waist, Legs, Feet, Rings, Trinkets) to show menus on the LEFT instead of the right.
-  * Bottom weapon slots (Main Hand, Off Hand, Ranged) always dock vertically and are unaffected by these settings.
-* Hotkey text renders in subtle gray with proper hide/show behavior.
-* Set icon and label accurately reflect the equipped set after combat, spec changes, and event transitions.
-
----
-
-## Core Features
-
-* **Quick Swapping**: Hover over a slot on your character sheet to pop out a menu of available items for that slot.
-* **Sets**: Create and save gear sets and swap them with a single click or keybind.
-* **Events**: Automate gear swaps based on events (mounting, entering a zone, shapeshifting, drinking, etc.).
-* **Auto-Queue**: Automatically cycle items based on cooldown availability—equip your best-in-slot trinket as soon as the current one goes on cooldown.
-* **Combat Queue**: Swaps attempted during combat are queued and executed automatically when combat ends.
-
----
-
-## Complete Control Scheme
-
-### 📌 Character Sheet Controls
-
-| Action | Effect |
-|--------|--------|
-| **Alt+Click** any equipment slot | Creates an on-screen "Quick Access" button for that slot |
-| **Alt+Click** the Character Model | Creates a "Set Button" (slot 20) for gear set management |
-| **Hover** over an equipment slot | Opens the item selection flyout menu (if enabled) |
-| **Shift+Hover** over slot | Opens the flyout menu when "Menu on Shift" option is enabled |
-
----
-
-### 🎮 Quick Access Slot Button Controls
-
-| Action | Effect |
-|--------|--------|
-| **Left-Click** | Uses the item (activates on-use trinkets, equippables, etc.) |
-| **Right-Click** | Advances to the next item in the queue for that slot |
-| **Hover** | Opens the item selection flyout menu |
-| **Shift+Left-Click** | Links the equipped item to chat (if chat edit box is open) |
-| **Alt+Left-Click** | Toggles Auto-Queue ON/OFF for that slot |
-| **Alt+Right-Click** | Opens the Queue configuration panel for that slot |
-| **Drag** | Moves the button group (if unlocked); Shift+Drag moves only that button |
-
----
-
-### 🔘 Set Button (Slot 20) Controls
-
-| Action | Effect |
-|--------|--------|
-| **Left-Click** | Equips the current set (or toggles if "Equip Toggle" is ON) |
-| **Right-Click** | Opens the Sets tab in Options |
-| **Shift+Left-Click** | Unequips the current gear set |
-| **Alt+Left-Click** | Toggles ItemRack Events ON/OFF |
-| **Alt+Right-Click** | Opens the Sets tab in Options |
-
----
-
-### 📋 Flyout Menu (Item Selection) Controls
-
-| Action | Effect |
-|--------|--------|
-| **Left-Click** item | Equips that item to the slot |
-| **Right-Click** item | Equips item (TrinketMenuMode: chooses slot 14) |
-| **Shift+Click** item | Links the item to chat (if chat edit box is open) |
-| **Alt+Click** item | Toggles the item as "Hidden" (if AllowHidden is ON) |
-| **Left-Click** while bank is open | Pulls item from bank to bags, or pushes to bank |
-| **Right-Click** menu frame | Toggles menu orientation (Vertical ↔ Horizontal) |
-| **Drag** menu frame border | Re-docks the menu to a different corner of the button |
-
----
-
-### 🌐 Minimap / Data Broker Button Controls
-
-| Action | Effect |
-|--------|--------|
-| **Left-Click** | Opens the gear set selection menu |
-| **Right-Click** | Opens the ItemRack Options window |
-| **Shift+Click** | Unequips the current gear set |
-| **Alt+Left-Click** | Shows hidden sets in the menu |
-| **Alt+Right-Click** | Toggles ItemRack Events ON/OFF |
-
----
-
-### ⌨️ Slash Commands
-
-| Command | Effect |
-|---------|--------|
-| `/itemrack opt` or `/itemrack options` | Opens the Options window |
-| `/itemrack equip <set name>` | Equips the specified set |
-| `/itemrack toggle <set name>` | Toggles the specified set on/off |
-| `/itemrack toggle <set1>, <set2>` | Toggles between two sets |
-| `/itemrack lock` | Locks all buttons in place |
-| `/itemrack unlock` | Unlocks buttons for repositioning |
-| `/itemrack dump` | Opens a copyable window with session logs, runtime state, and audit history |
-| `/itemrack debug` | Toggles the diagnostic logging framework (silent background mode) |
-| `/itemrack debug chat` | Toggles printing diagnostic traces to the chat window in real-time |
-| `/itemrack debug status` | Shows the current state of all debug tags |
-| `/itemrack debug clear` | Clears the log buffer |
-| `/itemrack debug audit` | Runs a full SavedVariables scan and prints results to chat |
-| `/itemrack debug help` | Shows all available debug subcommands |
-| `/itemrack debug <tag>` | Toggles a specific debug tag (e.g. `events`, `equip`, `queue`, `api`) |
-| `/itemrack reset` | Resets all buttons and positions |
-| `/itemrack reset everything` | Wipes all ItemRack data and reloads UI |
-
----
-
-### 🔄 Auto-Queue System
-
-The Auto-Queue system automatically swaps items based on cooldown availability:
-
-1. **Enable Queue**: Alt+Left-Click a slot button, or use the Queue tab in Options.
-2. **Configure Priority**: In the Queue tab, rank items from highest to lowest priority.
-3. **How it works**: When an equipped item goes on cooldown, ItemRack swaps to the next ready item.
-4. **Pause Queue**: Check "Pause Queue" on items to prevent them from being swapped out during use.
-
----
-
-### ⚡ Combat Queue
-
-If you try to swap items while in combat, ItemRack will:
-
-1. Queue the swap for when combat ends.
-2. Show a small overlay icon on the slot button indicating what's queued.
-3. Automatically perform the swap when you leave combat.
-
----
-
-### 📝 Notes
-
-* Most actions that modify buttons or swap gear are **blocked during combat** due to Blizzard's secure action restrictions.
-* The "Set Button" (slot 20) appears when you Alt+Click the character model frame.
-* Hidden items can still be seen by holding Alt while hovering over menus (if AllowHidden is enabled).
-* TrinketMenuMode combines both trinket slots into a single menu for easier management.
-
----
+- Client family and client build
+- ItemRack version
+- Reproduction steps
+- Expected and actual behavior
+- Relevant set names and item links
+- Full Lua error text
+- `/itemrack dump` output after reproducing the issue
+
+The dump identifies the exact ItemRack release and includes technical state such as event ownership, queues, equipment transactions, and locks. Review it before sharing because it can contain gear-set names and item information.
+
+- Source and issue tracker: https://github.com/Bl4ut0/ItemRack-Anniversary
+- Full controls: https://github.com/Bl4ut0/ItemRack-Anniversary/blob/master/CONTROLS.md
 
 ## Credits
 
-* **Gello**: Original code and concept.
-* **Rottenbeer, Roadblock, Rozil & Other Maintainers**: For keeping the Classic versions alive.
+ItemRack was created by **Gello**. The Classic port was maintained by **Rottenbeer** and **Roadblock**. This Anniversary/universal edition is maintained by **Bl4ut0**.
