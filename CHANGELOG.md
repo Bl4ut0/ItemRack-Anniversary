@@ -3,6 +3,10 @@
 All notable changes to the TBC Anniversary port of ItemRack will be documented in this file.
 
 ## [Development]
+
+
+## [4.50] - 2026-09-25
+### Bug Fixes & Improvements
 - **One Universal Package**: Release tooling now produces one `ItemRack-universal` archive for Classic Era, Anniversary/TBC, and Forever/Camelot. Both TOCs advertise the supported official and Forever interface builds, and local deployment discovers the Forever `_classic_beta_` client alongside the official Classic folders.
 - **Forever/Camelot Runtime Compatibility**: Ported guarded modern API fallbacks for item families, equippable/equipped checks, talent/spec names, removed mouseover APIs, movement secret values, optional tooltip/use-item hooks, and Equipment Manager coexistence into the shared codebase.
 - **Set Icon Picker Blank Entries**: Uncached item textures and unsupported equipment slots now use a visible question-mark fallback instead of inserting `nil` holes into the set-icon array. The picker refreshes when item data arrives, ignores invalid spell/macro icons, and repairs legacy sets whose saved icon is missing.
