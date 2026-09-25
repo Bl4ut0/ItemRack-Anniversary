@@ -1,4 +1,5 @@
 __ Development __
+- Fixed permanently blank, multiply-highlighted entries in the set icon picker when Forever or an uncached item returned no texture. Missing slot/item icons now use a question mark, late item data refreshes the grid, invalid spell icons are skipped, and saved nil icons are repaired when edited.
 - Fixed queue diagnostic branch attempting to call global ResolveProxy (nil) instead of ItemRack.ResolveProxy, resolving Lua errors during queue and trinket evaluation on Classic Era (PR #25).
 - Fixed ItemRackOptItemStatsPriority failing to anchor to ItemRackOptItemStatsDelay in ItemRackOptions.xml due to an errant virtual="true" attribute.
 - Added C_Item shims and nil guards for GetItemFamily, IsEquippableItem, GetItemInfo, and GetTalentTabInfo to ensure robust operation on modern and classic client variants.
