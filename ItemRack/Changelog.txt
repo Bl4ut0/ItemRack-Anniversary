@@ -1,8 +1,7 @@
 __ Development __
 
-- Updated installation, CurseForge, technical, testing, and release documentation around one universal package and one shared compatibility path. Removed obsolete dedicated-TBC and parallel client-release guidance; beta and primary remain publication safety channels only.
-
 __ New in 4.50 - By Bl4ut0 __
+- Updated installation, CurseForge, technical, testing, and release documentation around one universal package and one shared compatibility path. Removed obsolete dedicated-TBC and parallel client-release guidance; beta and primary remain publication safety channels only.
 - Release tooling now creates one ItemRack-universal archive for Classic Era, Anniversary/TBC, and Forever/Camelot. Shared TOCs and local deployment cover the official clients plus the Forever _classic_beta_ client.
 - Ported Forever/Camelot compatibility guards for modern item, spec, mouseover, movement, tooltip, and Equipment Manager APIs into the shared addon code.
 - Fixed permanently blank, multiply-highlighted entries in the set icon picker when Forever or an uncached item returned no texture. Missing slot/item icons now use a question mark, late item data refreshes the grid, invalid spell icons are skipped, and saved nil icons are repaired when edited.
