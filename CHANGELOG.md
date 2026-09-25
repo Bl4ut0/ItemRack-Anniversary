@@ -4,6 +4,9 @@ All notable changes to the TBC Anniversary port of ItemRack will be documented i
 
 ## [Development]
 
+### Documentation
+- **Unified Support and Release Documentation**: Replaced the obsolete dedicated-TBC and parallel-client release language with one supported-client matrix, one universal archive, shared runtime compatibility guidance, and client-specific acceptance checks. Beta and primary remain publication safety channels rather than separate client builds.
+
 
 ## [4.50] - 2026-09-25
 ### Bug Fixes & Improvements

@@ -1,11 +1,11 @@
 # Unified Release Workflow
 
-This is the only release workflow. It has two tracks:
+This is the only release workflow. It has two publication channels:
 
 - **Beta:** stays on `dev`, publishes a GitHub prerelease, installs that exact build locally, then restores the `dev` TOCs.
 - **Primary:** first creates and pushes a locally testable candidate on the production branch. It creates no tag or public release until the user explicitly accepts that exact candidate. Finalization then tags and publishes it, merges it back to `dev`, and restores the `dev` TOCs.
 
-All archives are exported from a committed Git ref. Never publish files copied from the mutable checkout. The single `ItemRack-universal-{Version}.zip` archive carries the shared Classic Era, Anniversary/TBC, and Forever/Camelot TOC metadata and runtime compatibility layer. Generated archives, manifests, hashes, and post files live under `.versions/` and are intentionally not committed.
+All archives are exported from a committed Git ref. Never publish files copied from the mutable checkout. The single `ItemRack-universal-{Version}.zip` archive carries the shared Classic Era, Anniversary/TBC, and Forever/Camelot TOC metadata and runtime compatibility layer. Separate client-specific branches, tags, archive names, and release procedures are retired. Generated archives, manifests, hashes, and post files live under `.versions/` and are intentionally not committed.
 
 CurseForge publication remains manual. The final build generates `CURSEFORGE_RELEASE.md`, but testing a primary candidate does not publish anything to CurseForge.
 
@@ -13,7 +13,7 @@ CurseForge publication remains manual. The final build generates `CURSEFORGE_REL
 
 Ask the user for:
 
-1. Track: `beta` or `primary`.
+1. Publication channel: `beta` or `primary`.
 2. Version:
    - Beta: `X.Y[-Z]-betaN`, such as `4.43-beta5`.
    - Primary: `X.Y[-Z]`, such as `4.43`.

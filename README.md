@@ -1,6 +1,16 @@
-# ItemRack - Anniversary Edition
+# ItemRack — Universal Classic Edition
 
-A maintained port of the classic ItemRack addon for **WoW Classic Era/Hardcore/Season of Discovery (1.15.9)** and **The Burning Crusade Classic Anniversary (2.5.5/2.5.6)**.
+A maintained ItemRack release for **WoW Classic Era, Hardcore, Season of Discovery, Burning Crusade Classic Anniversary, and WoW Forever/Camelot**. Every supported client uses the same `ItemRack-universal-{Version}.zip`; there is no separate Forever or TBC code track.
+
+## Supported clients
+
+| Client family | Interface metadata | Typical installation folder |
+|---|---|---|
+| Classic Era, Hardcore, Season of Discovery | `11508`, `11509` | `_classic_era_` |
+| Burning Crusade Classic Anniversary | `20505`, `20506` | `_anniversary_` or `_classic_` |
+| WoW Forever/Camelot | `11601`, `16001` with `AllowLoadGameType: camelot` | `_classic_beta_` |
+
+The shared runtime selects legacy globals or modern namespaced APIs according to what the active client exposes. Compatibility fixes must stay in this shared path and receive permanent regression coverage; do not create client-specific source or release branches.
 
 ## Credits
 
@@ -19,6 +29,7 @@ This addon is based on the original **ItemRack Classic** maintained by Rottenbee
    ```
    World of Warcraft\_classic_era_\Interface\AddOns\
    World of Warcraft\_anniversary_\Interface\AddOns\
+   World of Warcraft\_classic_beta_\Interface\AddOns\
    ```
 3. You should have two folders:
    - `ItemRack/`
@@ -122,9 +133,9 @@ ItemRack now includes an incredibly powerful, native diagnostic system built dir
 > [!IMPORTANT]
 > **Data Privacy Notice:** The `/itemrack dump` command retrieves technical data for debugging, which includes your gear set names, queue configurations, and recently equipped items. It does **not** collect passwords or sensitive account information. Please review the output before sharing if you wish to keep specific set names private.
 
-## TBC Anniversary Compatibility
+## Cross-client compatibility
 
-The TBC Anniversary Edition runs on a modern WoW client engine, which required several API compatibility fixes. See [TECHNICAL_CHANGES.md](TECHNICAL_CHANGES.md) for technical details and [CHANGELOG.md](CHANGELOG.md) for a summary of feature updates.
+The supported clients expose different mixtures of legacy APIs, modern namespaces, and protected/secret values. ItemRack keeps those differences behind one compatibility layer. See [TECHNICAL_CHANGES.md](TECHNICAL_CHANGES.md) for implementation details and [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ### Key Changes
 - API namespace migrations (`C_Container`, `C_Item`, `C_AddOns`)
@@ -147,7 +158,7 @@ checklist.
 
 ## Support
 
-For issues specific to the TBC Anniversary port, please open an issue on this GitHub repository.
+For issues on any supported client, please open an issue on this GitHub repository and include the client branch/build, ItemRack version, reproduction steps, and `/itemrack dump` output.
 
 For general ItemRack functionality questions, refer to the [original CurseForge page](https://www.curseforge.com/wow/addons/itemrack-classic).
 
