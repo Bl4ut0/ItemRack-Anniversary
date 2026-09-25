@@ -1,10 +1,10 @@
-# Technical Changes for TBC Anniversary Edition
+# Technical Changes for the Universal Classic Edition
 
-This document details all modifications made to port ItemRack Classic to the TBC Anniversary Edition (2.5.4/2.5.5).
+This document records the compatibility and reliability changes shared by Classic Era/Hardcore/Season of Discovery, Burning Crusade Classic Anniversary, and Forever/Camelot.
 
 ## Overview
 
-The TBC Anniversary Edition runs on a modern WoW client engine (similar to Retail), which means many APIs have been moved to new namespaces or deprecated. This port adds compatibility shims and fixes to ensure ItemRack functions correctly.
+The supported clients expose different mixtures of legacy globals, modern namespaces, protected values, and UI frames. ItemRack ships one source tree and one universal archive. Runtime feature detection selects the available API; client-specific source branches and packages are intentionally retired.
 
 ## Tooltip Post-Hook Taint Containment
 **File:** `ItemRack/ItemRack.lua` — `ItemRack.ListSetsHavingItem`

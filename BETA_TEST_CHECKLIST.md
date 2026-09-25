@@ -2,6 +2,15 @@
 
 Use the packaged build from `.versions/Release/v{Version}`. Reload the UI after installation and test with Lua errors enabled. Capture `/itemrack dump` output whenever a failure occurs.
 
+## Supported-client smoke matrix
+
+Use the same universal archive for every row; do not build or test separate Forever and TBC packages.
+
+- **Classic Era/Hardcore/Season of Discovery:** load both addon modules, open Options, equip a partial set, test a stance event, and inspect `/itemrack dump` version fields.
+- **Burning Crusade Classic Anniversary:** test dual-spec transitions, duplicate enchanted/gemmed items, fast multi-slot swaps, and AutoQueue.
+- **Forever/Camelot:** open Equipment Manager and ItemRack menus, test movement/mount events, specialization labels, item discovery, and the set-icon picker.
+- On every client, confirm the TOC version, `ItemRack.Version`, and `ItemRack.BuildID` identify the same candidate.
+
 ## 1. Tooltip safety and layout
 
 - Enable **Show set info in tooltips** and place one item in multiple saved sets.

@@ -16,6 +16,9 @@ const buildScript = read('.tools/build_release_dev.ps1');
 const installScript = read('.tools/install_local.ps1');
 const releaseWorkflow = read('.agent/workflows/release.md');
 const technicalChanges = read('TECHNICAL_CHANGES.md');
+const readme = read('README.md');
+const curseForgeDescription = read('CURSEFORGE_DESCRIPTION.md');
+const betaChecklist = read('BETA_TEST_CHECKLIST.md');
 
 let checks = 0;
 function check(condition, message) {
@@ -38,6 +41,23 @@ for (const [name, toc] of [['ItemRack', mainToc], ['ItemRackOptions', optionsToc
     `${name} TOC must advertise the shared official Classic and Forever/Camelot client matrix.`
   );
 }
+
+for (const [name, document] of [
+  ['README', readme],
+  ['CurseForge description', curseForgeDescription],
+  ['technical changes', technicalChanges],
+  ['client checklist', betaChecklist],
+]) {
+  check(
+    /universal/i.test(document) && /Forever|Camelot/.test(document) && /Burning Crusade|TBC/.test(document),
+    `${name} must describe the universal Classic/TBC/Forever support path.`
+  );
+}
+check(
+  !curseForgeDescription.includes('dedicated update for the **TBC Anniversary Edition**') &&
+    !technicalChanges.includes('port ItemRack Classic to the TBC Anniversary Edition'),
+  'Public and technical documentation must not describe the unified addon as a dedicated TBC-only port.'
+);
 
 const tooltipHook = between(
   core,
