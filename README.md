@@ -1,167 +1,112 @@
 # ItemRack — Universal Classic Edition
 
-A maintained ItemRack release for **WoW Classic Era, Hardcore, Season of Discovery, Burning Crusade Classic Anniversary, and WoW Forever/Camelot**. Every supported client uses the same `ItemRack-universal-{Version}.zip`; there is no separate Forever or TBC code track.
+ItemRack is an equipment-set, quick-swap, event, and cooldown-queue addon for World of Warcraft Classic clients.
+
+One release archive supports:
+
+- Classic Era, Hardcore, and Season of Discovery
+- Burning Crusade Classic Anniversary
+- WoW Forever/Camelot
+
+There are no separate Forever and TBC editions. Every client uses the same `ItemRack-universal-{Version}.zip` and the same source tree.
 
 ## Supported clients
 
-| Client family | Interface metadata | Typical installation folder |
+| Client family | Interface metadata | Common installation folder |
 |---|---|---|
 | Classic Era, Hardcore, Season of Discovery | `11508`, `11509` | `_classic_era_` |
 | Burning Crusade Classic Anniversary | `20505`, `20506` | `_anniversary_` or `_classic_` |
-| WoW Forever/Camelot | `11601`, `16001` with `AllowLoadGameType: camelot` | `_classic_beta_` |
+| WoW Forever/Camelot | `11601`, `16001`, `AllowLoadGameType: camelot` | `_classic_beta_` |
 
-The shared runtime selects legacy globals or modern namespaced APIs according to what the active client exposes. Compatibility fixes must stay in this shared path and receive permanent regression coverage; do not create client-specific source or release branches.
-
-## Credits
-
-This addon is based on the original **ItemRack Classic** maintained by Rottenbeer and Roadblock:
-
-🔗 **Original Addon:** [ItemRack Classic on CurseForge](https://www.curseforge.com/wow/addons/itemrack-classic)
-
-**Original Author:** Gello  
-**Classic Port:** Rottenbeer, Roadblock  
-**TBC Anniversary Port:** Bl4ut0
+ItemRack detects the APIs exposed by the running client. Legacy globals, modern `C_*` namespaces, missing UI helpers, and protected/secret-value differences are handled inside one shared compatibility layer.
 
 ## Installation
 
-1. Download the latest release from the [Releases page](https://github.com/Bl4ut0/ItemRack-Anniversary/releases)
-2. Extract the contents to the `Interface\AddOns` folder for the client you use, for example:
-   ```
-   World of Warcraft\_classic_era_\Interface\AddOns\
-   World of Warcraft\_anniversary_\Interface\AddOns\
-   World of Warcraft\_classic_beta_\Interface\AddOns\
-   ```
-3. You should have two folders:
-   - `ItemRack/`
-   - `ItemRackOptions/`
-4. **(Optional)** Install [LibSoundIndex](https://www.curseforge.com/wow/addons/libsoundindex) to mute individual gear-swap sounds without affecting combat alerts or UI. ItemRack never changes the game's global SFX setting when the library is absent.
-5. Restart WoW or type `/reload` if already in-game
-6. ItemRack should appear as equipment slot buttons on your character panel
+1. Download the newest ZIP from [GitHub Releases](https://github.com/Bl4ut0/ItemRack-Anniversary/releases) or [CurseForge](https://www.curseforge.com/wow/addons/itemrack-anniversary).
+2. Extract it into the selected client's `Interface\AddOns` directory.
+3. Confirm these two folders exist directly under `AddOns`:
+   - `ItemRack`
+   - `ItemRackOptions`
+4. Restart the client or run `/reload`.
 
-## 🎮 Features & Usage
+`ItemRackOptions` is ItemRack's load-on-demand configuration module. It is included in the same distribution and is not a separate addon download.
 
-ItemRack allows you to manage your gear with extreme precision through sets, automated queues, and event-based triggers.
+## Main features
 
-**[📖 View Complete Control Reference](CONTROLS.md)** - Detailed guide to all mouse clicks, keybinds, and commands.
+- Save and equip full or partial gear sets.
+- Bind sets and individual equipment slots to keys.
+- Add movable quick-access buttons from the character sheet.
+- Open flyout menus containing compatible carried and banked items.
+- Automatically equip sets for specializations, stances, mounting, movement, zones, buffs, drinking, and other events.
+- Configure per-slot and per-set cooldown queues.
+- Distinguish same-base items with different enchants, gems, suffixes, or runes.
+- Defer restricted swaps safely through combat, casting, loading screens, and item locks.
+- Use one-frame multi-item pipelining where the client permits it.
 
-### 🚀 Quick Access & Slot Buttons
-- **Open Options:** Type `/itemrack opt` or **Right-Click** the minimap button.
-- **Slot Buttons:** **Alt-Click** any item slot on your Character Sheet to create an on-screen "Quick Access" button for that slot.
-- **Use Item:** **Left-Click** a slot button to use the item (trinkets, on-use effects).
-- **Right-Click:** Opens the slot menu when **Menu on right click** is enabled; otherwise uses the item when **Use on right click** is enabled; with both disabled, advances to the next valid queue item.
-- **Open Slot Menu:** Hover over a slot button to open the item selection flyout menu.
-- **Open Queue Options:** **Alt+Right-Click** a slot button to open the Queue configuration for that slot.
-- **Auto-Queue Toggle:** **Alt+Left-Click** an on-screen slot button to toggle the Auto-Queue system for that specific slot on/off.
+See [CONTROLS.md](CONTROLS.md) for the full mouse, keybinding, macro, and slash-command reference.
 
-### ⚔️ Specialization Automation (Dual Spec)
-ItemRack now supports seamless gear-spec integration:
-1. Open the **Sets** tab in Options.
-2. Select or create a gear set.
-3. Check the **Primary Spec** or **Secondary Spec** box to link the set to your talent tree (e.g., "Holy", "Arms").
-4. ItemRack will automatically switch your gear when you change specializations.
-   - *Note:* A 0.5s stability timer prevents race conditions during the switch.
+## Quick start
 
-### 📋 Managing Gear Sets
-- **Saving Sets:** Select the items you want, choose an icon, enter a name, and click **Save**.
-- **Specialization Text:** Checkboxes now dynamically show your talent tree name if points are spent, making it easy to identify which set belongs to which build.
-- **Focus Preservation:** Saving or equipping sets no longer resets your UI scroll position—you stay right where you were editing.
+- `/itemrack opt` opens ItemRack Options.
+- Right-click the minimap button to open Options.
+- Left-click the minimap button to select a saved set.
+- Alt-click an equipment slot on the character sheet to create or remove its quick-access button.
+- Alt-click the character model to create or remove the set button.
+- Use the **Sets** tab to save gear and assign specialization links.
+- Use the **Events** tab to explicitly enable automatic triggers.
+- Use the **Queue** tab to prioritize cooldown items.
 
-### 🔄 Auto-Queue System
-The Auto-Queue system ensures you always have a "ready" item equipped:
-1. Click the **Queue** button (lightning bolt) in Options for a specific slot.
-2. Rank your items from top to bottom (Priority).
-3. When an equipped item goes on cooldown, ItemRack will automatically swap it for the highest priority item that is ready.
-4. **Pause Queue:** You can check "Pause Queue" on specific items to prevent them from being swapped out while in use.
-5. **Per-Set Queues:** Gear Sets automatically save and recall which slot queues are currently enabled when you equip them.
-6. **Burn on Use:** Burned queue items are now tracked by the exact queued item variant, so duplicate same-base items with different enchants, gems, or suffixes no longer burn each other.
+Linking a set to a specialization does not silently approve every automatic behavior. Review and enable the corresponding event when you want ItemRack to control that transition.
 
-### ⚡ Events & Automation
-Events allow for complex automation based on game state:
-1. Go to the **Config** tab and ensure **Enable Events** is checked.
-2. Use the **Events** tab to link specific gear sets to triggers like:
-   - **Drinking/Eating:** Swap to spirit gear.
-   - **Mounting:** Swap to riding gear.
-   - **Zone Changes:** Swap gear when entering a specific raid or city.
-   - **Combat State:** Switch weapons or gear sets when entering/leaving combat.
-3. **Manual Overrides:** Manually picking a set actively overrides and suppresses background events that attempt to combat your choice. 
-4. **Event Tracking:** Use the **`/itemrack debug`** command to monitor which triggers are firing in real-time. This prints all background event logic and gear restorations directly to your chat window. (See the Diagnostic Debugging section below for more details).
+## Script-event safety
 
-#### Script Event Compatibility
-Script events now have a stack-aware helper API:
-- `EquipEventSet("Set Name")`
-- `UnequipEventSet()`
+Script events execute Lua with addon privileges. ItemRack therefore requires an explicit trust decision:
 
-Existing simple script events do **not** need to be rewritten if they use bare `EquipSet(...)` and `UnequipSet(...)` inside the script event editor. Those names are now shimmed onto the stack-aware event path automatically.
+- A valid script saved through ItemRack's editor is approved for its exact name, trigger, and source.
+- A script inserted or changed externally remains disabled until the player accepts ItemRack's warning prompt.
+- Changing approved source invalidates the approval.
+- Rejected or invalid external additions cannot persist through ItemRack's saved script-event path.
 
-Recommended migration for older scripts:
+WoW addons share one Lua environment, so no addon can fully sandbox another hostile addon or WeakAura. Remove any untrusted addon or aura that introduced malicious code.
 
-Before:
-```lua
-EquipSet("My Set")
-UnequipSet("My Set")
+## Diagnostics and bug reports
+
+1. Run `/itemrack debug`.
+2. Reproduce the problem.
+3. Run `/itemrack dump`.
+4. Copy the generated report and review it before sharing.
+
+The dump includes the ItemRack release version/build ID, client state, event ownership, equipment transactions, queues, locks, and recent diagnostic entries. It may contain set names and item information, but not account passwords.
+
+Please include:
+
+- Client family and client build
+- ItemRack version
+- Exact reproduction steps
+- Expected and actual set names
+- Relevant item links, enchants, gems, or runes
+- Full Lua error text
+- `/itemrack dump` output
+
+Report issues at [GitHub Issues](https://github.com/Bl4ut0/ItemRack-Anniversary/issues) or on the [CurseForge comments page](https://www.curseforge.com/wow/addons/itemrack-anniversary/comments).
+
+## Development
+
+Run the complete gate from the repository root:
+
+```powershell
+npm.cmd ci
+npm.cmd test
 ```
 
-After:
-```lua
-EquipEventSet("My Set")
-UnequipEventSet()
-```
+Every reproducible user-reported bug must receive a named permanent regression in the standard `npm test` gate. See [TESTING.md](TESTING.md) for the workflow and [BETA_TEST_CHECKLIST.md](BETA_TEST_CHECKLIST.md) for live-client acceptance checks.
 
-Use the new helper names when editing or creating script events going forward. If a script intentionally calls `ItemRack.EquipSet(...)` or `ItemRack.UnequipSet(...)`, that remains the low-level escape hatch and is not automatically stack-managed.
+Release builds are exported from immutable Git commits. The only supported artifact is `ItemRack-universal-{Version}.zip`; client-specific source branches and packages are retired. See [.agent/workflows/release.md](.agent/workflows/release.md).
 
-#### Script Event Safety
+## Credits
 
-Script events execute Lua with addon-level access, so ItemRack treats their code as an explicit trust decision:
+- Original ItemRack author: **Gello**
+- Classic maintainers: **Rottenbeer** and **Roadblock**
+- Anniversary and universal maintenance: **Bl4ut0**
 
-- Saving a valid custom Script event through ItemRack's editor counts as explicit approval and enables that exact source without an extra prompt.
-- A Script event introduced or changed outside the editor is disabled. Deliberately enabling it opens an **Approve & Enable** prompt.
-- Approval covers the exact event name, game-event trigger, and script text. Changing any of them disables the event and requires prompt approval or an ItemRack editor save.
-- Unchanged scripts shipped with ItemRack are trusted as part of the installed addon. Modifying one removes that bundled trust.
-- Rejected, malformed, oversized, or syntactically invalid new events are removed. Rejected changes to a previously approved event restore its last approved source, disabled.
-- ItemRack removes or rolls back every remaining unapproved Script event before SavedVariables are written at logout. Registration and dispatch also recheck approval before compiling code.
-
-WoW addons share one Lua environment, so no addon can sandbox another hostile addon or WeakAura. This guard prevents unreviewed code from using ItemRack's saved script-event engine as an execution or persistence path; users should still delete any untrusted aura or addon that supplied the code.
-
-### 🛠️ Diagnostic Debugging Tools (New!)
-ItemRack now includes an incredibly powerful, native diagnostic system built directly into the UI. No more trying to find or zip `WTF` folders—if you experience a bug, you can instantly export exactly what is wrong.
-
-1. Turn on debugging: `/itemrack debug`
-2. Perform the action that breaks (e.g., mounting, entering combat).
-3. Type `/itemrack dump` to summon a native pop-up window containing the last 500 actions, queue states, and any stuck API locks.
-4. Hit `CTRL+C` in the text box to instantly copy the exact, anonymized diagnostic code and active `SavedVariables` state for easy sharing when reporting a bug.
-
-> [!IMPORTANT]
-> **Data Privacy Notice:** The `/itemrack dump` command retrieves technical data for debugging, which includes your gear set names, queue configurations, and recently equipped items. It does **not** collect passwords or sensitive account information. Please review the output before sharing if you wish to keep specific set names private.
-
-## Cross-client compatibility
-
-The supported clients expose different mixtures of legacy APIs, modern namespaces, and protected/secret values. ItemRack keeps those differences behind one compatibility layer. See [TECHNICAL_CHANGES.md](TECHNICAL_CHANGES.md) for implementation details and [CHANGELOG.md](CHANGELOG.md) for release history.
-
-### Key Changes
-- API namespace migrations (`C_Container`, `C_Item`, `C_AddOns`)
-- Button template compatibility fixes for secure action handling
-- **Visual Fix:** Resolved yellow triangle artifacts in Options Menu via texture cleanup
-- Deprecation fallback shims for critical functions
-
-## Development and testing
-
-Run `npm test` for the complete code-level release gate. The suite includes
-deterministic large-profile workloads with dozens of overlapping saved sets,
-deep event stacks, legacy queue migrations, and serialized equipment failures.
-See [TESTING.md](TESTING.md) for the scenario matrix, reproduction seed, and the
-client behaviors that still require in-game beta testing.
-
-Every reproducible user-reported bug gains a permanent named regression in this
-standard gate. Follow the [user-report regression workflow](TESTING.md#user-report-regression-workflow)
-when implementing fixes; client-only failures also retain an in-game acceptance
-checklist.
-
-## Support
-
-For issues on any supported client, please open an issue on this GitHub repository and include the client branch/build, ItemRack version, reproduction steps, and `/itemrack dump` output.
-
-For general ItemRack functionality questions, refer to the [original CurseForge page](https://www.curseforge.com/wow/addons/itemrack-classic).
-
-## License
-
-This addon maintains the same license as the original ItemRack Classic.
+This project builds on [ItemRack Classic](https://www.curseforge.com/wow/addons/itemrack-classic) and preserves the original addon's license.
