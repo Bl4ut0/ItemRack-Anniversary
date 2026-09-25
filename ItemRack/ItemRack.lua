@@ -94,14 +94,24 @@ function ItemRack.PrintDebugStatus()
 	ItemRack.Print("Layers: " .. table.concat(states, ", "))
 end
 
--- by Mikinho - Fix for latest update for Classic Era/SoD v11504
+-- by Mikinho - Fix for latest update for Classic Era/SoD v11504 & Modern/Camelot 1.60+
 local GetMouseFocus = GetMouseFocus
 if not GetMouseFocus and GetMouseFoci then
-    local GetMouseFoci = GetMouseFoci
-          GetMouseFocus = function()
-          return GetMouseFoci()[1]
-      end
+	GetMouseFocus = function()
+		local foci = GetMouseFoci()
+		return foci and foci[1]
+	end
+	_G.GetMouseFocus = GetMouseFocus
 end
+
+-- Compatibility shim for MouseIsOver (removed in Modern/Camelot 1.60+)
+if not MouseIsOver then
+	MouseIsOver = function(frame, ...)
+		return (frame and frame.IsMouseOver and frame:IsMouseOver(...)) and true or false
+	end
+	_G.MouseIsOver = MouseIsOver
+end
+
 
 
 -- Compatibility shim for CastingInfo/ChannelInfo (moved to UnitCastingInfo/UnitChannelInfo in some versions)
@@ -118,6 +128,18 @@ if not SetActiveTalentGroup and C_SpecializationInfo and C_SpecializationInfo.Se
 end
 if not GetNumTalentGroups and C_SpecializationInfo and C_SpecializationInfo.GetNumSpecGroups then
 	GetNumTalentGroups = C_SpecializationInfo.GetNumSpecGroups
+end
+if not GetTalentTabInfo and C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo then
+	GetTalentTabInfo = function(specializationIndex, isInspect, isPet, groupIndex)
+		local specId, name, description, icon, role, primaryStat, pointsSpent, background, previewPointsSpent, isUnlocked = C_SpecializationInfo.GetSpecializationInfo(specializationIndex, isInspect, isPet, nil, nil, groupIndex)
+		return specId, name, description, icon, pointsSpent, background, previewPointsSpent, isUnlocked
+	end
+end
+if not GetNumTalentTabs and C_SpecializationInfo and C_SpecializationInfo.GetNumSpecializationsForClassID then
+	GetNumTalentTabs = function()
+		local _, _, classID = UnitClass("player")
+		return classID and C_SpecializationInfo.GetNumSpecializationsForClassID(classID) or 3
+	end
 end
 
 -- Compatibility shim for AuraUtil.FindAuraByName (may not exist in TBC 2.5.5)
@@ -141,12 +163,69 @@ end
 -- Compatibility shims for Item APIs (may not have globals if deprecation fallbacks disabled)
 local GetItemInfo = _G.GetItemInfo or (C_Item and C_Item.GetItemInfo)
 local GetItemCount = _G.GetItemCount or (C_Item and C_Item.GetItemCount)
-local GetItemFamily = _G.GetItemFamily or (C_Item and C_Item.GetItemFamily)
+if not GetItemFamily then
+	GetItemFamily = function(item)
+		if not item then return 0 end
+		if C_Item and C_Item.GetItemFamily then
+			local num = tonumber(item)
+			local ok, family = pcall(C_Item.GetItemFamily, num or item)
+			if ok and type(family) == "number" then
+				return family
+			end
+		end
+		return 0
+	end
+	_G.GetItemFamily = GetItemFamily
+end
+local GetItemFamily = _G.GetItemFamily
 local IsEquippableItem = _G.IsEquippableItem or (C_Item and C_Item.IsEquippableItem)
 
+if not IsEquippableItem then
+	IsEquippableItem = function(item)
+		if not item or item == 0 or item == "0" then return false end
+		if C_Item and C_Item.IsEquippableItem then
+			local num = tonumber(item)
+			local ok, isEquippable = pcall(C_Item.IsEquippableItem, num or item)
+			if ok then return isEquippable and true or false end
+		end
+		return false
+	end
+	_G.IsEquippableItem = IsEquippableItem
+end
+local IsEquippableItem = _G.IsEquippableItem
+
+if not IsEquippedItem then
+	IsEquippedItem = function(item)
+		if not item or item == 0 or item == "0" then return false end
+		if C_Item and C_Item.IsEquippedItem then
+			local num = tonumber(item)
+			local ok, isEquipped = pcall(C_Item.IsEquippedItem, num or item)
+			if ok then return isEquipped and true or false end
+		end
+		return false
+	end
+	_G.IsEquippedItem = IsEquippedItem
+end
+local IsEquippedItem = _G.IsEquippedItem
+
+function ItemRack.IsPlayerMoving()
+	local ok, moving = pcall(function()
+		local speed = GetUnitSpeed and GetUnitSpeed("player")
+		if speed ~= nil then
+			return speed > 0
+		end
+		return nil
+	end)
+	if ok and moving ~= nil then
+		ItemRack.PlayerIsMoving = moving
+		return moving
+	end
+	return ItemRack.PlayerIsMoving or false
+end
+
 function ItemRack.IsClassic()
-	-- Classic Era: TOC version 10000-19999 or project ID
-	if wowtoc >= 10000 and wowtoc < 20000 then
+	-- Classic Era / Forever: legacy 1.x and modern six-digit 1.x TOCs.
+	if (wowtoc >= 10000 and wowtoc < 20000) or (wowtoc >= 100000 and wowtoc < 200000) then
 		return true
 	end
 	return WOW_PROJECT_CLASSIC and WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
@@ -285,9 +364,10 @@ do
 	end
 end
 
-local GetContainerNumSlots, GetContainerItemLink, GetContainerItemID, GetContainerItemCooldown, GetContainerItemInfo, GetItemCooldown, PickupContainerItem, ContainerIDToInventoryID
+local GetContainerNumSlots, GetContainerNumFreeSlots, GetContainerItemLink, GetContainerItemID, GetContainerItemCooldown, GetContainerItemInfo, GetItemCooldown, PickupContainerItem, ContainerIDToInventoryID
 if C_Container then
 	GetContainerNumSlots = C_Container.GetContainerNumSlots
+	GetContainerNumFreeSlots = C_Container.GetContainerNumFreeSlots
 	GetContainerItemLink = C_Container.GetContainerItemLink
 	GetContainerItemID = C_Container.GetContainerItemID
 	GetContainerItemCooldown = C_Container.GetContainerItemCooldown
@@ -303,8 +383,8 @@ if C_Container then
 		end
 	end
 else
-	GetContainerNumSlots, GetContainerItemLink, GetContainerItemID, GetContainerItemCooldown, GetContainerItemInfo, GetItemCooldown, PickupContainerItem, ContainerIDToInventoryID =
-	_G.GetContainerNumSlots, _G.GetContainerItemLink, _G.GetContainerItemID, _G.GetContainerItemCooldown, _G.GetContainerItemInfo, _G.GetItemCooldown, _G.PickupContainerItem, _G.ContainerIDToInventoryID
+	GetContainerNumSlots, GetContainerNumFreeSlots, GetContainerItemLink, GetContainerItemID, GetContainerItemCooldown, GetContainerItemInfo, GetItemCooldown, PickupContainerItem, ContainerIDToInventoryID =
+	_G.GetContainerNumSlots, _G.GetContainerNumFreeSlots, _G.GetContainerItemLink, _G.GetContainerItemID, _G.GetContainerItemCooldown, _G.GetContainerItemInfo, _G.GetItemCooldown, _G.PickupContainerItem, _G.ContainerIDToInventoryID
 end
 
 local LDB = LibStub("LibDataBroker-1.1")
@@ -2330,13 +2410,17 @@ function ItemRack.InitCore()
 		ItemRack.LockList[i] = {}
 	end
 
-	hooksecurefunc("UseInventoryItem",ItemRack.newUseInventoryItem)
-	hooksecurefunc("UseAction",ItemRack.newUseAction)
-	hooksecurefunc("UseItemByName",ItemRack.newUseItemByName)
-	hooksecurefunc("PaperDollFrame_OnShow",ItemRack.newPaperDollFrame_OnShow)
-	hooksecurefunc(GameTooltip, "SetBagItem", ItemRack.OnSetBagItem)
-	hooksecurefunc(GameTooltip, "SetInventoryItem", ItemRack.OnSetInventoryItem)
-	hooksecurefunc(GameTooltip, "SetHyperlink", ItemRack.OnSetHyperlink)
+	if UseInventoryItem then hooksecurefunc("UseInventoryItem",ItemRack.newUseInventoryItem) end
+	if UseAction then hooksecurefunc("UseAction",ItemRack.newUseAction) end
+	if UseItemByName then
+		hooksecurefunc("UseItemByName",ItemRack.newUseItemByName)
+	elseif C_Item and C_Item.UseItemByName then
+		hooksecurefunc(C_Item, "UseItemByName", ItemRack.newUseItemByName)
+	end
+	if PaperDollFrame_OnShow then hooksecurefunc("PaperDollFrame_OnShow",ItemRack.newPaperDollFrame_OnShow) end
+	if GameTooltip and GameTooltip.SetBagItem then hooksecurefunc(GameTooltip, "SetBagItem", ItemRack.OnSetBagItem) end
+	if GameTooltip and GameTooltip.SetInventoryItem then hooksecurefunc(GameTooltip, "SetInventoryItem", ItemRack.OnSetInventoryItem) end
+	if GameTooltip and GameTooltip.SetHyperlink then hooksecurefunc(GameTooltip, "SetHyperlink", ItemRack.OnSetHyperlink) end
 
 	ItemRackFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 	ItemRackFrame:RegisterEvent("PLAYER_LOGOUT")
@@ -3085,22 +3169,46 @@ end
 
 -- returns true if the bagid (0-4) is a normal "Container", as opposed to quivers and ammo pouches
 function ItemRack.ValidBag(bagid)
-	local baseID,bagtype
 	if bagid==0 or bagid==-1 then
 		return 1
-	else
-		local invID = ContainerIDToInventoryID(bagid)
-		baseID = ItemRack.GetIRString(GetInventoryItemLink("player",invID),true,true) --get the baseID for the container
-		if not GetItemFamily or GetItemFamily(baseID)==0 then
-			return 1
-		end
---		if baseID then
---			_,_,_,_,_,_,bagtype = GetItemInfo(baseID)
---			if bagtype=="Bag" or bagtype=="Conteneur" or bagtype=="Beh\195\164lter" then
---				return 1
---			end
---		end
 	end
+
+	-- Direct container free slots check if available (returns freeSlots, bagFamily)
+	if GetContainerNumFreeSlots then
+		local ok, _, bagFamily = pcall(GetContainerNumFreeSlots, bagid)
+		if ok and type(bagFamily) == "number" then
+			return bagFamily == 0 and 1 or nil
+		end
+	end
+
+	local invID = ContainerIDToInventoryID and ContainerIDToInventoryID(bagid)
+	local link = invID and GetInventoryItemLink("player",invID)
+	if not link then
+		local numSlots = GetContainerNumSlots and GetContainerNumSlots(bagid)
+		return (numSlots and numSlots > 0) and 1 or nil
+	end
+
+	local baseID = ItemRack.GetIRString(link,true,true) --get the baseID for the container
+	local family = nil
+	if baseID and baseID ~= 0 and baseID ~= "0" then
+		if GetItemFamily then
+			local ok, fam = pcall(GetItemFamily, tonumber(baseID) or baseID)
+			if ok and type(fam) == "number" then
+				family = fam
+			end
+		elseif C_Item and C_Item.GetItemFamily then
+			local ok, fam = pcall(C_Item.GetItemFamily, tonumber(baseID) or baseID)
+			if ok and type(fam) == "number" then
+				family = fam
+			end
+		end
+	end
+
+	if family ~= nil then
+		return family == 0 and 1 or nil
+	end
+
+	return 1
 end
 
 function ItemRack.ClearLockList() -- this function is called very frequently, such as every time you click a set popup button to change the current set, AS WELL as when the actual set change takes place, and will call PopulateKnownItems in order to re-build the cache of current item locations and their itemstrings
@@ -3244,7 +3352,16 @@ function ItemRack.PopulateKnownItems()
 		for j=1,GetContainerNumSlots(i) do
 			id = getid(i,j) --grab ItemRack-style ID for every bag item
 			if id~=0 then
-				if not IsEquippableItem or IsEquippableItem(ItemRack.GetIRString(id,true)) then --only proceed if this is an equippable item (test against the baseID of the item)
+				local baseID = ItemRack.GetIRString(id,true)
+				local isEquip = false
+				if IsEquippableItem then
+					local ok, res = pcall(IsEquippableItem, tonumber(baseID) or baseID)
+					if ok and res then isEquip = true end
+				elseif C_Item and C_Item.IsEquippableItem then
+					local ok, res = pcall(C_Item.IsEquippableItem, tonumber(baseID) or baseID)
+					if ok and res then isEquip = true end
+				end
+				if isEquip then
 					known[id] = i*100+j --we were able to generate a valid ID for this item, so store its location (as a bag container offset)
 				end
 			end
@@ -3255,8 +3372,19 @@ function ItemRack.PopulateKnownItems()
 			if ItemRack.ValidBag(i) then
 				for j=1,GetContainerNumSlots(i) do
 					id = getid(i,j)
-					if id~=0 and (not IsEquippableItem or IsEquippableItem(ItemRack.GetIRString(id,true))) then
-						known[id] = i*100+j
+					if id~=0 then
+						local baseID = ItemRack.GetIRString(id,true)
+						local isEquip = false
+						if IsEquippableItem then
+							local ok, res = pcall(IsEquippableItem, tonumber(baseID) or baseID)
+							if ok and res then isEquip = true end
+						elseif C_Item and C_Item.IsEquippableItem then
+							local ok, res = pcall(C_Item.IsEquippableItem, tonumber(baseID) or baseID)
+							if ok and res then isEquip = true end
+						end
+						if isEquip then
+							known[id] = i*100+j
+						end
 					end
 				end
 			end
@@ -3690,7 +3818,7 @@ function ItemRack.WriteMenuCooldowns()
 end
 
 function ItemRack.MenuMouseover()
-	local frame = GetMouseFocus()
+	local frame = (GetMouseFocus and GetMouseFocus()) or (GetMouseFoci and GetMouseFoci()[1])
 	local frameName = nil
 	local frameVisible = nil
 	local IRmouseOverFrame = nil
@@ -3703,14 +3831,26 @@ function ItemRack.MenuMouseover()
 		local ok, isVis = pcall(frame.IsVisible, frame)
 		if ok then frameVisible = isVis end
 	end
+
+	local function SafeMouseIsOver(f)
+		if not f then return false end
+		if f.IsMouseOver then
+			local ok, res = pcall(f.IsMouseOver, f)
+			return ok and res and true or false
+		elseif MouseIsOver then
+			local ok, res = pcall(MouseIsOver, f)
+			return ok and res and true or false
+		end
+		return false
+	end
 	
 	if frameName then IRmouseOverFrame = ItemRack.MenuMouseoverFrames[frameName] end
-	if MouseIsOver(ItemRackMenuFrame) or IsShiftKeyDown() or (frame and frameName and frameVisible and IRmouseOverFrame) then
+	if SafeMouseIsOver(ItemRackMenuFrame) or IsShiftKeyDown() or (frame and frameName and frameVisible and IRmouseOverFrame) then
 		return -- keep menu open if mouse over menu, shift is down or mouse is immediately over a mouseover frame
 	end
 	for i in pairs(ItemRack.MenuMouseoverFrames) do
 		frame = _G[i]
-		if frame and frame:IsVisible() and MouseIsOver(frame) then
+		if frame and frame:IsVisible() and SafeMouseIsOver(frame) then
 			return -- keep menu open if some frame beneath mouse is a mouseover frame
 		end
 	end
@@ -4078,8 +4218,8 @@ function ItemRack.EquipItemByID(id,slot,isAutoQueue,sourceBag,sourceSlot,origin)
 end
 
 function ItemRack.PollMovement()
-	-- If speed is 0, they have landed and lost momentum. Re-evaluate Buffs and stop timer.
-	if GetUnitSpeed("player") == 0 then
+	-- If player is not moving, they have landed and lost momentum. Re-evaluate Buffs and stop timer.
+	if not ItemRack.IsPlayerMoving() then
 		ItemRack.ProcessBuffEvent()
 		ItemRack.StopTimer("MovementPollingTimer")
 	end
@@ -4493,6 +4633,41 @@ end
 
 function ItemRack.newPaperDollFrame_OnShow()
 	ItemRack.UpdateCombatQueue()
+	if not ItemRack.sidebarHooked then
+		ItemRack.sidebarHooked = true
+		if PaperDollFrame and PaperDollFrame.EquipmentManagerPane then
+			PaperDollFrame.EquipmentManagerPane:HookScript("OnShow", function()
+				if ItemRackMenuFrame:IsVisible() and ItemRack.menuDockedTo then
+					ItemRackMenuFrame:Hide()
+					ItemRack.menuDockedTo = nil
+				end
+			end)
+		end
+		if EquipmentFlyoutFrame then
+			EquipmentFlyoutFrame:HookScript("OnShow", function()
+				if ItemRackMenuFrame:IsVisible() and ItemRack.menuDockedTo then
+					ItemRackMenuFrame:Hide()
+					ItemRack.menuDockedTo = nil
+				end
+			end)
+		end
+		if GearManagerDialog then
+			GearManagerDialog:HookScript("OnShow", function()
+				if ItemRackMenuFrame:IsVisible() and ItemRack.menuDockedTo then
+					ItemRackMenuFrame:Hide()
+					ItemRack.menuDockedTo = nil
+				end
+			end)
+		end
+		if PaperDollFrame_SetSidebar then
+			hooksecurefunc("PaperDollFrame_SetSidebar", function(self, index)
+				if ItemRack.IsEquipmentManagerOpen() and ItemRackMenuFrame:IsVisible() then
+					ItemRackMenuFrame:Hide()
+					ItemRack.menuDockedTo = nil
+				end
+			end)
+		end
+	end
 end
 
 function ItemRack.newUseInventoryItem(slot)
@@ -5053,8 +5228,35 @@ end
 
 --[[ Character sheet menus ]]
 
+function ItemRack.IsEquipmentManagerOpen()
+	if PaperDollFrame and PaperDollFrame.EquipmentManagerPane and PaperDollFrame.EquipmentManagerPane:IsShown() then
+		return true
+	end
+	if GearManagerDialog and GearManagerDialog:IsShown() then
+		return true
+	end
+	if EquipmentFlyoutFrame and EquipmentFlyoutFrame:IsShown() then
+		return true
+	end
+	if PaperDollFrame and PaperDollFrame.currentSideBar and PaperDollFrame.EquipmentManagerPane and PaperDollFrame.currentSideBar == PaperDollFrame.EquipmentManagerPane then
+		return true
+	end
+	return false
+end
+
 ItemRack.oldPaperDollItemSlotButton_OnEnter = PaperDollItemSlotButton_OnEnter
 function PaperDollItemSlotButton_OnEnter(self)
+	if ItemRack.IsEquipmentManagerOpen() then
+		if ItemRackMenuFrame:IsVisible() and ItemRack.menuDockedTo then
+			ItemRackMenuFrame:Hide()
+			ItemRack.menuDockedTo = nil
+		end
+		if ItemRack.oldPaperDollItemSlotButton_OnEnter then
+			ItemRack.oldPaperDollItemSlotButton_OnEnter(self)
+		end
+		return
+	end
+
 	local name = self:GetName()
 	local isMenuOpening = ItemRack.menuDockedTo~=name and (ItemRackSettings.MenuOnShift=="OFF" or IsShiftKeyDown()) and ItemRackSettings.CharacterSheetMenus=="ON"
 	

@@ -10,6 +10,8 @@ const buttons = read('ItemRack/ItemRackButtons.lua');
 const options = read('ItemRackOptions/ItemRackOptions.lua');
 const queue = read('ItemRack/ItemRackQueue.lua');
 const optionsXml = read('ItemRackOptions/ItemRackOptions.xml');
+const mainToc = read('ItemRack/ItemRack.toc');
+const optionsToc = read('ItemRackOptions/ItemRackOptions.toc');
 const buildScript = read('.tools/build_release_dev.ps1');
 const installScript = read('.tools/install_local.ps1');
 const releaseWorkflow = read('.agent/workflows/release.md');
@@ -27,6 +29,14 @@ function between(source, start, end) {
   assert.notStrictEqual(startIndex, -1, `Missing start marker: ${start}`);
   assert.notStrictEqual(endIndex, -1, `Missing end marker: ${end}`);
   return source.slice(startIndex, endIndex);
+}
+
+for (const [name, toc] of [['ItemRack', mainToc], ['ItemRackOptions', optionsToc]]) {
+  check(
+    toc.includes('## Interface: 11601, 16001, 11509, 11508, 20505, 20506') &&
+      toc.includes('## AllowLoadGameType: camelot'),
+    `${name} TOC must advertise the shared official Classic and Forever/Camelot client matrix.`
+  );
 }
 
 const tooltipHook = between(
@@ -198,6 +208,27 @@ check(
   !technicalChanges.includes('Calling `Show()` on `GameTooltip` is safe and taint-free'),
   'Technical guidance must not claim insecure tooltip Show calls are safe.'
 );
+check(
+  core.includes('MouseIsOver = function(frame, ...)') &&
+    core.includes('_G.MouseIsOver = MouseIsOver'),
+  'ItemRack.lua must provide a global MouseIsOver compatibility shim for modern/Camelot clients.'
+);
+check(
+  core.includes('SafeMouseIsOver') &&
+    core.includes('GetMouseFoci and GetMouseFoci()[1]'),
+  'MenuMouseover must use SafeMouseIsOver and fall back to GetMouseFoci when GetMouseFocus is nil.'
+);
+check(
+  core.includes('ItemRack.IsEquipmentManagerOpen') &&
+    core.includes('PaperDollItemSlotButton_OnEnter'),
+  'ItemRack must detect when Equipment Manager is open and suppress breakout menu.'
+);
+check(
+  options.includes('ItemRackOpt.GetSpecName') &&
+    options.includes('GetTalentTabInfo'),
+  'ItemRackOptions must safely query talent/spec info without nil errors.'
+);
+
 
 const shouldHold = between(
   queue,
@@ -212,6 +243,41 @@ check(
   queue.includes('local ResolveProxy = ItemRack.ResolveProxy'),
   'ItemRackQueue must define a local ResolveProxy alias.'
 );
+check(
+  core.includes('GetItemFamily = function(item)') &&
+    core.includes('_G.GetItemFamily = GetItemFamily'),
+  'ItemRack.lua must provide a global GetItemFamily compatibility shim for modern/Camelot clients.'
+);
+check(
+  core.includes('function ItemRack.ValidBag(bagid)') &&
+    core.includes('GetContainerNumFreeSlots') &&
+    core.includes('pcall(GetItemFamily'),
+  'ValidBag must use safe GetItemFamily and GetContainerNumFreeSlots checks.'
+);
+check(
+  core.includes('IsEquippableItem = function(item)') &&
+    core.includes('_G.IsEquippableItem = IsEquippableItem'),
+  'ItemRack.lua must provide a global IsEquippableItem compatibility shim for modern/Camelot clients.'
+);
+check(
+  core.includes('function ItemRack.PopulateKnownItems()') &&
+    core.includes('pcall(IsEquippableItem'),
+  'PopulateKnownItems must use safe IsEquippableItem calls with pcall and fallback.'
+);
+check(
+  core.includes('function ItemRack.IsPlayerMoving()') &&
+    events.includes('ItemRack.IsPlayerMoving'),
+  'ItemRack and ItemRackEvents must define ItemRack.IsPlayerMoving() to guard against secret value taint errors.'
+);
+check(
+  !events.includes('GetUnitSpeed("player") > 0') &&
+    !events.includes('local speed = GetUnitSpeed("player")') &&
+    !core.includes('GetUnitSpeed("player") == 0'),
+  'Movement evaluation must not perform direct comparison on GetUnitSpeed("player") without secret value guards.'
+);
+
+
+
 
 check(
   !optionsXml.includes('ItemRackOptItemStatsDelay" numeric="true" historyLines="0" enableMouse="true" autoFocus="false" letters="3" virtual="true"') &&
@@ -220,10 +286,12 @@ check(
 );
 
 check(
-  core.includes('local GetItemFamily = _G.GetItemFamily or (C_Item and C_Item.GetItemFamily)') &&
-    core.includes('local IsEquippableItem = _G.IsEquippableItem or (C_Item and C_Item.IsEquippableItem)') &&
-    core.includes('if not GetItemFamily or GetItemFamily(baseID)==0 then') &&
-    core.includes('not IsEquippableItem or IsEquippableItem(ItemRack.GetIRString(id,true))'),
+  core.includes('GetItemFamily = function(item)') &&
+    core.includes('_G.GetItemFamily = GetItemFamily') &&
+    core.includes('IsEquippableItem = function(item)') &&
+    core.includes('_G.IsEquippableItem = IsEquippableItem') &&
+    core.includes('pcall(GetItemFamily') &&
+    core.includes('pcall(IsEquippableItem'),
   'ItemRack core must provide C_Item fallbacks and nil guards for GetItemFamily and IsEquippableItem.'
 );
 
@@ -233,7 +301,9 @@ check(
 );
 
 check(
-  options.includes('if not GetTalentTabInfo then') &&
+  options.includes('if GetTalentTabInfo then') &&
+    options.includes('elseif C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo then') &&
+    options.includes('pcall(GetTalentTabInfo') &&
     options.includes('return group == 1 and "Primary Spec" or "Secondary Spec"'),
   'ItemRackOpt.GetSpecName must guard against nil GetTalentTabInfo.'
 );

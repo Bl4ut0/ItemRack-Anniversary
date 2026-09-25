@@ -6,6 +6,7 @@ ItemRackOpt = {
 	HoldInv = {}, -- 0-19 ItemRackOpt.Inv held when picking set
 	SetList = {}, -- numerically-indexed list of set names
 	selectedIcon = 0,
+	selectedIconIndex = nil,
 	prevFrame = nil, -- previous subframe a frame should return to (ItemRackOptSubFrame1-x)
 	numSubFrames = 9, -- number of subframes
 	slotOrder = {1,2,3,15,5,4,19,9,16,17,18,0,14,13,12,11,8,7,6,10,6,7,8,11,12,13,14,0,18,17,16,9,19,4,5,15,3,2},
@@ -13,35 +14,68 @@ ItemRackOpt = {
 	SpecDirty = false,
 }
 
+ItemRackOpt.FallbackSetIcon = "Interface\\Icons\\INV_Misc_QuestionMark"
+
+function ItemRackOpt.NormalizeSetIcon(texture)
+	if type(texture) == "number" then
+		return texture > 0 and texture or ItemRackOpt.FallbackSetIcon
+	end
+	if type(texture) == "string" and texture ~= "" then
+		return texture
+	end
+	return ItemRackOpt.FallbackSetIcon
+end
+
+function ItemRackOpt.AppendSetIcon(texture, prefixIconPath)
+	if type(texture) == "number" and texture > 0 then
+		table.insert(ItemRackOpt.Icons,texture)
+	elseif type(texture) == "string" and texture ~= "" then
+		table.insert(ItemRackOpt.Icons,(prefixIconPath and "Interface\\Icons\\" or "")..texture)
+	end
+end
+
+function ItemRackOpt.ShouldHighlightSetIcon(index, texture, alreadyMatched)
+	if ItemRackOpt.selectedIconIndex then
+		return ItemRackOpt.selectedIconIndex == index,alreadyMatched
+	end
+	if not alreadyMatched and texture == ItemRackOpt.selectedIcon then
+		return true,true
+	end
+	return false,alreadyMatched
+end
+
 function ItemRackOpt.GetSpecName(group)
 	local maxPoints, maxName = 0, "None"
-	local activeGroup = GetActiveTalentGroup and GetActiveTalentGroup()
-	if not GetTalentTabInfo then
-		return group == 1 and "Primary Spec" or "Secondary Spec"
-	end
+	local activeGroup = (GetActiveTalentGroup and GetActiveTalentGroup()) or (C_SpecializationInfo and C_SpecializationInfo.GetActiveSpecGroup and C_SpecializationInfo.GetActiveSpecGroup()) or 1
 	
 	for i=1,3 do
-		-- Handle different API return styles between old and modern Classic clients
-		local arg1, arg2, arg3, arg4, arg5, arg6, arg7 = GetTalentTabInfo(i, false, false, group)
-		
 		local name, points
-		-- Modern/Shimmed API: (specId, name, description, icon, pointsSpent, ...)
-		if type(arg1) == "number" then
-			name = arg2
-			points = arg5
-		-- Old API: (name, icon, pointsSpent, ...)
-		else
-			name = arg1
-			points = arg3
-		end
-
-		-- Fallback: If still zero/none and we are querying active group, try without group index
-		if (not points or points == 0) and (activeGroup and group == activeGroup) then
-			local f1, f2, f3, f4, f5 = GetTalentTabInfo(i)
-			if type(f1) == "number" then
-				name, points = f2, f5 -- Note: if the shim applies to single-arg call too
-			else
-				name, points = f1, f3
+		if GetTalentTabInfo then
+			local ok, arg1, arg2, arg3, arg4, arg5 = pcall(GetTalentTabInfo, i, false, false, group)
+			if ok then
+				if type(arg1) == "number" then
+					name = arg2
+					points = arg5
+				else
+					name = arg1
+					points = arg3
+				end
+			end
+			if (not points or points == 0) and (activeGroup and group == activeGroup) then
+				local okFallback, f1, f2, f3, f4, f5 = pcall(GetTalentTabInfo, i)
+				if okFallback then
+					if type(f1) == "number" then
+						name, points = f2, f5
+					else
+						name, points = f1, f3
+					end
+				end
+			end
+		elseif C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo then
+			local ok, specId, specName, _, _, _, _, pointsSpent = pcall(C_SpecializationInfo.GetSpecializationInfo, i, false, false, nil, nil, group)
+			if ok then
+				name = specName
+				points = pointsSpent
 			end
 		end
 
@@ -51,7 +85,15 @@ function ItemRackOpt.GetSpecName(group)
 			maxName = name
 		end
 	end
-	if maxPoints == 0 then return group == 1 and "Primary Spec" or "Secondary Spec" end
+	if maxPoints == 0 then
+		if C_SpecializationInfo and C_SpecializationInfo.GetSpecializationInfo then
+			local ok, _, specName = pcall(C_SpecializationInfo.GetSpecializationInfo, group or 1)
+			if ok and specName then
+				return specName
+			end
+		end
+		return group == 1 and "Primary Spec" or "Secondary Spec"
+	end
 	return maxName
 end
 
@@ -60,6 +102,10 @@ function ItemRackOpt.OnEvent(self, event, ...)
 		if ItemRackOptFrame:IsVisible() then
 			ItemRackOpt.ValidateSetButtons()
 		end
+	elseif event == "GET_ITEM_INFO_RECEIVED" and ItemRackOptFrame:IsVisible() then
+		-- GetItemInfo may initially return no texture. Rebuild only the icon
+		-- choices when the cache completes; never disturb the set being edited.
+		ItemRackOpt.PopulateInvIcons()
 	end
 end
 
@@ -123,6 +169,7 @@ end
 function ItemRackOpt.OnLoad(self)
 	self:RegisterEvent("PLAYER_TALENT_UPDATE")
 	self:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
+	self:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 	self:SetScript("OnEvent", ItemRackOpt.OnEvent)
 
 	self:SetClampedToScreen(true)
@@ -294,13 +341,15 @@ function ItemRackOpt.OnShow(setname)
 	end
 	if ItemRackUser.CurrentSet and ItemRackUser.Sets[ItemRackUser.CurrentSet] then
 		ItemRackOptSetsName:SetText(ItemRackUser.CurrentSet)
-		ItemRackOpt.selectedIcon = ItemRackUser.Sets[ItemRackUser.CurrentSet].icon
+		ItemRackOpt.selectedIcon = ItemRackOpt.NormalizeSetIcon(ItemRackUser.Sets[ItemRackUser.CurrentSet].icon)
+		ItemRackOpt.selectedIconIndex = nil
 		for i=0,19 do
 			ItemRackOpt.Inv[i].selected = ItemRackUser.Sets[ItemRackUser.CurrentSet].equip[i] and 1 or nil
 		end
 	else
 		ItemRackOptSetsName:SetText("")
 		ItemRackOpt.selectedIcon = ItemRackOpt.Icons[math.random(#(ItemRackOpt.Icons)-20)+20]
+		ItemRackOpt.selectedIconIndex = nil
 	end
 	ItemRackOpt.UpdateInv()
 	ItemRackOpt.SpecDirty = false
@@ -322,7 +371,8 @@ function ItemRackOpt.ChangeEditingSet()
 			end
 		end
 		ItemRackOptSetsName:SetText(setname)
-		ItemRackOpt.selectedIcon = ItemRackUser.Sets[setname].icon
+		ItemRackOpt.selectedIcon = ItemRackOpt.NormalizeSetIcon(ItemRackUser.Sets[setname].icon)
+		ItemRackOpt.selectedIconIndex = nil
 		ItemRackOpt.UpdateInv()
 		ItemRackOpt.SpecDirty = false
 		ItemRackOptSubFrame5:Hide()
@@ -462,7 +512,16 @@ function ItemRackOpt.PopulateInvIcons()
 		else
 			_,texture = GetInventorySlotInfo(ItemRack.SlotInfo[i].name)
 		end
-		ItemRackOpt.Icons[i+1] = texture
+		-- Some clients return nil for unsupported slots (notably ammo/ranged),
+		-- and uncached item data can temporarily have no texture. Keep this array
+		-- dense so later spell icons cannot shift into or disappear through holes.
+		ItemRackOpt.Icons[i+1] = ItemRackOpt.NormalizeSetIcon(texture)
+	end
+	if ItemRackOpt.selectedIconIndex and ItemRackOpt.selectedIconIndex <= 20 then
+		ItemRackOpt.selectedIcon = ItemRackOpt.Icons[ItemRackOpt.selectedIconIndex]
+		if ItemRackOptSetsCurrentSetIcon then
+			ItemRackOptSetsCurrentSetIcon:SetTexture(ItemRackOpt.selectedIcon)
+		end
 	end
 	ItemRackOpt.SetsIconScrollFrameUpdate()
 end
@@ -470,7 +529,7 @@ end
 function ItemRackOpt.PopulateInitialIcons()
 	ItemRackOpt.Icons = {}
 	for i=0,19 do
-		table.insert(ItemRackOpt.Icons,"Interface\\Icons\\INV_Misc_QuestionMark")
+		table.insert(ItemRackOpt.Icons,ItemRackOpt.FallbackSetIcon)
 	end
 	ItemRackOpt.PopulateInvIcons()
 	table.insert(ItemRackOpt.Icons,"Interface\\Icons\\INV_Banner_02")
@@ -481,17 +540,13 @@ function ItemRackOpt.PopulateInitialIcons()
 		local texture
 		for i=1,numMacros do
 			texture = GetSpellorMacroIconInfo(i)
-			if(type(texture) == "number") then
-				table.insert(ItemRackOpt.Icons,texture)
-			else
-				table.insert(ItemRackOpt.Icons,"Interface\\Icons\\"..texture)
-			end
+			ItemRackOpt.AppendSetIcon(texture,true)
 		end
 	elseif IconDataProviderMixin then
 		local iconProvider = CreateAndInitFromMixin(IconDataProviderMixin, IconDataProviderExtraType.Spell)
 		if iconProvider then
 			for i=1, iconProvider:GetNumIcons() do
-				table.insert(ItemRackOpt.Icons, iconProvider:GetIconByIndex(i))
+				ItemRackOpt.AppendSetIcon(iconProvider:GetIconByIndex(i))
 			end
 			iconProvider:Release()
 		end
@@ -500,7 +555,8 @@ end
 
 function ItemRackOpt.SetsIconScrollFrameUpdate()
 
-	local item, texture, idx
+	local item, texture, idx, selected
+	local selectedMatched = false
 	local offset = FauxScrollFrame_GetOffset(ItemRackOptSetsIconScrollFrame)
 
 	FauxScrollFrame_Update(ItemRackOptSetsIconScrollFrame, ceil(#(ItemRackOpt.Icons)/5),5,28)
@@ -509,10 +565,12 @@ function ItemRackOpt.SetsIconScrollFrameUpdate()
 		item = _G["ItemRackOptSetsIcon"..i]
 		idx = (offset*5) + i
 		if idx<=#(ItemRackOpt.Icons) then
-			texture = ItemRackOpt.Icons[idx]
+			texture = ItemRackOpt.NormalizeSetIcon(ItemRackOpt.Icons[idx])
+			ItemRackOpt.Icons[idx] = texture
 			_G["ItemRackOptSetsIcon"..i.."Icon"]:SetTexture(texture)
 			item:Show()
-			if texture==ItemRackOpt.selectedIcon then
+			selected,selectedMatched = ItemRackOpt.ShouldHighlightSetIcon(idx,texture,selectedMatched)
+			if selected then
 				item:LockHighlight()
 			else
 				item:UnlockHighlight()
@@ -526,7 +584,8 @@ end
 
 function ItemRackOpt.SetsIconOnClick(self)
 	local idx = self:GetID() + FauxScrollFrame_GetOffset(ItemRackOptSetsIconScrollFrame)*5
-	ItemRackOpt.selectedIcon = ItemRackOpt.Icons[idx]
+	ItemRackOpt.selectedIcon = ItemRackOpt.NormalizeSetIcon(ItemRackOpt.Icons[idx])
+	ItemRackOpt.selectedIconIndex = idx
 	ItemRackOptSetsCurrentSetIcon:SetTexture(ItemRackOpt.selectedIcon)
 	ItemRackOpt.SetsIconScrollFrameUpdate()
 end
@@ -551,7 +610,7 @@ function ItemRackOpt.SaveSet()
 	local setname = ItemRackOptSetsName:GetText()
 	ItemRackUser.Sets[setname] = ItemRackUser.Sets[setname] or {}
 	local set = ItemRackUser.Sets[setname]
-	set.icon = ItemRackOpt.selectedIcon
+	set.icon = ItemRackOpt.NormalizeSetIcon(ItemRackOpt.selectedIcon)
 	set.oldset = nil
 	set.old = {}
 	set.equip = {}
@@ -718,7 +777,7 @@ function ItemRackOpt.ValidateSetButtons()
 		ItemRackOptShowHelm:Enable()
 		ItemRackOptShowCloak:Enable()
 
-		ItemRackOptSetsCurrentSetIcon:SetTexture(ItemRackUser.Sets[setname].icon)
+		ItemRackOptSetsCurrentSetIcon:SetTexture(ItemRackOpt.NormalizeSetIcon(ItemRackUser.Sets[setname].icon))
 		
 		-- Only load saved state if we aren't already editing (to prevent overriding clicks)
 		if not ItemRackOpt.SpecDirty then
@@ -770,7 +829,8 @@ function ItemRackOpt.LoadSet()
 				ItemRackOpt.Inv[i].selected = 1
 			end
 		end
-		ItemRackOpt.selectedIcon = ItemRackUser.Sets[setname].icon
+		ItemRackOpt.selectedIcon = ItemRackOpt.NormalizeSetIcon(ItemRackUser.Sets[setname].icon)
+		ItemRackOpt.selectedIconIndex = nil
 		ItemRackOpt.UpdateInv()
 	end
 end
@@ -901,7 +961,7 @@ function ItemRackOpt.SetListScrollFrameUpdate()
 		idx = offset + i
 		if idx<=#(ItemRackOpt.SetList) then
 			_G["ItemRackOptSetList"..i.."Name"]:SetText(ItemRackOpt.SetList[idx])
-			_G["ItemRackOptSetList"..i.."Icon"]:SetTexture(ItemRackUser.Sets[ItemRackOpt.SetList[idx]].icon)
+			_G["ItemRackOptSetList"..i.."Icon"]:SetTexture(ItemRackOpt.NormalizeSetIcon(ItemRackUser.Sets[ItemRackOpt.SetList[idx]].icon))
 			_G["ItemRackOptSetList"..i.."Key"]:SetText(ItemRackUser.Sets[ItemRackOpt.SetList[idx]].key)
 			if ItemRack.IsHidden(ItemRackOpt.SetList[idx]) then
 				_G["ItemRackOptSetList"..i.."Name"]:SetTextColor(.7,.7,.7,1)
@@ -951,7 +1011,8 @@ function ItemRackOpt.SelectSetList(self)
 	else
 		-- fill out set build info if picking a set (ItemRackOptSubFrame2)
 		local set = ItemRackUser.Sets[setname]
-		ItemRackOpt.selectedIcon = set.icon
+		ItemRackOpt.selectedIcon = ItemRackOpt.NormalizeSetIcon(set.icon)
+		ItemRackOpt.selectedIconIndex = nil
 		ItemRackOptSetsName:SetText(setname)
 		
 		-- Load the items from the set into the UI slots
@@ -1591,7 +1652,7 @@ function ItemRackOpt.SetupQueue(id)
 	-- Populate set info at the bottom of the queue frame
 	if ItemRackUser.EnablePerSetQueues == "ON" and editingSet and ItemRackUser.Sets[editingSet] then
 		local set = ItemRackUser.Sets[editingSet]
-		ItemRackOptQueueSetIcon:SetTexture(set.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+		ItemRackOptQueueSetIcon:SetTexture(ItemRackOpt.NormalizeSetIcon(set.icon))
 		ItemRackOptQueueSetName:SetText(editingSet)
 		ItemRackOptQueueSetInfo:Show()
 	elseif ItemRackUser.EnablePerSetQueues == "ON" then

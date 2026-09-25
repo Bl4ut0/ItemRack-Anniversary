@@ -6,6 +6,22 @@ local loadstring = loadstring or load
 local _refreshMountState = 0
 local CaptureLegacyEventState
 
+ItemRack.IsPlayerMoving = ItemRack.IsPlayerMoving or function()
+	local ok, moving = pcall(function()
+		local speed = GetUnitSpeed and GetUnitSpeed("player")
+		if speed ~= nil then
+			return speed > 0
+		end
+		return nil
+	end)
+	if ok and moving ~= nil then
+		ItemRack.PlayerIsMoving = moving
+		return moving
+	end
+	return ItemRack.PlayerIsMoving or false
+end
+
+
 -- Script events execute arbitrary Lua and ItemRackEvents is a shared global
 -- SavedVariable that any addon can modify. Keep the active approval snapshot
 -- private to this file and compare the exact event name, trigger, and source at
@@ -1527,8 +1543,15 @@ function ItemRack.ProcessingFrameOnEvent(self,event,...)
 	if event == "UNIT_AURA" and arg1 == "player" then
 		ItemRack.StartTimer("EventsBuffTimer")
 	elseif event == "PLAYER_STARTED_MOVING" or event == "PLAYER_STOPPED_MOVING" then
+		ItemRack.PlayerIsMoving = (event == "PLAYER_STARTED_MOVING")
 		ItemRack.StartTimer("EventsBuffTimer")
-		if event == "PLAYER_STOPPED_MOVING" and GetUnitSpeed("player") > 0 then
+		local moving = false
+		local ok, res = pcall(function()
+			local speed = GetUnitSpeed and GetUnitSpeed("player")
+			return speed and speed > 0
+		end)
+		if ok and res ~= nil then moving = res end
+		if event == "PLAYER_STOPPED_MOVING" and moving then
 			ItemRack.StartTimer("MovementPollingTimer")
 		end
 	end
@@ -2451,7 +2474,7 @@ function ItemRack.ProcessOnMovementUnequip(expectedGeneration)
 	expectedGeneration = expectedGeneration or pending
 	if not expectedGeneration or pending ~= expectedGeneration
 	or ItemRack.OnMovementGeneration ~= expectedGeneration then return end
-	if GetUnitSpeed("player") > 0 then
+	if ItemRack.IsPlayerMoving() then
 		ItemRack.PendingOnMovementGeneration = nil
 		return
 	end
@@ -2484,8 +2507,7 @@ function ItemRack.ProcessBuffEvent()
 	local enabled = ItemRackUser.Events.Enabled
 	local events = ItemRackEvents
 	local state = ItemRack.EnsureEventFrameState()
-	local speed = GetUnitSpeed("player") or 0
-	local moving = speed > 0
+	local moving = ItemRack.IsPlayerMoving()
 	if ItemRack.LastOnMovementState == nil or ItemRack.LastOnMovementState ~= moving then
 		ItemRack.LastOnMovementState = moving
 		ItemRack.OnMovementGeneration = (ItemRack.OnMovementGeneration or 0) + 1

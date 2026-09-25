@@ -1,4 +1,7 @@
 __ Development __
+- Release tooling now creates one ItemRack-universal archive for Classic Era, Anniversary/TBC, and Forever/Camelot. Shared TOCs and local deployment cover the official clients plus the Forever _classic_beta_ client.
+- Ported Forever/Camelot compatibility guards for modern item, spec, mouseover, movement, tooltip, and Equipment Manager APIs into the shared addon code.
+- Fixed permanently blank, multiply-highlighted entries in the set icon picker when Forever or an uncached item returned no texture. Missing slot/item icons now use a question mark, late item data refreshes the grid, invalid spell icons are skipped, and saved nil icons are repaired when edited.
 
 __ New in 4.49 - By Bl4ut0 __
 - Fixed queue diagnostic branch attempting to call global ResolveProxy (nil) instead of ItemRack.ResolveProxy, resolving Lua errors during queue and trinket evaluation on Classic Era (PR #25).

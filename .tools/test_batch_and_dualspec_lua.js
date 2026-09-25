@@ -473,6 +473,212 @@ assert(ItemRack.CanPlayerDualWield() == true, "Warrior level 20 must return true
   'batch-dualspec:can-player-dualwield-spellbook-safety'
 );
 
+// Modern / Forever client MenuMouseover safety: MouseIsOver and GetMouseFocus removed
+const menuMouseoverFunc = extractFunction('ItemRack/ItemRack.lua', 'ItemRack.MenuMouseover');
+
+runCase(
+  'menu-mouseover-modern-client',
+  `${commonSetup}
+MouseIsOver = nil
+GetMouseFocus = nil
+local fociTarget = {
+  GetName = function() return "ItemRackMenu1" end,
+  IsVisible = function() return true end,
+  IsMouseOver = function() return true end
+}
+GetMouseFoci = function() return { fociTarget } end
+
+-- Compatibility shim from ItemRack.lua
+if not MouseIsOver then
+  MouseIsOver = function(frame, ...)
+    return (frame and frame.IsMouseOver and frame:IsMouseOver(...)) and true or false
+  end
+  _G.MouseIsOver = MouseIsOver
+end
+
+ItemRackMenuFrame = {
+  IsVisible = function() return true end,
+  Hide = function() end,
+  IsMouseOver = function() return false end,
+}
+ItemRack.MenuMouseoverFrames = { ["ItemRackMenu1"] = true }
+ItemRack.StopTimer = function() end
+IsShiftKeyDown = function() return false end
+
+${menuMouseoverFunc}
+`,
+  `
+local success, err = pcall(ItemRack.MenuMouseover)
+assert(success, "ItemRack.MenuMouseover must not throw when MouseIsOver/GetMouseFocus are nil: " .. tostring(err))
+
+-- Case 2: Mouse outside menu and outside mouseover frames -> should hide
+GetMouseFoci = function() return {} end
+local hidden = false
+ItemRackMenuFrame.Hide = function() hidden = true end
+ItemRack.MenuMouseover()
+assert(hidden == true, "ItemRack.MenuMouseover must hide menu when mouse is outside")
+`
+);
+
+// Modern / Forever client ValidBag safety: GetItemFamily moved to C_Item.GetItemFamily
+const validBagFunc = extractFunction('ItemRack/ItemRack.lua', 'ItemRack.ValidBag');
+
+runCase(
+  'valid-bag-modern-client',
+  `${commonSetup}
+GetItemFamily = nil
+C_Item = {
+  GetItemFamily = function(id)
+    if id == 2102 or id == "2102" then return 0 end
+    if id == 2101 or id == "2101" then return 1 end -- quiver
+    return 0
+  end
+}
+if not GetItemFamily then
+  GetItemFamily = function(item)
+    if not item then return 0 end
+    if C_Item and C_Item.GetItemFamily then
+      local num = tonumber(item)
+      local ok, family = pcall(C_Item.GetItemFamily, num or item)
+      if ok and type(family) == "number" then return family end
+    end
+    return 0
+  end
+  _G.GetItemFamily = GetItemFamily
+end
+
+ContainerIDToInventoryID = function(bagid) return 30 + bagid end
+GetInventoryItemLink = function(unit, invid)
+  if invid == 34 then return "|cffffffff|Hitem:2102:0:0:0:0:0:0:0:70|h[Small Brown Pouch]|h|r" end
+  if invid == 33 then return "|cffffffff|Hitem:2101:0:0:0:0:0:0:0:70|h[Quiver]|h|r" end
+  return nil
+end
+ItemRack.GetIRString = function(link, base)
+  if not link then return "0" end
+  local id = link:match("item:(%d+)")
+  return id or "0"
+end
+
+${validBagFunc}
+`,
+  `
+-- Bag 0 and -1 are always valid
+assert(ItemRack.ValidBag(0) == 1, "Bag 0 must be valid")
+assert(ItemRack.ValidBag(-1) == 1, "Bag -1 must be valid")
+
+-- Bag 4 (Small Brown Pouch, family 0) must be valid WITHOUT throwing nil error
+local ok, res = pcall(ItemRack.ValidBag, 4)
+assert(ok, "ItemRack.ValidBag(4) must not throw: " .. tostring(res))
+assert(res == 1, "ItemRack.ValidBag(4) with pouch must return 1")
+
+-- Bag 3 (Quiver, family 1) must return nil
+local ok3, res3 = pcall(ItemRack.ValidBag, 3)
+assert(ok3, "ItemRack.ValidBag(3) must not throw")
+assert(res3 == nil, "ItemRack.ValidBag(3) with quiver must return nil")
+`
+);
+
+// Modern / Forever client PopulateKnownItems safety: IsEquippableItem moved to C_Item.IsEquippableItem
+const populateKnownFunc = extractFunction('ItemRack/ItemRack.lua', 'ItemRack.PopulateKnownItems');
+
+runCase(
+  'populate-known-items-modern-client',
+  `${commonSetup}
+IsEquippableItem = nil
+C_Item = {
+  IsEquippableItem = function(id)
+    if id == 6948 or id == "6948" then return false end -- Hearthstone not equippable
+    if id == 19001 or id == "19001" then return true end -- Ring
+    return false
+  end
+}
+if not IsEquippableItem then
+  IsEquippableItem = function(item)
+    if not item or item == 0 or item == "0" then return false end
+    if C_Item and C_Item.IsEquippableItem then
+      local num = tonumber(item)
+      local ok, isEquippable = pcall(C_Item.IsEquippableItem, num or item)
+      if ok then return isEquippable and true or false end
+    end
+    return false
+  end
+  _G.IsEquippableItem = IsEquippableItem
+end
+
+ItemRack.KnownItems = {}
+ItemRack.BankOpen = false
+ItemRack.GetID = function(bag, slot)
+  if slot then
+    if bag == 0 and slot == 1 then return "6948::::::::11:1485::75:::::::" end
+    if bag == 0 and slot == 2 then return "19001::::::::11:1485::75:::::::" end
+    return 0
+  end
+  return 0
+end
+ItemRack.GetIRString = function(link, base)
+  if not link then return "0" end
+  local id = tostring(link):match("^(%-?%d+)")
+  return id or "0"
+end
+function GetContainerNumSlots(bag) return bag == 0 and 2 or 0 end
+
+${populateKnownFunc}
+`,
+  `
+local ok, err = pcall(ItemRack.PopulateKnownItems)
+assert(ok, "ItemRack.PopulateKnownItems must not throw when IsEquippableItem is nil: " .. tostring(err))
+
+-- Verify ring was added to known items and hearthstone was skipped
+assert(ItemRack.KnownItems["6948::::::::11:1485::75:::::::"] == nil, "Non-equippable Hearthstone must not be in KnownItems")
+assert(ItemRack.KnownItems["19001::::::::11:1485::75:::::::"] == 2, "Equippable ring in bag 0 slot 2 must be recorded at offset 2")
+`
+);
+
+// Modern / Forever client movement safety: GetUnitSpeed returns a secret number value
+// Comparing a secret number value throws "attempt to compare local 'speed' (a secret number value...)"
+const isPlayerMovingFunc = extractFunction('ItemRack/ItemRack.lua', 'ItemRack.IsPlayerMoving');
+
+runCase(
+  'is-player-moving-secret-value',
+  `${commonSetup}
+-- Create a simulated "secret number" userdata or metatable object that throws when compared
+local secretNumber = setmetatable({}, {
+  __lt = function(a, b) error("attempt to compare local 'speed' (a secret number value, while execution tainted by 'ItemRack')", 2) end,
+  __le = function(a, b) error("attempt to compare local 'speed' (a secret number value, while execution tainted by 'ItemRack')", 2) end,
+  __eq = function(a, b) error("attempt to compare local 'speed' (a secret number value, while execution tainted by 'ItemRack')", 2) end,
+})
+
+GetUnitSpeed = function(unit)
+  return secretNumber
+end
+
+ItemRack.PlayerIsMoving = false
+
+${isPlayerMovingFunc}
+`,
+  `
+-- Case 1: When speed is a secret number and PlayerIsMoving is false -> returns false without error
+local ok, moving = pcall(ItemRack.IsPlayerMoving)
+assert(ok, "ItemRack.IsPlayerMoving must not throw on secret number value: " .. tostring(moving))
+assert(moving == false, "ItemRack.IsPlayerMoving must fall back to PlayerIsMoving (false)")
+
+-- Case 2: When PLAYER_STARTED_MOVING fired -> PlayerIsMoving is true -> returns true without error
+ItemRack.PlayerIsMoving = true
+local ok2, moving2 = pcall(ItemRack.IsPlayerMoving)
+assert(ok2, "ItemRack.IsPlayerMoving must not throw on secret number value")
+assert(moving2 == true, "ItemRack.IsPlayerMoving must return PlayerIsMoving (true)")
+
+-- Case 3: Normal client where speed is a standard number
+GetUnitSpeed = function(unit) return 7.5 end
+local ok3, moving3 = pcall(ItemRack.IsPlayerMoving)
+assert(ok3 and moving3 == true, "ItemRack.IsPlayerMoving must return true when speed > 0")
+
+GetUnitSpeed = function(unit) return 0 end
+local ok4, moving4 = pcall(ItemRack.IsPlayerMoving)
+assert(ok4 and moving4 == false, "ItemRack.IsPlayerMoving must return false when speed == 0")
+`
+);
+
 // GitHub #24 follow-up audit: preflight reservations must survive execution,
 // not just exact-first lookup. Ring identities are synthetic, not a new claim
 // that the original bracer report or the untriaged SoD report used this shape.
