@@ -14,11 +14,11 @@ The archive contains two required addon folders: `ItemRack` and the load-on-dema
 
 ### UI & Quality of Life Improvements
 
-* **Tooltips System Overhaul**: 
+* **Tooltips System Overhaul**:
   * Options to disable ItemRack's custom tooltips entirely if preferred.
   * **Tiny Tooltips on Quick Access Only**: Keeps your main Set button detailed while shrinking individual gear slot tooltips.
   * Suppresses duplicate overlapping item comparison tooltips from the default WoW UI when holding Shift.
-* **Audio System Enhancements**: 
+* **Audio System Enhancements**:
   * Dedicated options to mute all automatic swap sounds.
   * **LibSoundIndex Integration (WIP)**: ItemRack optionally supports LibSoundIndex for surgical equipment-sound muting. If it is not installed, swaps use normal sound; ItemRack does not change the game's global SFX setting.
 * **Menu Mutual Exclusivity**: Features like `Menu on Shift` and `Menu on right click` are now mutually exclusive and auto-toggle each other to prevent control conflicts.
